@@ -1,7 +1,9 @@
 {
   "name": "@test-station/cli",
   "version": "0.1.0",
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "bin": {
     "test-station": "./src/cli.js"

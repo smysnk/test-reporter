@@ -1,7 +1,9 @@
 {
   "name": "@test-station/adapter-vitest",
   "version": "0.1.0",
-  "private": true,
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "exports": {
     ".": "./src/index.js"
