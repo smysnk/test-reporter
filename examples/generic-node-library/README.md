@@ -1,6 +1,8 @@
 # generic-node-library
 
-Minimal standalone consumer project for the test reporter.
+Minimal standalone consumer project for Test Station.
+
+For a published install in a real project, the main package is `@test-station/cli`.
 
 Run from the repository root:
 

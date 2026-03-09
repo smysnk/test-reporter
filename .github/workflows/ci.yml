@@ -34,8 +34,27 @@ jobs:
       - name: Lint
         run: yarn lint
 
-      - name: Test
-        run: yarn test
+      - name: Run self-test report
+        id: self_test
+        shell: bash
+        run: |
+          set +e
+          yarn test:coverage
+          status=$?
+          echo "exit_code=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload self-test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-test-report
+          path: ./.test-results/self-test-report
+          if-no-files-found: warn
+
+      - name: Assert self-test pass
+        if: always()
+        run: test "${{ steps.self_test.outputs.exit_code }}" = "0"
 
       - name: Build
         run: yarn build

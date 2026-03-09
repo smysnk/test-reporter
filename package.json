@@ -13,7 +13,10 @@
   "scripts": {
     "build": "yarn workspaces foreach -A run build",
     "lint": "yarn workspaces foreach -A run lint",
-    "test": "node --test ./tests/*.test.js",
+    "test:node": "node --test ./tests/*.test.js",
+    "test": "node ./bin/test-station.mjs run --config ./test-station.config.mjs",
+    "test:coverage": "node ./bin/test-station.mjs run --config ./test-station.config.mjs --coverage",
+    "pages:build": "node ./scripts/pages/build-self-test-site.mjs",
     "check": "yarn lint && yarn test"
   },
   "devDependencies": {

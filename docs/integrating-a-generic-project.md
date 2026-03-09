@@ -30,32 +30,44 @@ There are two supported ways to consume the reporter:
      - `./references/test-station/config.mjs`
      - `./references/test-station/bin/test-station.mjs`
 2. Installed package dependency
-   - use the published `test-station` binary in package scripts
-   - import `defineConfig` from the published package entrypoint your install layout provides
+   - install `@test-station/cli` for the published `test-station` binary in package scripts
+   - install `@test-station/core` if you want `defineConfig(...)` or `runReport(...)`
+   - install `@test-station/render-html` only if you render from existing `report.json` files outside the CLI
 
 For local-reference mode, do not point consumers at `packages/*/src`.
 
 ## Install patterns
 
+### Common case: install the CLI
+
+The normal consumer install is the CLI package:
+
 ### Yarn
 
 ```sh
-yarn add -D @test-station/cli @test-station/core @test-station/plugin-source-analysis
+yarn add -D @test-station/cli
 ```
 
 ### npm
 
 ```sh
-npm install --save-dev @test-station/cli @test-station/core @test-station/plugin-source-analysis
+npm install --save-dev @test-station/cli
 ```
 
 ### pnpm
 
 ```sh
-pnpm add -D @test-station/cli @test-station/core @test-station/plugin-source-analysis
+pnpm add -D @test-station/cli
 ```
 
 Until the packages are published, point those dependencies at a checked-out copy of this repository or a Git reference. If you are using a direct local reference, prefer the root-level stable entrypoints above instead of package source files.
+
+### Additional packages when needed
+
+- `@test-station/core`: install when you want `defineConfig(...)`, `runReport(...)`, or other programmatic control
+- `@test-station/render-html`: install when rendering HTML from an existing `report.json`
+- `@test-station/plugin-source-analysis`: install when importing the plugin directly into a custom plugin list
+- `@test-station/adapter-node-test`, `@test-station/adapter-vitest`, `@test-station/adapter-playwright`, `@test-station/adapter-shell`, `@test-station/adapter-jest`: install directly only when assembling a custom adapter registry outside the default core bundle
 
 ## Minimal config
 
@@ -124,6 +136,8 @@ Example:
 ```
 
 ## Package-manager scripts
+
+These examples assume `@test-station/cli` is installed.
 
 ### Yarn
 
