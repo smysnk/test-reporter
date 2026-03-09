@@ -70,8 +70,10 @@ Internal source layout inside `packages/*/src` is not a compatibility promise.
 4. Run the external consumer example:
    - `node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs`
 5. Verify the generated HTML report opens and renders module/package drilldown correctly.
-6. Tag the repo with the shared package version.
-7. Publish all `@test-station/*` packages at that same version.
+6. Push the validated release commit to the `release` branch.
+7. Let the publish workflow run the npm release helper and publish all non-private `@test-station/*` packages at that same version.
+
+Manual workflow dispatch can run the same npm release helper in validation-only mode, and only publishes when `publish_npm` is explicitly enabled.
 
 ## Consumer compatibility promise
 
