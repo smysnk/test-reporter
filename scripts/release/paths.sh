@@ -3,7 +3,7 @@
 set -euo pipefail
 
 THIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "${THIS_DIR}/../.." && pwd)"
+ROOT_DIR="${ROOT_DIR:-$(cd "${THIS_DIR}/../.." && pwd)}"
 
 PUBLISH_PACKAGE_DIRS=(
   "${ROOT_DIR}/packages/adapter-jest"

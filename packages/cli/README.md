@@ -99,7 +99,7 @@ flowchart LR
 This is the fastest way to see the reporter running against its own test suite.
 
 ```sh
-git clone <repo>
+git clone https://github.com/smysnk/test-station.git
 cd test-station
 yarn install
 yarn test:coverage
