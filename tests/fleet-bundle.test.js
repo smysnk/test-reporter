@@ -27,8 +27,10 @@ test('fleet values and workflow use the unified image contract without stray ref
   const workflowYaml = fs.readFileSync(path.join(repoRoot, '.github/workflows/image-build.yml'), 'utf8');
   const dockerfile = fs.readFileSync(path.join(repoRoot, 'docker/Dockerfile'), 'utf8');
 
-  assert.match(valuesYaml, /repository:\s*ghcr\.io\/smysnk\/test-station-unified/);
-  assert.match(workflowYaml, /ghcr\.io\/\$\{\{ github\.repository_owner \}\}\/test-station-unified/);
+  assert.match(valuesYaml, /repository:\s*ghcr\.io\/smysnk\/test-station/);
+  assert.match(workflowYaml, /vars\.CONTAINER_REGISTRY/);
+  assert.match(workflowYaml, /vars\.CONTAINER_IMAGE_REPOSITORY/);
+  assert.match(workflowYaml, /secrets\.CONTAINER_REGISTRY_PASSWORD/);
   assert.match(workflowYaml, /push:\s*true/);
   assert.match(dockerfile, /COPY scripts \.\/scripts/);
 });

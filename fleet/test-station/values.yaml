@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/smysnk/test-station-unified
+  repository: ghcr.io/smysnk/test-station
   tag: main
   pullPolicy: IfNotPresent
   pullSecrets: []

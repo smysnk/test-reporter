@@ -26,5 +26,9 @@ test('image build workflow targets main and uses the unified Dockerfile', () => 
   assert.match(workflow, /branches:\s*\n\s*-\s*main/);
   assert.match(workflow, /file:\s*docker\/Dockerfile/);
   assert.match(workflow, /Build and publish unified portal\/server image/);
-  assert.match(workflow, /ghcr\.io\/\$\{\{ github\.repository_owner \}\}\/test-station-unified/);
+  assert.match(workflow, /CONTAINER_REGISTRY/);
+  assert.match(workflow, /CONTAINER_IMAGE_REPOSITORY/);
+  assert.match(workflow, /CONTAINER_REGISTRY_USERNAME/);
+  assert.match(workflow, /secrets\.CONTAINER_REGISTRY_PASSWORD/);
+  assert.match(workflow, /images:\s*\$\{\{ env\.CONTAINER_REGISTRY \}\}\/\$\{\{ env\.CONTAINER_IMAGE_REPOSITORY \}\}/);
 });
