@@ -14,3 +14,4 @@ playwright-report/
 docs-internal/
 .DS_Store
 .test-results
+references/
