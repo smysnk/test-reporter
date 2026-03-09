@@ -1,0 +1,20 @@
+{
+  "name": "@test-reporter/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "test-reporter": "./src/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@test-reporter/core": "workspace:*",
+    "@test-reporter/render-html": "workspace:*"
+  },
+  "scripts": {
+    "build": "node ../../scripts/check-package.mjs ./src/index.js && node --check ./src/cli.js",
+    "lint": "node ../../scripts/lint-syntax.mjs ./src"
+  }
+}

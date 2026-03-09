@@ -1,0 +1,34 @@
+{
+  "rules": [
+    {
+      "package": "library",
+      "include": ["test/**/*.test.js"],
+      "module": "library",
+      "theme": "api"
+    }
+  ],
+  "coverageRules": [
+    {
+      "package": "library",
+      "include": ["src/**/*.js"],
+      "module": "library",
+      "theme": "api",
+      "reason": "generic library source attribution"
+    }
+  ],
+  "ownership": {
+    "modules": [
+      {
+        "module": "library",
+        "owner": "library-team"
+      }
+    ],
+    "themes": [
+      {
+        "module": "library",
+        "theme": "api",
+        "owner": "library-api-team"
+      }
+    ]
+  }
+}

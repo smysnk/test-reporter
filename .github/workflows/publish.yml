@@ -1,0 +1,152 @@
+name: Publish Packages
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: yarn
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Test
+        run: yarn test
+
+      - name: Build
+        run: yarn build
+
+      - name: Run smoke example
+        run: |
+          rm -rf ./examples/generic-node-library/artifacts/test-report
+          node ./bin/test-reporter.mjs run --config ./examples/generic-node-library/test-reporter.config.mjs --coverage
+
+      - name: Determine publish order
+        id: packages
+        run: |
+          node <<'NODE' >> "$GITHUB_OUTPUT"
+          import { readdirSync, readFileSync } from 'node:fs';
+          import { join } from 'node:path';
+
+          const root = 'packages';
+          const workspaces = new Map();
+
+          for (const entry of readdirSync(root, { withFileTypes: true })) {
+            if (!entry.isDirectory()) continue;
+
+            const manifestPath = join(root, entry.name, 'package.json');
+            const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+
+            if (manifest.private === true) continue;
+
+            const deps = Object.keys({
+              ...(manifest.dependencies ?? {}),
+              ...(manifest.optionalDependencies ?? {}),
+              ...(manifest.peerDependencies ?? {}),
+            }).filter((name) => name.startsWith('@test-reporter/'));
+
+            workspaces.set(manifest.name, { deps });
+          }
+
+          const indegree = new Map();
+          const dependents = new Map();
+
+          for (const [name] of workspaces) {
+            indegree.set(name, 0);
+            dependents.set(name, []);
+          }
+
+          for (const [name, meta] of workspaces) {
+            for (const dep of meta.deps) {
+              if (!workspaces.has(dep)) continue;
+              indegree.set(name, indegree.get(name) + 1);
+              dependents.get(dep).push(name);
+            }
+          }
+
+          const ready = [...indegree.entries()]
+            .filter(([, count]) => count === 0)
+            .map(([name]) => name)
+            .sort();
+
+          const ordered = [];
+
+          while (ready.length > 0) {
+            const current = ready.shift();
+            ordered.push(current);
+
+            for (const dependent of dependents.get(current)) {
+              indegree.set(dependent, indegree.get(dependent) - 1);
+              if (indegree.get(dependent) === 0) {
+                ready.push(dependent);
+                ready.sort();
+              }
+            }
+          }
+
+          if (ordered.length !== workspaces.size) {
+            throw new Error('Could not derive a publish order for non-private workspaces.');
+          }
+
+          console.log(`count=${ordered.length}`);
+          console.log('packages<<EOF');
+          console.log(ordered.join('\n'));
+          console.log('EOF');
+          NODE
+
+      - name: Skip when everything is private
+        if: steps.packages.outputs.count == '0'
+        run: echo "No non-private packages found. Skipping publish."
+
+      - name: Verify npm token
+        if: steps.packages.outputs.count != '0'
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NPM_TOKEN" ]; then
+            echo "NPM_TOKEN secret is required to publish packages."
+            exit 1
+          fi
+
+      - name: Publish npm packages
+        if: steps.packages.outputs.count != '0'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          YARN_NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PUBLISH_PACKAGES: ${{ steps.packages.outputs.packages }}
+        run: |
+          printf '%s\n' "$PUBLISH_PACKAGES" | while IFS= read -r workspace; do
+            if [ -z "$workspace" ]; then
+              continue
+            fi
+
+            yarn workspace "$workspace" npm publish --access public --tolerate-republish
+          done

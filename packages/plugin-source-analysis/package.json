@@ -1,0 +1,16 @@
+{
+  "name": "@test-reporter/plugin-source-analysis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "acorn": "^8.15.0"
+  },
+  "scripts": {
+    "build": "node ../../scripts/check-package.mjs ./src/index.js",
+    "lint": "node ../../scripts/lint-syntax.mjs ./src"
+  }
+}

@@ -331,13 +331,11 @@ plugins: [
 ## Examples
 
 - Generic consumer example:
-  [`/Users/josh/play/test-reporter/examples/generic-node-library/test-reporter.config.mjs`](/Users/josh/play/test-reporter/examples/generic-node-library/test-reporter.config.mjs)
+  [`./examples/generic-node-library/test-reporter.config.mjs`](./examples/generic-node-library/test-reporter.config.mjs)
 - Mixed-framework example:
-  [`/Users/josh/play/test-reporter/examples/mixed-framework-monorepo/test-reporter.config.mjs`](/Users/josh/play/test-reporter/examples/mixed-framework-monorepo/test-reporter.config.mjs)
-- `varcad.io` host integration shape:
-  [`/Users/josh/play/test-reporter/examples/varcad/test-reporter.config.mjs`](/Users/josh/play/test-reporter/examples/varcad/test-reporter.config.mjs)
+  [`./examples/mixed-framework-monorepo/test-reporter.config.mjs`](./examples/mixed-framework-monorepo/test-reporter.config.mjs)
 - Integration guide:
-  [`/Users/josh/play/test-reporter/docs/integrating-a-generic-project.md`](/Users/josh/play/test-reporter/docs/integrating-a-generic-project.md)
+  [`./docs/integrating-a-generic-project.md`](./docs/integrating-a-generic-project.md)
 
 ## Development
 
@@ -361,7 +359,5 @@ All publishable `@test-reporter/*` packages currently move in lockstep at `0.1.0
 
 For deeper release and compatibility details, see:
 
-- [`/Users/josh/play/test-reporter/docs/integrating-a-generic-project.md`](/Users/josh/play/test-reporter/docs/integrating-a-generic-project.md)
-- [`/Users/josh/play/test-reporter/docs/migrating-downstream-publishers.md`](/Users/josh/play/test-reporter/docs/migrating-downstream-publishers.md)
-- [`/Users/josh/play/test-reporter/docs/versioning-and-release-strategy.md`](/Users/josh/play/test-reporter/docs/versioning-and-release-strategy.md)
-# test-reporter
+- [`./docs/integrating-a-generic-project.md`](./docs/integrating-a-generic-project.md)
+- [`./docs/versioning-and-release-strategy.md`](./docs/versioning-and-release-strategy.md)

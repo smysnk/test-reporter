@@ -1,0 +1,21 @@
+{
+  "name": "@test-reporter/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "dependencies": {
+    "@test-reporter/adapter-jest": "workspace:*",
+    "@test-reporter/adapter-node-test": "workspace:*",
+    "@test-reporter/adapter-playwright": "workspace:*",
+    "@test-reporter/adapter-shell": "workspace:*",
+    "@test-reporter/adapter-vitest": "workspace:*",
+    "@test-reporter/plugin-source-analysis": "workspace:*"
+  },
+  "scripts": {
+    "build": "node ../../scripts/check-package.mjs ./src/index.js",
+    "lint": "node ../../scripts/lint-syntax.mjs ./src"
+  }
+}

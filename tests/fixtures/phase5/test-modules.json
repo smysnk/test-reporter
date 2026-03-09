@@ -1,0 +1,34 @@
+{
+  "rules": [
+    {
+      "package": "app",
+      "include": ["specs/runtime.test.js"],
+      "module": "runtime",
+      "theme": "core"
+    }
+  ],
+  "coverageRules": [
+    {
+      "package": "app",
+      "include": ["src/runtime.js"],
+      "module": "runtime",
+      "theme": "core",
+      "reason": "fixture manifest coverage mapping"
+    }
+  ],
+  "ownership": {
+    "modules": [
+      {
+        "module": "runtime",
+        "owner": "runtime-team"
+      }
+    ],
+    "themes": [
+      {
+        "module": "runtime",
+        "theme": "core",
+        "owner": "runtime-core-team"
+      }
+    ]
+  }
+}

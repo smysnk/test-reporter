@@ -1,0 +1,15 @@
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+node_modules/
+dist/
+coverage/
+artifacts/
+test-results/
+playwright-report/
+docs-internal/
+.DS_Store
