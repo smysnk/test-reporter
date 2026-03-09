@@ -1,6 +1,5 @@
 {
-  "name": "test-station-monorepo",
-  "private": true,
+  "name": "test-station",
   "type": "module",
   "bin": {
     "test-station": "./bin/test-station.mjs"
