@@ -1,5 +1,5 @@
 {
-  "name": "@test-reporter/core",
+  "name": "@test-station/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,12 +7,12 @@
     ".": "./src/index.js"
   },
   "dependencies": {
-    "@test-reporter/adapter-jest": "workspace:*",
-    "@test-reporter/adapter-node-test": "workspace:*",
-    "@test-reporter/adapter-playwright": "workspace:*",
-    "@test-reporter/adapter-shell": "workspace:*",
-    "@test-reporter/adapter-vitest": "workspace:*",
-    "@test-reporter/plugin-source-analysis": "workspace:*"
+    "@test-station/adapter-jest": "workspace:*",
+    "@test-station/adapter-node-test": "workspace:*",
+    "@test-station/adapter-playwright": "workspace:*",
+    "@test-station/adapter-shell": "workspace:*",
+    "@test-station/adapter-vitest": "workspace:*",
+    "@test-station/plugin-source-analysis": "workspace:*"
   },
   "scripts": {
     "build": "node ../../scripts/check-package.mjs ./src/index.js",

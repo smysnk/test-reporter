@@ -81,7 +81,7 @@ export default {
       label: "Mapping Parity",
       adapter: "custom",
       package: "transpiler",
-      handler: "./scripts/test-reporter/transpilerMappingParityAdapter.mjs",
+      handler: "./scripts/test-station/transpilerMappingParityAdapter.mjs",
       coverage: {
         enabled: false,
       },

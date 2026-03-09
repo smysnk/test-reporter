@@ -3,19 +3,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { loadConfig, summarizeConfig, createPhase1ScaffoldReport } from '@test-reporter/core';
-import { renderHtmlReport } from '@test-reporter/render-html';
-import { createNodeTestAdapter } from '@test-reporter/adapter-node-test';
-import { createVitestAdapter } from '@test-reporter/adapter-vitest';
-import { createPlaywrightAdapter } from '@test-reporter/adapter-playwright';
-import { createShellAdapter } from '@test-reporter/adapter-shell';
-import { createJestAdapter } from '@test-reporter/adapter-jest';
-import { createSourceAnalysisPlugin } from '@test-reporter/plugin-source-analysis';
+import { loadConfig, summarizeConfig, createPhase1ScaffoldReport } from '@test-station/core';
+import { renderHtmlReport } from '@test-station/render-html';
+import { createNodeTestAdapter } from '@test-station/adapter-node-test';
+import { createVitestAdapter } from '@test-station/adapter-vitest';
+import { createPlaywrightAdapter } from '@test-station/adapter-playwright';
+import { createShellAdapter } from '@test-station/adapter-shell';
+import { createJestAdapter } from '@test-station/adapter-jest';
+import { createSourceAnalysisPlugin } from '@test-station/plugin-source-analysis';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
-const exampleConfigPath = path.join(repoRoot, 'examples', 'varcad', 'test-reporter.config.mjs');
+const exampleConfigPath = path.join(repoRoot, 'examples', 'varcad', 'test-station.config.mjs');
 const cliPath = path.join(repoRoot, 'packages', 'cli', 'src', 'cli.js');
-const rootCliPath = path.join(repoRoot, 'bin', 'test-reporter.mjs');
+const rootCliPath = path.join(repoRoot, 'bin', 'test-station.mjs');
 const configEntryPath = path.join(repoRoot, 'config.mjs');
 
 function createSampleReport() {

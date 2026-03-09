@@ -1,5 +1,5 @@
 {
-  "name": "@test-reporter/plugin-source-analysis",
+  "name": "@test-station/plugin-source-analysis",
   "version": "0.1.0",
   "private": true,
   "type": "module",

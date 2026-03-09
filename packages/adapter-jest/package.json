@@ -1,5 +1,5 @@
 {
-  "name": "@test-reporter/adapter-jest",
+  "name": "@test-station/adapter-jest",
   "version": "0.1.0",
   "private": true,
   "type": "module",

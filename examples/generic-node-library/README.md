@@ -5,7 +5,7 @@ Minimal standalone consumer project for the test reporter.
 Run from the repository root:
 
 ```sh
-node ./bin/test-reporter.mjs run --config ./examples/generic-node-library/test-reporter.config.mjs
+node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs
 ```
 
 The example intentionally uses only:

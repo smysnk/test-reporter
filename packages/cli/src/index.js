@@ -1,11 +1,11 @@
 import path from 'node:path';
-import { loadConfig, summarizeConfig, runReport, readJson, formatConsoleSummary, createConsoleProgressReporter } from '@test-reporter/core';
-import { writeHtmlReport } from '@test-reporter/render-html';
+import { loadConfig, summarizeConfig, runReport, readJson, formatConsoleSummary, createConsoleProgressReporter } from '@test-station/core';
+import { writeHtmlReport } from '@test-station/render-html';
 
 export function parseCliArgs(argv) {
   const parsed = {
     command: argv[0] || 'help',
-    config: './test-reporter.config.mjs',
+    config: './test-station.config.mjs',
     input: null,
     output: null,
     outputDir: null,
@@ -55,12 +55,12 @@ export function parseCliArgs(argv) {
 
 export function renderHelp() {
   return [
-    'test-reporter CLI',
+    'test-station CLI',
     '',
     'Commands:',
-    '  test-reporter inspect --config ./test-reporter.config.mjs',
-    '  test-reporter run --config ./test-reporter.config.mjs [--dry-run] [--coverage] [--workspace <name>|--package <name>] [--output-dir <path>]',
-    '  test-reporter render --input ./artifacts/workspace-tests/report.json --output ./artifacts/workspace-tests',
+    '  test-station inspect --config ./test-station.config.mjs',
+    '  test-station run --config ./test-station.config.mjs [--dry-run] [--coverage] [--workspace <name>|--package <name>] [--output-dir <path>]',
+    '  test-station render --input ./artifacts/workspace-tests/report.json --output ./artifacts/workspace-tests',
   ].join('\n');
 }
 
@@ -120,7 +120,7 @@ export async function runCli(argv = process.argv.slice(2)) {
     const report = readJson(inputPath);
     const outputDir = args.output || path.dirname(inputPath);
     const reportPath = writeHtmlReport(report, outputDir, {
-      title: report?.meta?.projectName || report?.summary?.projectName || 'test-reporter',
+      title: report?.meta?.projectName || report?.summary?.projectName || 'test-station',
       projectRootDir: report?.meta?.projectRootDir || process.cwd(),
       defaultView: report?.meta?.render?.defaultView,
       includeDetailedAnalysisToggle: report?.meta?.render?.includeDetailedAnalysisToggle,

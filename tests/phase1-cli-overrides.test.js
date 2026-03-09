@@ -3,18 +3,18 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runReport, readJson } from '@test-reporter/core';
-import { parseCliArgs } from '@test-reporter/cli';
+import { runReport, readJson } from '@test-station/core';
+import { parseCliArgs } from '@test-station/cli';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixtureDir = path.join(repoRoot, 'tests', 'fixtures', 'phase2');
-const fixtureConfigPath = path.join(fixtureDir, 'test-reporter.fixture.config.mjs');
+const fixtureConfigPath = path.join(fixtureDir, 'test-station.fixture.config.mjs');
 const cliPath = path.join(repoRoot, 'packages', 'cli', 'src', 'cli.js');
 
 test('parseCliArgs supports workspace filters, package alias, and output-dir', () => {
   const parsed = parseCliArgs([
     'run',
-    '--config', './test-reporter.config.mjs',
+    '--config', './test-station.config.mjs',
     '--workspace', 'web',
     '--package', 'transpiler',
     '--output-dir', './artifacts/custom-report',
@@ -22,7 +22,7 @@ test('parseCliArgs supports workspace filters, package alias, and output-dir', (
   ]);
 
   assert.equal(parsed.command, 'run');
-  assert.equal(parsed.config, './test-reporter.config.mjs');
+  assert.equal(parsed.config, './test-station.config.mjs');
   assert.equal(parsed.outputDir, './artifacts/custom-report');
   assert.equal(parsed.coverage, true);
   assert.deepEqual(parsed.workspaceFilters, ['web', 'transpiler']);

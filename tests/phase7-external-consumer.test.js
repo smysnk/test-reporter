@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { readJson } from '@test-reporter/core';
+import { readJson } from '@test-station/core';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const cliPath = path.join(repoRoot, 'packages', 'cli', 'src', 'cli.js');
 const exampleDir = path.join(repoRoot, 'examples', 'generic-node-library');
-const exampleConfigPath = path.join(exampleDir, 'test-reporter.config.mjs');
+const exampleConfigPath = path.join(exampleDir, 'test-station.config.mjs');
 
 test('generic external consumer project can run through the standalone CLI without varcad-specific code', () => {
   const artifactsDir = path.join(exampleDir, 'artifacts');

@@ -1,6 +1,6 @@
 # Mixed Framework Monorepo Example
 
-Illustrative consumer config showing one `test-reporter` run across:
+Illustrative consumer config showing one `test-station` run across:
 
 - `jest`
 - `node:test`

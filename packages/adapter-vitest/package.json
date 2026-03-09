@@ -1,5 +1,5 @@
 {
-  "name": "@test-reporter/adapter-vitest",
+  "name": "@test-station/adapter-vitest",
   "version": "0.1.0",
   "private": true,
   "type": "module",

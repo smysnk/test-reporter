@@ -3,17 +3,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createNodeTestAdapter } from '@test-reporter/adapter-node-test';
-import { createVitestAdapter } from '@test-reporter/adapter-vitest';
-import { createPlaywrightAdapter } from '@test-reporter/adapter-playwright';
-import { createShellAdapter } from '@test-reporter/adapter-shell';
-import { createJestAdapter } from '@test-reporter/adapter-jest';
+import { createNodeTestAdapter } from '@test-station/adapter-node-test';
+import { createVitestAdapter } from '@test-station/adapter-vitest';
+import { createPlaywrightAdapter } from '@test-station/adapter-playwright';
+import { createShellAdapter } from '@test-station/adapter-shell';
+import { createJestAdapter } from '@test-station/adapter-jest';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixtureRoot = path.join(repoRoot, 'tests', 'fixtures', 'phase3');
 
 function createProject() {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-reporter-phase3-'));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-station-phase3-'));
   return {
     name: 'fixture-project',
     rootDir: repoRoot,
@@ -199,7 +199,7 @@ test('node:test adapter merges suite.env into execution environment', async () =
       cwd,
       command: [process.execPath, '--test', './env.test.js'],
       env: {
-        TEST_REPORTER_PHASE3_ENV: 'enabled',
+        TEST_STATION_PHASE3_ENV: 'enabled',
       },
     },
     execution: { coverage: false },
@@ -222,7 +222,7 @@ test('vitest adapter merges suite.env into execution environment', async () => {
       cwd,
       command: ['yarn', 'vitest', 'run', './env.test.js', '--config', './vitest.env.config.mjs'],
       env: {
-        TEST_REPORTER_PHASE3_ENV: 'enabled',
+        TEST_STATION_PHASE3_ENV: 'enabled',
       },
     },
     execution: { coverage: false },
@@ -245,7 +245,7 @@ test('playwright adapter merges suite.env into execution environment', async () 
       cwd,
       command: ['yarn', 'playwright', 'test', './env.spec.js', '--config', './playwright.config.mjs'],
       env: {
-        TEST_REPORTER_PHASE3_ENV: 'enabled',
+        TEST_STATION_PHASE3_ENV: 'enabled',
       },
     },
     execution: { coverage: false },
@@ -268,7 +268,7 @@ test('shell adapter merges suite.env into execution environment', async () => {
       cwd,
       command: [process.execPath, './env-suite.mjs'],
       env: {
-        TEST_REPORTER_PHASE3_ENV: 'enabled',
+        TEST_STATION_PHASE3_ENV: 'enabled',
       },
     },
     execution: { coverage: false },
@@ -291,7 +291,7 @@ test('jest adapter merges suite.env into execution environment', async () => {
       cwd,
       command: [process.execPath, './runner.mjs', './env.test.js'],
       env: {
-        TEST_REPORTER_PHASE3_ENV: 'enabled',
+        TEST_STATION_PHASE3_ENV: 'enabled',
       },
     },
     execution: { coverage: false },

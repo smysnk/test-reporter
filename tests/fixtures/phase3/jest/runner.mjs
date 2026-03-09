@@ -75,7 +75,7 @@ function createDefaultReport(rootDir) {
 }
 
 function createEnvReport(rootDir) {
-  const envOk = process.env.TEST_REPORTER_PHASE3_ENV === 'enabled';
+  const envOk = process.env.TEST_STATION_PHASE3_ENV === 'enabled';
   const file = path.join(rootDir, 'env.test.js');
   return {
     success: envOk,
@@ -94,7 +94,7 @@ function createEnvReport(rootDir) {
             fullName: 'env inherits suite env',
             status: envOk ? 'passed' : 'failed',
             duration: 2,
-            failureMessages: envOk ? [] : [`Expected TEST_REPORTER_PHASE3_ENV=enabled but received ${process.env.TEST_REPORTER_PHASE3_ENV || '<missing>'}`],
+            failureMessages: envOk ? [] : [`Expected TEST_STATION_PHASE3_ENV=enabled but received ${process.env.TEST_STATION_PHASE3_ENV || '<missing>'}`],
             location: { line: 2, column: 1 },
           },
         ],

@@ -1,5 +1,5 @@
-if (process.env.TEST_REPORTER_PHASE3_ENV !== 'enabled') {
-  process.stderr.write(`Expected TEST_REPORTER_PHASE3_ENV=enabled but received ${process.env.TEST_REPORTER_PHASE3_ENV || '<missing>'}\n`);
+if (process.env.TEST_STATION_PHASE3_ENV !== 'enabled') {
+  process.stderr.write(`Expected TEST_STATION_PHASE3_ENV=enabled but received ${process.env.TEST_STATION_PHASE3_ENV || '<missing>'}\n`);
   process.exit(1);
 }
 

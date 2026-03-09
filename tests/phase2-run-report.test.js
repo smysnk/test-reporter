@@ -4,15 +4,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runReport, formatConsoleSummary, readJson } from '@test-reporter/core';
+import { runReport, formatConsoleSummary, readJson } from '@test-station/core';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixtureDir = path.join(repoRoot, 'tests', 'fixtures', 'phase2');
-const fixtureConfigPath = path.join(fixtureDir, 'test-reporter.fixture.config.mjs');
+const fixtureConfigPath = path.join(fixtureDir, 'test-station.fixture.config.mjs');
 const cliPath = path.join(repoRoot, 'packages', 'cli', 'src', 'cli.js');
 
 function createTempOutputDir(label) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `test-reporter-${label}-`));
+  return fs.mkdtempSync(path.join(os.tmpdir(), `test-station-${label}-`));
 }
 
 test('runReport executes configured suites and writes artifacts', async () => {

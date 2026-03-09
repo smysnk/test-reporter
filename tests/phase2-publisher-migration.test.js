@@ -4,17 +4,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runReport, readJson } from '@test-reporter/core';
+import { runReport, readJson } from '@test-station/core';
 import { createDiscordPayload, createLegacySummary } from '../scripts/examples/report-json-migration-utils.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixtureDir = path.join(repoRoot, 'tests', 'fixtures', 'phase2');
-const fixtureConfigPath = path.join(fixtureDir, 'test-reporter.fixture.config.mjs');
+const fixtureConfigPath = path.join(fixtureDir, 'test-station.fixture.config.mjs');
 const summaryScriptPath = path.join(repoRoot, 'scripts', 'examples', 'report-json-to-summary.mjs');
 const discordScriptPath = path.join(repoRoot, 'scripts', 'examples', 'report-json-to-discord-payload.mjs');
 
 function createTempOutputDir(label) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `test-reporter-${label}-`));
+  return fs.mkdtempSync(path.join(os.tmpdir(), `test-station-${label}-`));
 }
 
 async function buildFixtureReport() {

@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { runReport, readJson } from '@test-reporter/core';
+import { runReport, readJson } from '@test-station/core';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixtureDir = path.join(repoRoot, 'tests', 'fixtures', 'phase5');
-const fixtureConfigPath = path.join(fixtureDir, 'test-reporter.fixture.config.mjs');
+const fixtureConfigPath = path.join(fixtureDir, 'test-station.fixture.config.mjs');
 
 test('runReport applies manifest and plugin policy plus source analysis enrichment', async () => {
   const artifactsDir = path.join(fixtureDir, 'artifacts');

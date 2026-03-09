@@ -486,71 +486,71 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@test-reporter/adapter-jest@workspace:*, @test-reporter/adapter-jest@workspace:packages/adapter-jest":
+"@test-station/adapter-jest@workspace:*, @test-station/adapter-jest@workspace:packages/adapter-jest":
   version: 0.0.0-use.local
-  resolution: "@test-reporter/adapter-jest@workspace:packages/adapter-jest"
+  resolution: "@test-station/adapter-jest@workspace:packages/adapter-jest"
   languageName: unknown
   linkType: soft
 
-"@test-reporter/adapter-node-test@workspace:*, @test-reporter/adapter-node-test@workspace:packages/adapter-node-test":
+"@test-station/adapter-node-test@workspace:*, @test-station/adapter-node-test@workspace:packages/adapter-node-test":
   version: 0.0.0-use.local
-  resolution: "@test-reporter/adapter-node-test@workspace:packages/adapter-node-test"
+  resolution: "@test-station/adapter-node-test@workspace:packages/adapter-node-test"
   languageName: unknown
   linkType: soft
 
-"@test-reporter/adapter-playwright@workspace:*, @test-reporter/adapter-playwright@workspace:packages/adapter-playwright":
+"@test-station/adapter-playwright@workspace:*, @test-station/adapter-playwright@workspace:packages/adapter-playwright":
   version: 0.0.0-use.local
-  resolution: "@test-reporter/adapter-playwright@workspace:packages/adapter-playwright"
+  resolution: "@test-station/adapter-playwright@workspace:packages/adapter-playwright"
   languageName: unknown
   linkType: soft
 
-"@test-reporter/adapter-shell@workspace:*, @test-reporter/adapter-shell@workspace:packages/adapter-shell":
+"@test-station/adapter-shell@workspace:*, @test-station/adapter-shell@workspace:packages/adapter-shell":
   version: 0.0.0-use.local
-  resolution: "@test-reporter/adapter-shell@workspace:packages/adapter-shell"
+  resolution: "@test-station/adapter-shell@workspace:packages/adapter-shell"
   languageName: unknown
   linkType: soft
 
-"@test-reporter/adapter-vitest@workspace:*, @test-reporter/adapter-vitest@workspace:packages/adapter-vitest":
+"@test-station/adapter-vitest@workspace:*, @test-station/adapter-vitest@workspace:packages/adapter-vitest":
   version: 0.0.0-use.local
-  resolution: "@test-reporter/adapter-vitest@workspace:packages/adapter-vitest"
+  resolution: "@test-station/adapter-vitest@workspace:packages/adapter-vitest"
   languageName: unknown
   linkType: soft
 
-"@test-reporter/cli@workspace:packages/cli":
+"@test-station/cli@workspace:packages/cli":
   version: 0.0.0-use.local
-  resolution: "@test-reporter/cli@workspace:packages/cli"
+  resolution: "@test-station/cli@workspace:packages/cli"
   dependencies:
-    "@test-reporter/core": "workspace:*"
-    "@test-reporter/render-html": "workspace:*"
+    "@test-station/core": "workspace:*"
+    "@test-station/render-html": "workspace:*"
   bin:
-    test-reporter: ./src/cli.js
+    test-station: ./src/cli.js
   languageName: unknown
   linkType: soft
 
-"@test-reporter/core@workspace:*, @test-reporter/core@workspace:packages/core":
+"@test-station/core@workspace:*, @test-station/core@workspace:packages/core":
   version: 0.0.0-use.local
-  resolution: "@test-reporter/core@workspace:packages/core"
+  resolution: "@test-station/core@workspace:packages/core"
   dependencies:
-    "@test-reporter/adapter-jest": "workspace:*"
-    "@test-reporter/adapter-node-test": "workspace:*"
-    "@test-reporter/adapter-playwright": "workspace:*"
-    "@test-reporter/adapter-shell": "workspace:*"
-    "@test-reporter/adapter-vitest": "workspace:*"
-    "@test-reporter/plugin-source-analysis": "workspace:*"
+    "@test-station/adapter-jest": "workspace:*"
+    "@test-station/adapter-node-test": "workspace:*"
+    "@test-station/adapter-playwright": "workspace:*"
+    "@test-station/adapter-shell": "workspace:*"
+    "@test-station/adapter-vitest": "workspace:*"
+    "@test-station/plugin-source-analysis": "workspace:*"
   languageName: unknown
   linkType: soft
 
-"@test-reporter/plugin-source-analysis@workspace:*, @test-reporter/plugin-source-analysis@workspace:packages/plugin-source-analysis":
+"@test-station/plugin-source-analysis@workspace:*, @test-station/plugin-source-analysis@workspace:packages/plugin-source-analysis":
   version: 0.0.0-use.local
-  resolution: "@test-reporter/plugin-source-analysis@workspace:packages/plugin-source-analysis"
+  resolution: "@test-station/plugin-source-analysis@workspace:packages/plugin-source-analysis"
   dependencies:
     acorn: "npm:^8.15.0"
   languageName: unknown
   linkType: soft
 
-"@test-reporter/render-html@workspace:*, @test-reporter/render-html@workspace:packages/render-html":
+"@test-station/render-html@workspace:*, @test-station/render-html@workspace:packages/render-html":
   version: 0.0.0-use.local
-  resolution: "@test-reporter/render-html@workspace:packages/render-html"
+  resolution: "@test-station/render-html@workspace:packages/render-html"
   languageName: unknown
   linkType: soft
 
@@ -1574,15 +1574,15 @@ __metadata:
   languageName: node
   linkType: hard
 
-"test-reporter-monorepo@workspace:.":
+"test-station-monorepo@workspace:.":
   version: 0.0.0-use.local
-  resolution: "test-reporter-monorepo@workspace:."
+  resolution: "test-station-monorepo@workspace:."
   dependencies:
     "@playwright/test": "npm:^1.58.2"
     "@vitest/coverage-v8": "npm:^4.0.18"
     vitest: "npm:^4.0.18"
   bin:
-    test-reporter: ./bin/test-reporter.mjs
+    test-station: ./bin/test-station.mjs
   languageName: unknown
   linkType: soft
 

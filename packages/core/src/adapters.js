@@ -1,10 +1,10 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createNodeTestAdapter } from '@test-reporter/adapter-node-test';
-import { createVitestAdapter } from '@test-reporter/adapter-vitest';
-import { createPlaywrightAdapter } from '@test-reporter/adapter-playwright';
-import { createShellAdapter } from '@test-reporter/adapter-shell';
-import { createJestAdapter } from '@test-reporter/adapter-jest';
+import { createNodeTestAdapter } from '@test-station/adapter-node-test';
+import { createVitestAdapter } from '@test-station/adapter-vitest';
+import { createPlaywrightAdapter } from '@test-station/adapter-playwright';
+import { createShellAdapter } from '@test-station/adapter-shell';
+import { createJestAdapter } from '@test-station/adapter-jest';
 
 const builtInAdapterFactories = {
   'node-test': createNodeTestAdapter,

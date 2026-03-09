@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export function renderHtmlReport(report, options = {}) {
-  const title = options.title || report?.meta?.projectName || 'Test Reporter';
+  const title = options.title || report?.meta?.projectName || 'Test Station';
   const rootDir = resolveRootDir(report, options);
   const defaultView = normalizeView(options.defaultView || report?.meta?.render?.defaultView || 'module');
   const includeDetailedAnalysisToggle = options.includeDetailedAnalysisToggle ?? report?.meta?.render?.includeDetailedAnalysisToggle ?? true;

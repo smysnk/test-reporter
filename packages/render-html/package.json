@@ -1,5 +1,5 @@
 {
-  "name": "@test-reporter/render-html",
+  "name": "@test-station/render-html",
   "version": "0.1.0",
   "private": true,
   "type": "module",

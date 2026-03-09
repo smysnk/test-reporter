@@ -2,7 +2,7 @@
 
 ## Versioning model
 
-All publishable `@test-reporter/*` packages move in lockstep on the same version.
+All publishable `@test-station/*` packages move in lockstep on the same version.
 
 Current baseline for external consumers:
 
@@ -20,7 +20,7 @@ That version means:
 
 Bump the major version when any of these break:
 
-- `test-reporter.config.mjs` contract
+- `test-station.config.mjs` contract
 - `report.json` normalized schema
 - adapter hook contract
 - policy plugin hook contract
@@ -50,15 +50,15 @@ Bump the patch version for:
 
 Only these package entrypoints should be treated as public:
 
-- `@test-reporter/cli`
-- `@test-reporter/core`
-- `@test-reporter/render-html`
-- `@test-reporter/adapter-node-test`
-- `@test-reporter/adapter-vitest`
-- `@test-reporter/adapter-playwright`
-- `@test-reporter/adapter-shell`
-- `@test-reporter/adapter-jest`
-- `@test-reporter/plugin-source-analysis`
+- `@test-station/cli`
+- `@test-station/core`
+- `@test-station/render-html`
+- `@test-station/adapter-node-test`
+- `@test-station/adapter-vitest`
+- `@test-station/adapter-playwright`
+- `@test-station/adapter-shell`
+- `@test-station/adapter-jest`
+- `@test-station/plugin-source-analysis`
 
 Internal source layout inside `packages/*/src` is not a compatibility promise.
 
@@ -68,10 +68,10 @@ Internal source layout inside `packages/*/src` is not a compatibility promise.
 2. Run `yarn test`.
 3. Run `yarn build`.
 4. Run the external consumer example:
-   - `node ./bin/test-reporter.mjs run --config ./examples/generic-node-library/test-reporter.config.mjs`
+   - `node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs`
 5. Verify the generated HTML report opens and renders module/package drilldown correctly.
 6. Tag the repo with the shared package version.
-7. Publish all `@test-reporter/*` packages at that same version.
+7. Publish all `@test-station/*` packages at that same version.
 
 ## Consumer compatibility promise
 

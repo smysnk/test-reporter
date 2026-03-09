@@ -1,4 +1,4 @@
-# Integrating `test-reporter` Into a Generic Project
+# Integrating `test-station` Into a Generic Project
 
 ## Scope
 
@@ -8,15 +8,15 @@ This guide describes the stable consumer-facing interface for adopting the repor
 
 Treat these packages as the public integration surface:
 
-- `@test-reporter/cli`
-- `@test-reporter/core`
-- `@test-reporter/render-html`
-- `@test-reporter/adapter-node-test`
-- `@test-reporter/adapter-vitest`
-- `@test-reporter/adapter-playwright`
-- `@test-reporter/adapter-shell`
-- `@test-reporter/adapter-jest`
-- `@test-reporter/plugin-source-analysis`
+- `@test-station/cli`
+- `@test-station/core`
+- `@test-station/render-html`
+- `@test-station/adapter-node-test`
+- `@test-station/adapter-vitest`
+- `@test-station/adapter-playwright`
+- `@test-station/adapter-shell`
+- `@test-station/adapter-jest`
+- `@test-station/plugin-source-analysis`
 
 A consumer project only needs the CLI for normal use. `core` and the plugin packages matter when you want programmatic control or custom policy hooks.
 
@@ -25,12 +25,12 @@ A consumer project only needs the CLI for normal use. `core` and the plugin pack
 There are two supported ways to consume the reporter:
 
 1. Local reference checkout
-   - use this while developing a host project against a sibling checkout of `test-reporter`
+   - use this while developing a host project against a sibling checkout of `test-station`
    - stable local-reference entrypoints are:
-     - `./references/test-reporter/config.mjs`
-     - `./references/test-reporter/bin/test-reporter.mjs`
+     - `./references/test-station/config.mjs`
+     - `./references/test-station/bin/test-station.mjs`
 2. Installed package dependency
-   - use the published `test-reporter` binary in package scripts
+   - use the published `test-station` binary in package scripts
    - import `defineConfig` from the published package entrypoint your install layout provides
 
 For local-reference mode, do not point consumers at `packages/*/src`.
@@ -40,19 +40,19 @@ For local-reference mode, do not point consumers at `packages/*/src`.
 ### Yarn
 
 ```sh
-yarn add -D @test-reporter/cli @test-reporter/core @test-reporter/plugin-source-analysis
+yarn add -D @test-station/cli @test-station/core @test-station/plugin-source-analysis
 ```
 
 ### npm
 
 ```sh
-npm install --save-dev @test-reporter/cli @test-reporter/core @test-reporter/plugin-source-analysis
+npm install --save-dev @test-station/cli @test-station/core @test-station/plugin-source-analysis
 ```
 
 ### pnpm
 
 ```sh
-pnpm add -D @test-reporter/cli @test-reporter/core @test-reporter/plugin-source-analysis
+pnpm add -D @test-station/cli @test-station/core @test-station/plugin-source-analysis
 ```
 
 Until the packages are published, point those dependencies at a checked-out copy of this repository or a Git reference. If you are using a direct local reference, prefer the root-level stable entrypoints above instead of package source files.
@@ -130,8 +130,8 @@ Example:
 ```json
 {
   "scripts": {
-    "test": "test-reporter run --config ./test-reporter.config.mjs",
-    "test:coverage": "test-reporter run --config ./test-reporter.config.mjs --coverage"
+    "test": "test-station run --config ./test-station.config.mjs",
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
   }
 }
 ```
@@ -141,8 +141,8 @@ Example:
 ```json
 {
   "scripts": {
-    "test": "test-reporter run --config ./test-reporter.config.mjs",
-    "test:coverage": "test-reporter run --config ./test-reporter.config.mjs --coverage"
+    "test": "test-station run --config ./test-station.config.mjs",
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
   }
 }
 ```
@@ -152,8 +152,8 @@ Example:
 ```json
 {
   "scripts": {
-    "test": "test-reporter run --config ./test-reporter.config.mjs",
-    "test:coverage": "test-reporter run --config ./test-reporter.config.mjs --coverage"
+    "test": "test-station run --config ./test-station.config.mjs",
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
   }
 }
 ```
@@ -191,7 +191,7 @@ If you want module/theme grouping and ownership in the HTML report, provide a lo
 }
 ```
 
-Then reference it from `test-reporter.config.mjs`:
+Then reference it from `test-station.config.mjs`:
 
 ```js
 manifests: {
@@ -215,7 +215,7 @@ Register plugins in config like this:
 ```js
 plugins: [
   {
-    handler: './scripts/test-reporter/my-policy-plugin.mjs',
+    handler: './scripts/test-station/my-policy-plugin.mjs',
     options: {
       owner: 'platform-team'
     }
@@ -239,7 +239,7 @@ Typical setup:
 yarn playwright install --with-deps
 ```
 
-Do this before `test-reporter run ...` in any CI job that includes Playwright suites.
+Do this before `test-station run ...` in any CI job that includes Playwright suites.
 
 ## Raw artifact contract
 
@@ -328,7 +328,7 @@ This keeps the public integration model uniform even when one client has a more 
 
 ## Mixed-framework example
 
-See [`../examples/mixed-framework-monorepo/test-reporter.config.mjs`](../examples/mixed-framework-monorepo/test-reporter.config.mjs) for a config that combines `jest` and `node-test` in one run while keeping one standard `report.json` output contract.
+See [`../examples/mixed-framework-monorepo/test-station.config.mjs`](../examples/mixed-framework-monorepo/test-station.config.mjs) for a config that combines `jest` and `node-test` in one run while keeping one standard `report.json` output contract.
 
 ## Downstream publisher migration
 
@@ -343,4 +343,4 @@ See [`./migrating-downstream-publishers.md`](./migrating-downstream-publishers.m
 
 ## Example project
 
-See [`../examples/generic-node-library/test-reporter.config.mjs`](../examples/generic-node-library/test-reporter.config.mjs) for a minimal standalone consumer.
+See [`../examples/generic-node-library/test-station.config.mjs`](../examples/generic-node-library/test-station.config.mjs) for a minimal standalone consumer.

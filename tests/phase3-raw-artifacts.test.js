@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runReport, readJson } from '@test-reporter/core';
+import { runReport, readJson } from '@test-station/core';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixtureDir = path.join(repoRoot, 'tests', 'fixtures', 'phase3', 'raw-artifacts');
-const fixtureConfigPath = path.join(fixtureDir, 'test-reporter.fixture.config.mjs');
+const fixtureConfigPath = path.join(fixtureDir, 'test-station.fixture.config.mjs');
 
 function createTempOutputDir(label) {
-  return fs.mkdtempSync(path.join(os.tmpdir(), `test-reporter-${label}-`));
+  return fs.mkdtempSync(path.join(os.tmpdir(), `test-station-${label}-`));
 }
 
 test('runReport writes raw artifact manifests and copies file and directory sources into raw/', async () => {

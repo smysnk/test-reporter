@@ -47,7 +47,7 @@ jobs:
       - name: Run smoke example
         run: |
           rm -rf ./examples/generic-node-library/artifacts/test-report
-          node ./bin/test-reporter.mjs run --config ./examples/generic-node-library/test-reporter.config.mjs --coverage
+          node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs --coverage
 
       - name: Determine publish order
         id: packages
@@ -71,7 +71,7 @@ jobs:
               ...(manifest.dependencies ?? {}),
               ...(manifest.optionalDependencies ?? {}),
               ...(manifest.peerDependencies ?? {}),
-            }).filter((name) => name.startsWith('@test-reporter/'));
+            }).filter((name) => name.startsWith('@test-station/'));
 
             workspaces.set(manifest.name, { deps });
           }

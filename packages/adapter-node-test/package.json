@@ -1,5 +1,5 @@
 {
-  "name": "@test-reporter/adapter-node-test",
+  "name": "@test-station/adapter-node-test",
   "version": "0.1.0",
   "private": true,
   "type": "module",

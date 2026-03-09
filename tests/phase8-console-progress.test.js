@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { runReport, formatConsoleSummary, createConsoleProgressReporter } from '@test-reporter/core';
+import { runReport, formatConsoleSummary, createConsoleProgressReporter } from '@test-station/core';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
-const fixtureConfigPath = path.join(repoRoot, 'tests', 'fixtures', 'phase8', 'test-reporter.fixture.config.mjs');
+const fixtureConfigPath = path.join(repoRoot, 'tests', 'fixtures', 'phase8', 'test-station.fixture.config.mjs');
 
 test('runReport emits package and suite progress events including skipped packages from workspace discovery', async () => {
   const events = [];

@@ -1,14 +1,14 @@
-# test-reporter
+# test-station
 
-`test-reporter` is a framework- and language-agnostic test orchestration and reporting toolkit.
+`test-station` is a framework- and language-agnostic test orchestration and reporting toolkit.
 
 It runs suites from multiple test systems, normalizes the results into a single `report.json`, and renders a drillable HTML report with module, theme, package, suite, test, and coverage views.
 
-Built-in adapters currently target common JavaScript tooling, but the execution contract is not tied to a specific language or framework. If a project can produce structured test results or can be wrapped by an adapter, it can be reported through `test-reporter`.
+Built-in adapters currently target common JavaScript tooling, but the execution contract is not tied to a specific language or framework. If a project can produce structured test results or can be wrapped by an adapter, it can be reported through `test-station`.
 
 ## Purpose
 
-Use `test-reporter` when raw test output is too fragmented to be operationally useful.
+Use `test-station` when raw test output is too fragmented to be operationally useful.
 
 Typical cases:
 
@@ -45,46 +45,46 @@ The HTML report supports:
 
 The system is split into small packages with explicit boundaries.
 
-1. `@test-reporter/cli`
+1. `@test-station/cli`
    Runs configured suites and writes JSON + HTML artifacts.
-2. `@test-reporter/core`
+2. `@test-station/core`
    Loads config, resolves adapters, executes suites, normalizes results, applies policy, and builds the report model.
-3. `@test-reporter/render-html`
+3. `@test-station/render-html`
    Renders the normalized report into the interactive HTML UI.
 4. Built-in adapters
-   - `@test-reporter/adapter-node-test`
-   - `@test-reporter/adapter-vitest`
-   - `@test-reporter/adapter-playwright`
-   - `@test-reporter/adapter-shell`
-   - `@test-reporter/adapter-jest`
+   - `@test-station/adapter-node-test`
+   - `@test-station/adapter-vitest`
+   - `@test-station/adapter-playwright`
+   - `@test-station/adapter-shell`
+   - `@test-station/adapter-jest`
 5. Built-in enrichment/plugin package
-   - `@test-reporter/plugin-source-analysis`
+   - `@test-station/plugin-source-analysis`
 
 ### Execution Flow
 
 ```mermaid
 flowchart LR
-  A["test-reporter.config.mjs"] --> B["@test-reporter/cli"]
-  B --> C["@test-reporter/core"]
+  A["test-station.config.mjs"] --> B["@test-station/cli"]
+  B --> C["@test-station/core"]
   C --> D["Adapters"]
   D --> E["Normalized suite results"]
   E --> F["Policy and plugin pipeline"]
   F --> G["report.json"]
-  F --> H["@test-reporter/render-html"]
+  F --> H["@test-station/render-html"]
   H --> I["index.html"]
 ```
 
 ### Package Responsibilities
 
-- `@test-reporter/cli`: command entrypoint and artifact writing
-- `@test-reporter/core`: config loading, orchestration, normalization, aggregation, coverage rollups, policy pipeline
-- `@test-reporter/render-html`: browser report UI and report rendering
-- `@test-reporter/adapter-node-test`: direct `node --test` execution and normalization
-- `@test-reporter/adapter-vitest`: Vitest execution, normalization, and coverage collection
-- `@test-reporter/adapter-playwright`: Playwright execution and normalization
-- `@test-reporter/adapter-shell`: arbitrary command-backed suites
-- `@test-reporter/adapter-jest`: Jest execution, normalization, and coverage collection
-- `@test-reporter/plugin-source-analysis`: static enrichment of assertions, setup, mocks, and source snippets
+- `@test-station/cli`: command entrypoint and artifact writing
+- `@test-station/core`: config loading, orchestration, normalization, aggregation, coverage rollups, policy pipeline
+- `@test-station/render-html`: browser report UI and report rendering
+- `@test-station/adapter-node-test`: direct `node --test` execution and normalization
+- `@test-station/adapter-vitest`: Vitest execution, normalization, and coverage collection
+- `@test-station/adapter-playwright`: Playwright execution and normalization
+- `@test-station/adapter-shell`: arbitrary command-backed suites
+- `@test-station/adapter-jest`: Jest execution, normalization, and coverage collection
+- `@test-station/plugin-source-analysis`: static enrichment of assertions, setup, mocks, and source snippets
 
 ## Quickstart
 
@@ -94,9 +94,9 @@ This is the fastest way to see the reporter working.
 
 ```sh
 git clone <repo>
-cd test-reporter
+cd test-station
 yarn install
-node ./bin/test-reporter.mjs run --config ./examples/generic-node-library/test-reporter.config.mjs --coverage
+node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs --coverage
 ```
 
 Artifacts are written to:
@@ -107,7 +107,7 @@ examples/generic-node-library/artifacts/test-report/
 
 ### Minimal Consumer Setup
 
-Create `test-reporter.config.mjs` in the target project:
+Create `test-station.config.mjs` in the target project:
 
 ```js
 const rootDir = import.meta.dirname;
@@ -144,8 +144,8 @@ export default {
 Run it with:
 
 ```sh
-test-reporter run --config ./test-reporter.config.mjs
-test-reporter run --config ./test-reporter.config.mjs --coverage
+test-station run --config ./test-station.config.mjs
+test-station run --config ./test-station.config.mjs --coverage
 ```
 
 ### Package Script Integration
@@ -155,8 +155,8 @@ test-reporter run --config ./test-reporter.config.mjs --coverage
 ```json
 {
   "scripts": {
-    "test": "test-reporter run --config ./test-reporter.config.mjs",
-    "test:coverage": "test-reporter run --config ./test-reporter.config.mjs --coverage"
+    "test": "test-station run --config ./test-station.config.mjs",
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
   }
 }
 ```
@@ -166,8 +166,8 @@ test-reporter run --config ./test-reporter.config.mjs --coverage
 ```json
 {
   "scripts": {
-    "test": "test-reporter run --config ./test-reporter.config.mjs",
-    "test:coverage": "test-reporter run --config ./test-reporter.config.mjs --coverage"
+    "test": "test-station run --config ./test-station.config.mjs",
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
   }
 }
 ```
@@ -177,8 +177,8 @@ test-reporter run --config ./test-reporter.config.mjs --coverage
 ```json
 {
   "scripts": {
-    "test": "test-reporter run --config ./test-reporter.config.mjs",
-    "test:coverage": "test-reporter run --config ./test-reporter.config.mjs --coverage"
+    "test": "test-station run --config ./test-station.config.mjs",
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
   }
 }
 ```
@@ -187,17 +187,17 @@ test-reporter run --config ./test-reporter.config.mjs --coverage
 
 A host project typically owns only three things:
 
-- `test-reporter.config.mjs`
+- `test-station.config.mjs`
 - a classification / coverage attribution / ownership manifest
 - optional host-specific plugins or custom adapters when generic ones are not enough
 
-Everything else should be delegated to `test-reporter`.
+Everything else should be delegated to `test-station`.
 
 ### Uniform Runtime Contract
 
 All built-in command-backed adapters follow the same integration rules:
 
-- declare suites explicitly in `test-reporter.config.mjs`
+- declare suites explicitly in `test-station.config.mjs`
 - pass per-suite environment variables with `suite.env`
 - consume normalized output from `report.json`
 - use `raw/` for framework-native artifacts and intermediate reports
@@ -255,11 +255,11 @@ There are two supported consumer modes:
 1. Local reference checkout
    - useful while the standalone repo is being developed alongside a host project
    - stable host-facing entrypoints are:
-     - `./references/test-reporter/config.mjs`
-     - `./references/test-reporter/bin/test-reporter.mjs`
+     - `./references/test-station/config.mjs`
+     - `./references/test-station/bin/test-station.mjs`
 2. Installed package dependency
-   - use the published `test-reporter` binary
-   - import `defineConfig` from a published package entrypoint such as `@test-reporter/core` when that distribution path is available in your project
+   - use the published `test-station` binary
+   - import `defineConfig` from a published package entrypoint such as `@test-station/core` when that distribution path is available in your project
 
 For local-reference mode, keep host imports pointed at the root-level entrypoints above rather than `packages/*/src`.
 
@@ -320,7 +320,7 @@ Register plugins like this:
 ```js
 plugins: [
   {
-    handler: './scripts/test-reporter/my-policy-plugin.mjs',
+    handler: './scripts/test-station/my-policy-plugin.mjs',
     options: {
       owner: 'platform-team',
     },
@@ -331,9 +331,9 @@ plugins: [
 ## Examples
 
 - Generic consumer example:
-  [`./examples/generic-node-library/test-reporter.config.mjs`](./examples/generic-node-library/test-reporter.config.mjs)
+  [`./examples/generic-node-library/test-station.config.mjs`](./examples/generic-node-library/test-station.config.mjs)
 - Mixed-framework example:
-  [`./examples/mixed-framework-monorepo/test-reporter.config.mjs`](./examples/mixed-framework-monorepo/test-reporter.config.mjs)
+  [`./examples/mixed-framework-monorepo/test-station.config.mjs`](./examples/mixed-framework-monorepo/test-station.config.mjs)
 - Integration guide:
   [`./docs/integrating-a-generic-project.md`](./docs/integrating-a-generic-project.md)
 
@@ -350,12 +350,12 @@ yarn build
 The current external-consumer smoke path is:
 
 ```sh
-node ./bin/test-reporter.mjs run --config ./examples/generic-node-library/test-reporter.config.mjs --coverage
+node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs --coverage
 ```
 
 ## Versioning
 
-All publishable `@test-reporter/*` packages currently move in lockstep at `0.1.0`.
+All publishable `@test-station/*` packages currently move in lockstep at `0.1.0`.
 
 For deeper release and compatibility details, see:
 

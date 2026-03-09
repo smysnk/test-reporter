@@ -1,13 +1,13 @@
 {
-  "name": "test-reporter-monorepo",
+  "name": "test-station-monorepo",
   "private": true,
   "type": "module",
   "bin": {
-    "test-reporter": "./bin/test-reporter.mjs"
+    "test-station": "./bin/test-station.mjs"
   },
   "exports": {
     "./config": "./config.mjs",
-    "./bin": "./bin/test-reporter.mjs"
+    "./bin": "./bin/test-station.mjs"
   },
   "packageManager": "yarn@4.13.0",
   "workspaces": [

@@ -6,7 +6,7 @@ import { normalizeSuiteResult, buildReportFromSuiteResults, createSummary, norma
 import { writeReportArtifacts } from './artifacts.js';
 
 export async function runReport(options = {}) {
-  const loaded = await loadConfig(options.configPath || './test-reporter.config.mjs', {
+  const loaded = await loadConfig(options.configPath || './test-station.config.mjs', {
     cwd: options.cwd,
   });
   const effectiveConfig = applyConfigOverrides(loaded.config, loaded.configDir, {

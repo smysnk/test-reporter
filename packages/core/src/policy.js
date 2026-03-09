@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { createSourceAnalysisPlugin } from '@test-reporter/plugin-source-analysis';
+import { createSourceAnalysisPlugin } from '@test-station/plugin-source-analysis';
 import { readJson, resolveMaybeRelative } from './config.js';
 
 const builtInPluginFactories = {
