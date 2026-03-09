@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "test-station.serverName" . }}-env
+  labels:
+    {{- include "test-station.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+data:
+  SERVER_PORT: {{ .Values.server.env.SERVER_PORT | quote }}
+  PORTAL_URL: {{ default (printf "http://%s:%v" (include "test-station.portalName" .) .Values.portal.service.port) .Values.server.env.PORTAL_URL | quote }}

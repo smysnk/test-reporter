@@ -6,6 +6,13 @@
 !.yarn/versions
 .pnp.*
 node_modules/
+.next/
+.env
+.env.local
+packages/server/.env
+packages/server/.env.local
+packages/portal/.env
+packages/portal/.env.local
 dist/
 coverage/
 artifacts/

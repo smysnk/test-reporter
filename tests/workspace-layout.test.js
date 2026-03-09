@@ -16,9 +16,23 @@ const expectedPackages = [
   'plugin-source-analysis',
 ];
 
+const expectedAppPackages = [
+  'server',
+  'portal',
+];
+
 test('workspace contains expected reporter packages', () => {
   for (const pkg of expectedPackages) {
     const packageJsonPath = path.join(repoRoot, 'packages', pkg, 'package.json');
     assert.equal(fs.existsSync(packageJsonPath), true, `missing ${packageJsonPath}`);
+  }
+});
+
+test('workspace contains expected private application packages', () => {
+  for (const pkg of expectedAppPackages) {
+    const packageJsonPath = path.join(repoRoot, 'packages', pkg, 'package.json');
+    assert.equal(fs.existsSync(packageJsonPath), true, `missing ${packageJsonPath}`);
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+    assert.equal(packageJson.private, true, `${pkg} should remain private`);
   }
 });

@@ -1,0 +1,35 @@
+import Artifact from './Artifact.js';
+import CoverageFile from './CoverageFile.js';
+import CoverageSnapshot from './CoverageSnapshot.js';
+import CoverageTrendPoint from './CoverageTrendPoint.js';
+import ErrorOccurrence from './ErrorOccurrence.js';
+import PerformanceStat from './PerformanceStat.js';
+import Project from './Project.js';
+import ProjectFile from './ProjectFile.js';
+import ProjectModule from './ProjectModule.js';
+import ProjectPackage from './ProjectPackage.js';
+import ProjectVersion from './ProjectVersion.js';
+import ReleaseNote from './ReleaseNote.js';
+import Run from './Run.js';
+import SuiteRun from './SuiteRun.js';
+import TestExecution from './TestExecution.js';
+
+import './reportingAssociations.js';
+
+export {
+  Artifact,
+  CoverageFile,
+  CoverageSnapshot,
+  CoverageTrendPoint,
+  ErrorOccurrence,
+  PerformanceStat,
+  Project,
+  ProjectFile,
+  ProjectModule,
+  ProjectPackage,
+  ProjectVersion,
+  ReleaseNote,
+  Run,
+  SuiteRun,
+  TestExecution,
+};
