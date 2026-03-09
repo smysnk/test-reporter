@@ -9,7 +9,7 @@
     "./config": "./config.mjs",
     "./bin": "./bin/test-reporter.mjs"
   },
-  "packageManager": "yarn@4.9.2",
+  "packageManager": "yarn@4.13.0",
   "workspaces": [
     "packages/*"
   ],
