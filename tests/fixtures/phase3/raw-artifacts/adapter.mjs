@@ -38,7 +38,7 @@ export function createAdapter() {
             relativePath: 'fixture-dir/test-results',
             label: 'Copied test-results directory',
             kind: 'directory',
-            sourcePath: './source/test-results',
+            sourcePath: './source/copied-directory',
           },
         ],
       };
