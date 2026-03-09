@@ -1,0 +1,11 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  name: your-app
+  namespace: fleet-local
+spec:
+  repo: git@github.com:your-org/your-repo.git
+  clientSecretName: your-github-ssh-secret
+  branch: main
+  paths:
+    - .

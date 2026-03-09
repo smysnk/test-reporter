@@ -22,3 +22,4 @@ docs-internal/
 .DS_Store
 .test-results
 references/
+fleet/gitrepo.yml

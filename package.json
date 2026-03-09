@@ -11,6 +11,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "yarn workspaces foreach -A --include server --include portal -pi -j unlimited run dev",
     "build": "yarn workspaces foreach -A run build",
     "lint": "yarn workspaces foreach -A run lint",
     "test:node": "node --test ./tests/*.test.js",
