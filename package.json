@@ -1,9 +1,7 @@
 {
   "name": "test-station",
   "type": "module",
-  "bin": {
-    "test-station": "./bin/test-station.mjs"
-  },
+  "bin": "./bin/test-station.mjs",
   "exports": {
     "./config": "./config.mjs",
     "./bin": "./bin/test-station.mjs"
