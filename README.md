@@ -28,6 +28,8 @@ Typical cases:
 A run produces:
 
 - `report.json`: normalized machine-readable results
+- `modules.json`: module/theme rollups for machine consumers
+- `ownership.json`: module/theme ownership rollups
 - `index.html`: interactive HTML report
 - `raw/`: per-suite raw artifacts and framework output
 
@@ -167,6 +169,7 @@ With `@test-station/cli` installed, run it with:
 ```sh
 npx test-station run --config ./test-station.config.mjs
 npx test-station run --config ./test-station.config.mjs --coverage
+npx test-station run --config ./test-station.config.mjs --no-coverage
 ```
 
 ### Package Script Integration
@@ -177,7 +180,8 @@ npx test-station run --config ./test-station.config.mjs --coverage
 {
   "scripts": {
     "test": "test-station run --config ./test-station.config.mjs",
-    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage",
+    "test:fast": "test-station run --config ./test-station.config.mjs --no-coverage"
   }
 }
 ```
@@ -188,7 +192,8 @@ npx test-station run --config ./test-station.config.mjs --coverage
 {
   "scripts": {
     "test": "test-station run --config ./test-station.config.mjs",
-    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage",
+    "test:fast": "test-station run --config ./test-station.config.mjs --no-coverage"
   }
 }
 ```
@@ -199,10 +204,29 @@ npx test-station run --config ./test-station.config.mjs --coverage
 {
   "scripts": {
     "test": "test-station run --config ./test-station.config.mjs",
-    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage",
+    "test:fast": "test-station run --config ./test-station.config.mjs --no-coverage"
   }
 }
 ```
+
+### CLI Commands And Overrides
+
+The public CLI surface is:
+
+```sh
+npx test-station inspect --config ./test-station.config.mjs
+npx test-station run --config ./test-station.config.mjs --coverage --workspace app --output-dir ./artifacts/app-report
+npx test-station render --input ./artifacts/test-report/report.json --output ./artifacts/test-report
+```
+
+Useful overrides:
+
+- `--coverage` and `--no-coverage` override `execution.defaultCoverage`
+- `--workspace <name>` and `--package <name>` are equivalent repeatable filters
+- `--output-dir <path>` overrides `project.outputDir` and rewrites `raw/` under that directory
+
+When filters match no suites, the run exits with a clear error. If `workspaceDiscovery.packages` still lists other workspaces, those unmatched packages remain visible as `skipped`.
 
 ## Integration Model
 
@@ -228,6 +252,12 @@ All built-in command-backed adapters follow the same integration rules:
 If `workspaceDiscovery.packages` lists a package with no matching suites, that package still appears in the report as `skipped` with zero suites. This is the recommended way to keep explicit monorepo packages visible without inventing synthetic suite results.
 
 If a suite runs and the underlying framework reports zero tests, the suite is normalized as `skipped`.
+
+### Adapter Notes
+
+- `node-test` coverage works for direct `node --test ...` commands and package scripts that resolve directly to a single `node --test ...` invocation
+- `playwright` can collect browser Istanbul coverage when `suite.coverage.strategy` is `browser-istanbul`
+- `shell` supports `resultFormat: 'single-check-json-v1'` for structured single-check outputs with mapped warnings and raw details
 
 ### Playwright In CI
 
@@ -286,7 +316,7 @@ There are two supported consumer modes:
 
 For local-reference mode, keep host imports pointed at the root-level entrypoints above rather than `packages/*/src`.
 
-### Classification, Coverage Attribution, And Ownership
+### Classification, Coverage Attribution, Ownership, And Thresholds
 
 If you want the report grouped by product or subsystem instead of leaving tests uncategorized, provide a manifest file.
 
@@ -315,6 +345,23 @@ If you want the report grouped by product or subsystem instead of leaving tests 
     "themes": [
       { "module": "runtime", "theme": "api", "owner": "runtime-api-team" }
     ]
+  },
+  "thresholds": {
+    "modules": [
+      {
+        "module": "runtime",
+        "coverage": { "linesPct": 80, "branchesPct": 70 },
+        "enforcement": "error"
+      }
+    ],
+    "themes": [
+      {
+        "module": "runtime",
+        "theme": "api",
+        "coverage": { "linesPct": 75 },
+        "enforcement": "warn"
+      }
+    ]
   }
 }
 ```
@@ -326,8 +373,30 @@ manifests: {
   classification: './test-modules.json',
   coverageAttribution: './test-modules.json',
   ownership: './test-modules.json',
+  thresholds: './test-modules.json',
 }
 ```
+
+Error-enforced threshold failures are reported in `report.json`, rendered in HTML, and cause `test-station run` to exit non-zero even when every suite itself passed. Warning-enforced thresholds stay visible in the report but do not fail the process.
+
+### Failure Diagnostics
+
+Suites can define an optional diagnostics rerun. When the suite fails, `test-station` reruns the configured command, captures stdout/stderr, and writes diagnostic artifacts under `raw/diagnostics/`.
+
+```js
+{
+  id: 'web-unit',
+  adapter: 'vitest',
+  command: ['yarn', 'vitest', 'run', '--config', './vitest.config.js'],
+  diagnostics: {
+    label: 'Verbose rerun',
+    command: ['yarn', 'vitest', 'run', '--config', './vitest.config.js', '--reporter', 'verbose'],
+    timeoutMs: 120000,
+  },
+}
+```
+
+The rerun metadata is attached to the suite result as `suite.diagnostics`, linked from the HTML report, and summarized in the console output.
 
 ### Custom Policy Plugins
 
@@ -366,9 +435,14 @@ Run the standalone repo checks with:
 
 ```sh
 yarn lint
+yarn test:node
 yarn test
 yarn build
 ```
+
+`yarn test:node` runs the direct Node test suite. `yarn test` runs the repository through `test-station` itself and produces the self-test report.
+
+When running the server and web app locally, `SERVER_URL`, `WEB_URL`, `WEB_GRAPHQL_PATH`, and `NEXTAUTH_URL` are optional. If omitted, they default to `http://localhost:${SERVER_PORT}`, `http://localhost:${WEB_PORT}`, `/graphql`, and `http://localhost:${WEB_PORT}` respectively. Container and Fleet configs still set explicit cross-service URLs where needed.
 
 The current external-consumer smoke path is:
 
@@ -378,7 +452,7 @@ node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-st
 
 ## Versioning
 
-All publishable `@test-station/*` packages currently move in lockstep at `0.1.0`.
+All publishable `@test-station/*` packages currently move in lockstep at `0.2.0`.
 
 For deeper release and compatibility details, see:
 

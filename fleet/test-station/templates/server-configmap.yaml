@@ -1,10 +1,29 @@
+{{- if not .Values.server.existingConfigMap }}
+{{- $config := dict -}}
+{{- range $key, $value := default (dict) .Values.server.env }}
+{{- $_ := set $config $key $value -}}
+{{- end }}
+{{- range $key, $value := default (dict) .Values.server.config }}
+{{- $_ := set $config $key $value -}}
+{{- end }}
+{{- if or (not (hasKey $config "NODE_ENV")) (eq (printf "%v" (index $config "NODE_ENV")) "") }}
+{{- $_ := set $config "NODE_ENV" "production" -}}
+{{- end }}
+{{- if or (not (hasKey $config "SERVER_PORT")) (eq (printf "%v" (index $config "SERVER_PORT")) "") }}
+{{- $_ := set $config "SERVER_PORT" (printf "%v" .Values.server.service.port) -}}
+{{- end }}
+{{- if or (not (hasKey $config "WEB_URL")) (eq (printf "%v" (index $config "WEB_URL")) "") }}
+{{- $_ := set $config "WEB_URL" (printf "http://%s:%v" (include "test-station.webName" .) .Values.web.service.port) -}}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "test-station.serverName" . }}-env
+  name: {{ include "test-station.serverConfigMapName" . }}
   labels:
     {{- include "test-station.labels" . | nindent 4 }}
     app.kubernetes.io/component: server
 data:
-  SERVER_PORT: {{ .Values.server.env.SERVER_PORT | quote }}
-  PORTAL_URL: {{ default (printf "http://%s:%v" (include "test-station.portalName" .) .Values.portal.service.port) .Values.server.env.PORTAL_URL | quote }}
+  {{- range $key := keys $config | sortAlpha }}
+  {{ $key }}: {{ printf "%v" (index $config $key) | quote }}
+  {{- end }}
+{{- end }}

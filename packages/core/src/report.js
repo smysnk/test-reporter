@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { mergeCoverageSummaries, normalizeCoverageSummary } from './coverage.js';
-import { collectCoverageAttribution, lookupOwner } from './policy.js';
+import { collectCoverageAttribution, lookupOwner, evaluateCoverageThresholds } from './policy.js';
 
 export function createSummary(values = {}) {
   return {
@@ -145,8 +145,13 @@ export function buildReportFromSuiteResults(context, suiteResults, durationMs) {
 
   const allTests = packages.flatMap((pkg) => pkg.suites.flatMap((suite) => suite.tests));
   const coverageAttribution = collectCoverageAttribution(context.policy, packages, context.project);
-  const modules = buildModulesFromPackages(packages, coverageAttribution.files, context.policy);
+  const moduleResults = buildModulesFromPackages(packages, coverageAttribution.files, context.policy);
+  const thresholdEvaluation = evaluateCoverageThresholds(context.policy, moduleResults, {
+    coverageEnabled: !context.execution?.coverageExplicitlyDisabled,
+  });
+  const modules = thresholdEvaluation.modules;
   const overallCoverage = mergeCoverageSummaries(packages.map((pkg) => pkg.coverage).filter(Boolean));
+  const diagnosticsSummary = summarizeDiagnostics(packages);
 
   return {
     schemaVersion: '1',
@@ -169,6 +174,12 @@ export function buildReportFromSuiteResults(context, suiteResults, durationMs) {
       coverage: overallCoverage,
       classification: summarizeClassification(allTests),
       coverageAttribution: coverageAttribution.summary,
+      policy: {
+        failedThresholds: thresholdEvaluation.summary.failedRules,
+        warningThresholds: thresholdEvaluation.summary.warningRules,
+        diagnosticsSuites: diagnosticsSummary.totalSuites,
+        failedDiagnostics: diagnosticsSummary.failedSuites,
+      },
       filterOptions: {
         modules: dedupe(modules.map((moduleEntry) => moduleEntry.module)).sort(),
         packages: packages.map((pkg) => pkg.name).sort(),
@@ -177,8 +188,12 @@ export function buildReportFromSuiteResults(context, suiteResults, durationMs) {
     },
     packages,
     modules,
+    policy: {
+      thresholds: thresholdEvaluation.summary,
+      diagnostics: diagnosticsSummary,
+    },
     meta: {
-      phase: 5,
+      phase: 8,
       projectName: context.project.name,
       projectRootDir: context.project.rootDir,
       outputDir: context.project.outputDir,
@@ -219,6 +234,7 @@ function buildModulesFromPackages(packages, coverageFiles, policy) {
             command: suite.command,
             warnings: suite.warnings,
             coverage: null,
+            diagnostics: suite.diagnostics || null,
             rawArtifacts: suite.rawArtifacts,
             tests: [],
             summary: createSummary(),
@@ -364,6 +380,16 @@ function finalizePackageResult(pkg) {
 function stripSuitePackageName(suite) {
   const { packageName, ...rest } = suite;
   return rest;
+}
+
+function summarizeDiagnostics(packages) {
+  const diagnostics = (packages || []).flatMap((pkg) => pkg.suites.map((suite) => suite.diagnostics).filter(Boolean));
+  return {
+    totalSuites: diagnostics.length,
+    passedSuites: diagnostics.filter((entry) => entry.status === 'passed').length,
+    failedSuites: diagnostics.filter((entry) => entry.status === 'failed').length,
+    skippedSuites: diagnostics.filter((entry) => entry.status === 'skipped').length,
+  };
 }
 
 function normalizeRawArtifacts(rawArtifacts, suite) {

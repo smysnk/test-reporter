@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { runReport, formatConsoleSummary, createConsoleProgressReporter } from '@test-station/core';
+import { runReport, readJson, formatConsoleSummary, createConsoleProgressReporter } from '@test-station/core';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixtureConfigPath = path.join(repoRoot, 'tests', 'fixtures', 'phase8', 'test-station.fixture.config.mjs');
+const thresholdFixtureConfigPath = path.join(repoRoot, 'tests', 'fixtures', 'phase7', 'test-station.thresholds.fixture.config.mjs');
 
 test('runReport emits package and suite progress events including skipped packages from workspace discovery', async () => {
   const events = [];
@@ -96,6 +99,19 @@ test('createConsoleProgressReporter and formatConsoleSummary render the legacy-s
         coverage: null,
       },
     ],
+    modules: [
+      {
+        module: 'runtime',
+        durationMs: 42000,
+        summary: { total: 3, passed: 3, failed: 0, skipped: 0 },
+        coverage: { lines: { pct: 80 } },
+        owner: 'platform-team',
+        threshold: {
+          configured: true,
+          status: 'passed',
+        },
+      },
+    ],
   }, {}, { htmlPath: '/tmp/report/index.html' });
 
   assert.match(output, /Running Workspace Tests/);
@@ -108,4 +124,26 @@ test('createConsoleProgressReporter and formatConsoleSummary render the legacy-s
   assert.match(summary, /HTML report: \/tmp\/report\/index.html/);
   assert.match(summary, /PASS\s+app\s+00:42\s+tests 3 \| pass 3 \| fail 0 \| skip 0\s+L 80.00%/);
   assert.match(summary, /SKIP\s+empty\s+00:00\s+tests 0 \| pass 0 \| fail 0 \| skip 0/);
+  assert.match(summary, /Modules/);
+  assert.match(summary, /PASS\s+runtime\s+00:42\s+tests 3 \| pass 3 \| fail 0 \| skip 0\s+L 80.00% \| owner platform-team \| threshold passed/);
+});
+
+test('runReport writes module and ownership rollup artifacts', async () => {
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-station-phase8-rollups-'));
+  const execution = await runReport({
+    configPath: thresholdFixtureConfigPath,
+    outputDir,
+  });
+
+  assert.equal(execution.report.meta.phase, 8);
+  assert.equal(fs.existsSync(path.join(outputDir, 'modules.json')), true);
+  assert.equal(fs.existsSync(path.join(outputDir, 'ownership.json')), true);
+
+  const modulesArtifact = readJson(path.join(outputDir, 'modules.json'));
+  const ownershipArtifact = readJson(path.join(outputDir, 'ownership.json'));
+
+  assert.equal(modulesArtifact.modules[0].module, 'runtime');
+  assert.equal(modulesArtifact.modules[0].themes[0].theme, 'core');
+  assert.equal(ownershipArtifact.modules[0].owner, 'platform-team');
+  assert.equal(ownershipArtifact.themes[0].owner, 'runtime-core-team');
 });

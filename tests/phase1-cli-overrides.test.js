@@ -28,6 +28,28 @@ test('parseCliArgs supports workspace filters, package alias, and output-dir', (
   assert.deepEqual(parsed.workspaceFilters, ['web', 'transpiler']);
 });
 
+test('parseCliArgs leaves coverage undefined when the flag is omitted', () => {
+  const parsed = parseCliArgs([
+    'run',
+    '--config', './test-station.config.mjs',
+    '--workspace', 'app',
+  ]);
+
+  assert.equal(parsed.coverage, undefined);
+  assert.deepEqual(parsed.workspaceFilters, ['app']);
+});
+
+test('parseCliArgs supports explicit no-coverage overrides', () => {
+  const parsed = parseCliArgs([
+    'run',
+    '--config', './test-station.config.mjs',
+    '--coverage',
+    '--no-coverage',
+  ]);
+
+  assert.equal(parsed.coverage, false);
+});
+
 test('runReport filters suites by workspace and writes artifacts to the overridden output directory', async () => {
   const outputDir = path.join(fixtureDir, 'artifacts', 'filtered-app');
   fs.rmSync(outputDir, { recursive: true, force: true });

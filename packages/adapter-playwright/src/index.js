@@ -1,41 +1,102 @@
 import path from 'node:path';
+import fs from 'node:fs';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
+import istanbulCoverage from 'istanbul-lib-coverage';
 
 export const id = 'playwright';
 export const description = 'Playwright adapter';
+
+const { createCoverageMap } = istanbulCoverage;
 
 export function createPlaywrightAdapter() {
   return {
     id,
     description,
-    phase: 3,
-    async run({ project, suite }) {
+    phase: 8,
+    async run({ project, suite, execution: executionOptions }) {
       const commandSpec = parseCommandSpec(suite.command);
-      const execution = await spawnCommand(commandSpec.command, appendPlaywrightJsonArgs(commandSpec.args), {
+      const browserCoverageEnabled = shouldCollectBrowserCoverage({
+        execution: executionOptions,
+        suite,
+      });
+      const coverageDir = browserCoverageEnabled
+        ? fs.mkdtempSync(
+            path.join(
+              os.tmpdir(),
+              `test-station-playwright-coverage-${slugify(suite.packageName || 'default')}-${slugify(suite.id)}-`
+            )
+          )
+        : null;
+      const commandExecution = await spawnCommand(commandSpec.command, appendPlaywrightJsonArgs(commandSpec.args), {
         cwd: suite.cwd || project.rootDir,
-        env: resolveSuiteEnv(suite.env),
+        env: resolveSuiteEnv({
+          ...(suite.env || {}),
+          ...(browserCoverageEnabled
+            ? {
+                PLAYWRIGHT_BROWSER_COVERAGE: '1',
+                PLAYWRIGHT_BROWSER_COVERAGE_DIR: coverageDir,
+              }
+            : {}),
+        }),
       });
 
-      const payload = extractJsonPayload(execution.stdout || execution.stderr);
+      const payload = extractJsonPayload(commandExecution.stdout || commandExecution.stderr);
       const parsed = parsePlaywrightReport(payload, suite.cwd || project.rootDir);
+      const rawArtifacts = [
+        {
+          relativePath: `${slugify(suite.packageName || 'default')}-${slugify(suite.id)}-playwright.json`,
+          content: JSON.stringify(payload, null, 2),
+        },
+      ];
+      const warnings = [];
+      let coverage = null;
+
+      if (browserCoverageEnabled && coverageDir) {
+        const coverageArtifactBase = `${slugify(suite.packageName || 'default')}-${slugify(suite.id)}-playwright-coverage`;
+        coverage = mergeBrowserCoverage({
+          coverageDir,
+          packageName: suite.packageName || null,
+          coverageRootDir: suite.cwd || project.rootDir,
+          projectRootDir: project.rootDir,
+        });
+
+        rawArtifacts.push({
+          relativePath: coverageArtifactBase,
+          sourcePath: coverageDir,
+          kind: 'directory',
+        });
+
+        if (coverage) {
+          const coverageSummaryPath = path.join(coverageDir, 'coverage-summary.json');
+          const mergedCoveragePath = path.join(coverageDir, 'merged-coverage.json');
+          fs.writeFileSync(coverageSummaryPath, `${JSON.stringify(coverage, null, 2)}\n`);
+          fs.writeFileSync(mergedCoveragePath, `${JSON.stringify(buildMergedCoveragePayload(coverageDir), null, 2)}\n`);
+          rawArtifacts.push({
+            relativePath: `${coverageArtifactBase}/coverage-summary.json`,
+            sourcePath: coverageSummaryPath,
+          });
+          rawArtifacts.push({
+            relativePath: `${coverageArtifactBase}/merged-coverage.json`,
+            sourcePath: mergedCoveragePath,
+          });
+        } else {
+          warnings.push('Browser coverage was requested, but no window.__coverage__ payloads were collected.');
+        }
+      }
 
       return {
-        status: deriveSuiteStatus(parsed.summary, execution.exitCode),
-        durationMs: execution.durationMs,
+        status: deriveSuiteStatus(parsed.summary, commandExecution.exitCode),
+        durationMs: commandExecution.durationMs,
         summary: parsed.summary,
-        coverage: null,
+        coverage,
         tests: parsed.tests,
-        warnings: [],
+        warnings,
         output: {
-          stdout: execution.stdout,
-          stderr: execution.stderr,
+          stdout: commandExecution.stdout,
+          stderr: commandExecution.stderr,
         },
-        rawArtifacts: [
-          {
-            relativePath: `${slugify(suite.packageName || 'default')}-${slugify(suite.id)}-playwright.json`,
-            content: JSON.stringify(payload, null, 2),
-          },
-        ],
+        rawArtifacts,
       };
     },
   };
@@ -66,6 +127,14 @@ function appendPlaywrightJsonArgs(args) {
     filtered.push(token);
   }
   return [...filtered, '--reporter=json'];
+}
+
+function shouldCollectBrowserCoverage(context) {
+  return Boolean(
+    context?.execution?.coverage
+      && context?.suite?.coverage?.enabled !== false
+      && context?.suite?.coverage?.strategy === 'browser-istanbul'
+  );
 }
 
 function tokenizeCommand(command) {
@@ -168,6 +237,157 @@ function parsePlaywrightReport(report, workspaceDir) {
     }),
     tests: tests.sort(sortTests),
   };
+}
+
+function mergeBrowserCoverage(options) {
+  const payloads = readCoveragePayloads(options.coverageDir);
+  if (payloads.length === 0) {
+    return null;
+  }
+
+  const coverageMap = createCoverageMap({});
+  for (const payload of payloads) {
+    const pageEntries = Array.isArray(payload.pages) ? payload.pages : [];
+    for (const pageEntry of pageEntries) {
+      if (pageEntry?.coverage && typeof pageEntry.coverage === 'object') {
+        coverageMap.merge(pageEntry.coverage);
+      }
+    }
+  }
+
+  const files = coverageMap.files()
+    .map((filePath) => normalizeCoverageFileEntry(coverageMap, filePath, options))
+    .filter(Boolean)
+    .sort((left, right) => left.path.localeCompare(right.path));
+
+  if (files.length === 0) {
+    return null;
+  }
+
+  return normalizeCoverageSummary({ files }, options.packageName || null);
+}
+
+function buildMergedCoveragePayload(coverageDir) {
+  const payloads = readCoveragePayloads(coverageDir);
+  const coverageMap = createCoverageMap({});
+  for (const payload of payloads) {
+    for (const pageEntry of payload.pages || []) {
+      if (pageEntry?.coverage && typeof pageEntry.coverage === 'object') {
+        coverageMap.merge(pageEntry.coverage);
+      }
+    }
+  }
+  return coverageMap.toJSON();
+}
+
+function readCoveragePayloads(coverageDir) {
+  if (!coverageDir || !fs.existsSync(coverageDir)) {
+    return [];
+  }
+
+  return fs.readdirSync(coverageDir)
+    .filter((fileName) => fileName.endsWith('.json'))
+    .filter((fileName) => !['coverage-summary.json', 'merged-coverage.json'].includes(fileName))
+    .map((fileName) => path.join(coverageDir, fileName))
+    .map((filePath) => {
+      try {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function normalizeCoverageFileEntry(coverageMap, filePath, options = {}) {
+  const normalizedPath = normalizeSourcePath(filePath, options.projectRootDir);
+  if (options.coverageRootDir && !isWithinDirectory(normalizedPath, options.coverageRootDir)) {
+    return null;
+  }
+
+  const summary = coverageMap.fileCoverageFor(filePath).toSummary();
+  return {
+    path: normalizedPath,
+    lines: createCoverageMetric(summary.lines?.covered, summary.lines?.total),
+    statements: createCoverageMetric(summary.statements?.covered, summary.statements?.total),
+    functions: createCoverageMetric(summary.functions?.covered, summary.functions?.total),
+    branches: createCoverageMetric(summary.branches?.covered, summary.branches?.total),
+    packageName: options.packageName || null,
+  };
+}
+
+function normalizeCoverageSummary(coverage, packageName = null) {
+  if (!coverage) {
+    return null;
+  }
+
+  const files = Array.isArray(coverage.files)
+    ? coverage.files.map((file) => ({
+        path: file.path,
+        lines: file.lines || null,
+        statements: file.statements || null,
+        functions: file.functions || null,
+        branches: file.branches || null,
+        packageName: file.packageName || packageName || null,
+      }))
+    : [];
+
+  return {
+    lines: coverage.lines || aggregateCoverageMetric(files, 'lines'),
+    statements: coverage.statements || aggregateCoverageMetric(files, 'statements'),
+    functions: coverage.functions || aggregateCoverageMetric(files, 'functions'),
+    branches: coverage.branches || aggregateCoverageMetric(files, 'branches'),
+    files,
+  };
+}
+
+function aggregateCoverageMetric(files, metricKey) {
+  const valid = files
+    .map((file) => file?.[metricKey])
+    .filter((metric) => metric && Number.isFinite(metric.total));
+
+  if (valid.length === 0) {
+    return null;
+  }
+
+  const total = valid.reduce((sum, metric) => sum + metric.total, 0);
+  const covered = valid.reduce((sum, metric) => sum + metric.covered, 0);
+  return createCoverageMetric(covered, total);
+}
+
+function createCoverageMetric(covered, total) {
+  if (!Number.isFinite(total)) {
+    return null;
+  }
+  const safeTotal = Math.max(0, total);
+  const safeCovered = Number.isFinite(covered) ? Math.max(0, Math.min(safeTotal, covered)) : 0;
+  const pct = safeTotal === 0 ? 100 : Number(((safeCovered / safeTotal) * 100).toFixed(2));
+  return {
+    covered: safeCovered,
+    total: safeTotal,
+    pct,
+  };
+}
+
+function normalizeSourcePath(filePath, projectRootDir) {
+  let nextPath = String(filePath || '');
+  nextPath = nextPath.replace(/^file:\/\//, '');
+  nextPath = nextPath.replace(/^webpack:\/\/_N_E\//, '');
+  nextPath = nextPath.replace(/^webpack:\/\//, '');
+  nextPath = nextPath.replace(/^\.\//, '');
+  nextPath = nextPath.split('?')[0];
+  nextPath = nextPath.split('#')[0];
+
+  if (path.isAbsolute(nextPath)) {
+    return path.normalize(nextPath);
+  }
+
+  return path.resolve(projectRootDir || process.cwd(), nextPath);
+}
+
+function isWithinDirectory(targetPath, rootDir) {
+  const relative = path.relative(rootDir, targetPath);
+  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
 function collectPlaywrightTests(suite, titleTrail, bucket, rootDir) {

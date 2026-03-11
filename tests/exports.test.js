@@ -336,7 +336,7 @@ test('adapter and plugin scaffolds expose stable ids', () => {
   assert.equal(createJestAdapter().id, 'jest');
   assert.equal(createNodeTestAdapter().phase, 3);
   assert.equal(createVitestAdapter().phase, 3);
-  assert.equal(createPlaywrightAdapter().phase, 3);
+  assert.equal(createPlaywrightAdapter().phase, 8);
   assert.equal(createShellAdapter().phase, 3);
   assert.equal(createJestAdapter().phase, 3);
   const sourceAnalysisPlugin = createSourceAnalysisPlugin();

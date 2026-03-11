@@ -14,10 +14,12 @@ export function createNodeTestAdapter() {
     phase: 3,
     async run({ project, suite, execution }) {
       const commandSpec = parseCommandSpec(suite.command);
-      const directNodeTest = isDirectNodeTestCommand(commandSpec);
-      const primaryExecution = await executeNodeTestRun(commandSpec, {
+      const resolvedCommand = resolveNodeTestCommand(commandSpec, {
         cwd: suite.cwd || project.rootDir,
-        suiteEnv: suite.env,
+      });
+      const primaryExecution = await executeNodeTestRun(resolvedCommand.commandSpec, {
+        cwd: suite.cwd || project.rootDir,
+        suiteEnv: mergeEnvRecords(suite.env, resolvedCommand.env),
         rawRelativePath: `${slugify(suite.packageName || 'default')}-${slugify(suite.id)}-node.ndjson`,
       });
       const parsed = parseNodeEvents(parseNdjson(primaryExecution.stdout), suite.cwd || project.rootDir);
@@ -26,13 +28,20 @@ export function createNodeTestAdapter() {
       let coverageArtifact = null;
 
       if (execution?.coverage && suite?.coverage?.enabled !== false) {
-        if (!directNodeTest) {
-          warnings.push('Coverage pass skipped for wrapped node:test command; use a direct node --test invocation to collect coverage.');
+        const coverageCommandSpec = suite?.coverage?.command
+          ? parseCommandSpec(suite.coverage.command)
+          : commandSpec;
+        const resolvedCoverageCommand = resolveNodeTestCommand(coverageCommandSpec, {
+          cwd: suite.cwd || project.rootDir,
+        });
+
+        if (!resolvedCoverageCommand.directNodeTest) {
+          warnings.push(createUnsupportedCoverageWarning(Boolean(suite?.coverage?.command)));
         } else {
-          const coverageExecution = await executeNodeTestRun(commandSpec, {
+          const coverageExecution = await executeNodeTestRun(resolvedCoverageCommand.commandSpec, {
             cwd: suite.cwd || project.rootDir,
             enableCoverage: true,
-            suiteEnv: suite.env,
+            suiteEnv: mergeEnvRecords(suite.env, resolvedCoverageCommand.env),
             rawRelativePath: `${slugify(suite.packageName || 'default')}-${slugify(suite.id)}-node-coverage.ndjson`,
           });
           const coverageParsed = parseNodeEvents(parseNdjson(coverageExecution.stdout), suite.cwd || project.rootDir);
@@ -153,8 +162,205 @@ function tokenizeCommand(command) {
 }
 
 function isDirectNodeTestCommand(commandSpec) {
-  const binary = path.basename(commandSpec.command).toLowerCase();
+  const binary = normalizeBinaryName(commandSpec.command);
   return binary.startsWith('node') && commandSpec.args.includes('--test');
+}
+
+function resolveNodeTestCommand(commandSpec, options = {}) {
+  const normalized = extractLeadingEnvAssignments(commandSpec);
+  if (isDirectNodeTestCommand(normalized.commandSpec)) {
+    return {
+      commandSpec: normalized.commandSpec,
+      env: normalized.env,
+      directNodeTest: true,
+    };
+  }
+
+  const packageScript = resolvePackageScriptNodeTestCommand(normalized.commandSpec, options);
+  if (packageScript) {
+    return {
+      commandSpec: packageScript.commandSpec,
+      env: mergeEnvRecords(normalized.env, packageScript.env),
+      directNodeTest: true,
+    };
+  }
+
+  return {
+    commandSpec: normalized.commandSpec,
+    env: normalized.env,
+    directNodeTest: false,
+  };
+}
+
+function resolvePackageScriptNodeTestCommand(commandSpec, options = {}) {
+  const invocation = parsePackageScriptInvocation(commandSpec);
+  if (!invocation) {
+    return null;
+  }
+
+  const packageJsonPath = findClosestPackageJson(options.cwd);
+  if (!packageJsonPath) {
+    return null;
+  }
+
+  const seenScripts = options.seenScripts || new Set();
+  const scriptKey = `${packageJsonPath}:${invocation.scriptName}`;
+  if (seenScripts.has(scriptKey)) {
+    return null;
+  }
+
+  const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+  const scriptValue = pkg?.scripts?.[invocation.scriptName];
+  if (typeof scriptValue !== 'string' || scriptValue.trim().length === 0) {
+    return null;
+  }
+
+  const scriptCommand = parseCommandSpec(scriptValue);
+  if (containsShellControlTokens([scriptCommand.command, ...scriptCommand.args])) {
+    return null;
+  }
+
+  const normalizedScript = extractLeadingEnvAssignments(scriptCommand);
+  const scriptCommandSpec = appendForwardedArgs(normalizedScript.commandSpec, invocation.forwardedArgs);
+  if (isDirectNodeTestCommand(scriptCommandSpec)) {
+    return {
+      commandSpec: scriptCommandSpec,
+      env: normalizedScript.env,
+    };
+  }
+
+  const nested = resolvePackageScriptNodeTestCommand(scriptCommandSpec, {
+    cwd: path.dirname(packageJsonPath),
+    seenScripts: new Set([...seenScripts, scriptKey]),
+  });
+  if (!nested) {
+    return null;
+  }
+
+  return {
+    commandSpec: nested.commandSpec,
+    env: mergeEnvRecords(normalizedScript.env, nested.env),
+  };
+}
+
+function extractLeadingEnvAssignments(commandSpec) {
+  const tokens = [commandSpec.command, ...commandSpec.args];
+  const env = {};
+  let index = 0;
+
+  while (index < tokens.length && isEnvAssignmentToken(tokens[index])) {
+    const token = tokens[index];
+    const equalsIndex = token.indexOf('=');
+    env[token.slice(0, equalsIndex)] = token.slice(equalsIndex + 1);
+    index += 1;
+  }
+
+  if (index >= tokens.length) {
+    return {
+      commandSpec,
+      env,
+    };
+  }
+
+  return {
+    commandSpec: {
+      command: tokens[index],
+      args: tokens.slice(index + 1),
+    },
+    env,
+  };
+}
+
+function parsePackageScriptInvocation(commandSpec) {
+  const binary = normalizeBinaryName(commandSpec.command);
+  const args = [...commandSpec.args];
+
+  if (binary === 'yarn') {
+    let scriptIndex = 0;
+    if (args[0] === 'run') {
+      scriptIndex = 1;
+    }
+    const scriptName = args[scriptIndex];
+    if (!scriptName || scriptName.startsWith('-')) {
+      return null;
+    }
+    return {
+      manager: 'yarn',
+      scriptName,
+      forwardedArgs: normalizeForwardedArgs(args.slice(scriptIndex + 1)),
+    };
+  }
+
+  if (binary === 'npm' || binary === 'pnpm') {
+    if (args[0] !== 'run') {
+      return null;
+    }
+    const scriptName = args[1];
+    if (!scriptName || scriptName.startsWith('-')) {
+      return null;
+    }
+    return {
+      manager: binary,
+      scriptName,
+      forwardedArgs: normalizeForwardedArgs(args.slice(2)),
+    };
+  }
+
+  return null;
+}
+
+function normalizeForwardedArgs(args) {
+  if (!Array.isArray(args) || args.length === 0) {
+    return [];
+  }
+  if (args[0] === '--') {
+    return args.slice(1);
+  }
+  return args;
+}
+
+function appendForwardedArgs(commandSpec, forwardedArgs) {
+  if (!Array.isArray(forwardedArgs) || forwardedArgs.length === 0) {
+    return commandSpec;
+  }
+  return {
+    command: commandSpec.command,
+    args: [...commandSpec.args, ...forwardedArgs],
+  };
+}
+
+function findClosestPackageJson(startDir) {
+  let current = path.resolve(startDir || process.cwd());
+  while (true) {
+    const candidate = path.join(current, 'package.json');
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+    const parent = path.dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+}
+
+function containsShellControlTokens(tokens) {
+  return tokens.some((token) => ['&&', '||', ';', '|', '>', '>>', '<', '2>', '2>>', '2>&1'].includes(token));
+}
+
+function isEnvAssignmentToken(token) {
+  return typeof token === 'string' && /^[A-Za-z_][A-Za-z0-9_]*=/.test(token);
+}
+
+function normalizeBinaryName(command) {
+  return path.basename(command || '').toLowerCase().replace(/\.cmd$/, '');
+}
+
+function createUnsupportedCoverageWarning(hasCoverageCommand) {
+  if (hasCoverageCommand) {
+    return 'Coverage pass skipped for suite.coverage.command because it did not resolve to a supported node:test pattern.';
+  }
+  return 'Coverage pass skipped for wrapped node:test command; use a direct node --test invocation, a supported yarn/npm/pnpm package script, or suite.coverage.command.';
 }
 
 function withReporterArgs(args, options = {}) {
@@ -497,6 +703,13 @@ function sanitizeEnv(env) {
   const nextEnv = { ...env };
   delete nextEnv.NODE_TEST_CONTEXT;
   return nextEnv;
+}
+
+function mergeEnvRecords(...records) {
+  return records.reduce((merged, record) => ({
+    ...merged,
+    ...normalizeEnvRecord(record),
+  }), {});
 }
 
 function resolveSuiteEnv(suiteEnv) {

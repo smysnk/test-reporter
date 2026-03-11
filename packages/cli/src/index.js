@@ -10,7 +10,7 @@ export function parseCliArgs(argv) {
     output: null,
     outputDir: null,
     dryRun: false,
-    coverage: false,
+    coverage: undefined,
     workspaceFilters: [],
   };
 
@@ -47,6 +47,10 @@ export function parseCliArgs(argv) {
     }
     if (token === '--coverage') {
       parsed.coverage = true;
+      continue;
+    }
+    if (token === '--no-coverage') {
+      parsed.coverage = false;
     }
   }
 
@@ -59,7 +63,7 @@ export function renderHelp() {
     '',
     'Commands:',
     '  test-station inspect --config ./test-station.config.mjs',
-    '  test-station run --config ./test-station.config.mjs [--dry-run] [--coverage] [--workspace <name>|--package <name>] [--output-dir <path>]',
+    '  test-station run --config ./test-station.config.mjs [--dry-run] [--coverage|--no-coverage] [--workspace <name>|--package <name>] [--output-dir <path>]',
     '  test-station render --input ./artifacts/workspace-tests/report.json --output ./artifacts/workspace-tests',
   ].join('\n');
 }
@@ -112,7 +116,11 @@ export async function runCli(argv = process.argv.slice(2)) {
       process.stdout.write(`${JSON.stringify({ report: execution.artifactPaths.reportJsonPath, html: htmlPath }, null, 2)}\n`);
     }
 
-    return execution.report.summary.failedPackages > 0 || execution.report.summary.failedSuites > 0 ? 1 : 0;
+    return execution.report.summary.failedPackages > 0
+      || execution.report.summary.failedSuites > 0
+      || (execution.report.summary?.policy?.failedThresholds || 0) > 0
+      ? 1
+      : 0;
   }
 
   if (args.command === 'render') {

@@ -785,7 +785,7 @@ function createGraphqlModels() {
         projectId: 'project-1',
         projectVersionId: 'version-1',
         title: '0.1.0 release',
-        body: 'Initial portal and API release.',
+        body: 'Initial web and API release.',
         sourceUrl: 'https://example.test/releases/0.1.0',
         publishedAt: '2026-03-09T16:00:00.000Z',
         metadata: {},

@@ -21,7 +21,7 @@ services:
     environment:
       NODE_ENV: production
       SERVER_PORT: ${SERVER_PORT:-4400}
-      PORTAL_URL: ${PORTAL_URL:-http://localhost:3001}
+      WEB_URL: ${WEB_URL:-http://localhost:3001}
       DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/test_station}
       INGEST_API_KEYS: ${INGEST_API_KEYS:-local-dev-shared-key}
       INGEST_SHARED_KEY: ${INGEST_SHARED_KEY:-}
@@ -30,28 +30,28 @@ services:
     depends_on:
       - postgres
 
-  portal:
+  web:
     image: ${IMAGE:-test-station:local}
     build:
       context: ..
       dockerfile: docker/Dockerfile
-    command: ["portal"]
+    command: ["web"]
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      PORTAL_PORT: ${PORTAL_PORT:-3001}
+      WEB_PORT: ${WEB_PORT:-3001}
       SERVER_PORT: ${SERVER_PORT:-4400}
       SERVER_URL: ${SERVER_URL:-http://server:4400}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3001}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-test-station-portal-development-secret}
-      PORTAL_DEFAULT_PROJECT_KEYS: ${PORTAL_DEFAULT_PROJECT_KEYS:-*}
-      PORTAL_ADMIN_EMAILS: ${PORTAL_ADMIN_EMAILS:-}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-test-station-web-development-secret}
+      WEB_DEFAULT_PROJECT_KEYS: ${WEB_DEFAULT_PROJECT_KEYS:-*}
+      WEB_ADMIN_EMAILS: ${WEB_ADMIN_EMAILS:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
     ports:
-      - "${PORTAL_PORT:-3001}:${PORTAL_PORT:-3001}"
+      - "${WEB_PORT:-3001}:${WEB_PORT:-3001}"
     depends_on:
       - server
 

@@ -1,0 +1,57 @@
+{
+  "rules": [
+    {
+      "package": "app",
+      "include": ["tests/runtime/**/*.test.js"],
+      "module": "runtime",
+      "theme": "core"
+    }
+  ],
+  "coverageRules": [
+    {
+      "package": "app",
+      "include": ["src/**/*.js"],
+      "module": "runtime",
+      "theme": "core"
+    }
+  ],
+  "ownership": {
+    "modules": [
+      {
+        "module": "runtime",
+        "owner": "platform-team"
+      }
+    ],
+    "themes": [
+      {
+        "module": "runtime",
+        "theme": "core",
+        "owner": "runtime-core-team"
+      }
+    ]
+  },
+  "thresholds": {
+    "modules": [
+      {
+        "module": "runtime",
+        "coverage": {
+          "linesPct": 45,
+          "branchesPct": 15
+        },
+        "enforcement": "error",
+        "reason": "Module baseline after phase 6"
+      }
+    ],
+    "themes": [
+      {
+        "module": "runtime",
+        "theme": "core",
+        "coverage": {
+          "linesPct": 50
+        },
+        "enforcement": "warn",
+        "reason": "Theme baseline after phase 6"
+      }
+    ]
+  }
+}

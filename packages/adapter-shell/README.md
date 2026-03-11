@@ -17,6 +17,32 @@ npm install --save-dev @test-station/adapter-shell
 - supports the `single-check-json-v1` result format for structured single-check suites
 - writes raw shell logs under `raw/`
 
+## Structured Single-Check JSON
+
+Use `resultFormat: 'single-check-json-v1'` when the command prints a single JSON object to stdout and you want that payload normalized as one structured check.
+
+```js
+{
+  adapter: 'shell',
+  command: [process.execPath, './scripts/check-mappings.mjs'],
+  resultFormat: 'single-check-json-v1',
+  resultFormatOptions: {
+    name: 'Mapping parity',
+    assertions: [
+      'Compare local mappings against the upstream reference list.',
+    ],
+    module: 'transpiler',
+    theme: 'analysis',
+    warningFields: [
+      { field: 'missingFromLocal', label: 'mappings missing locally', mode: 'count-array' },
+    ],
+    rawDetailsFields: ['referenceCount', 'localCount', 'missingFromLocal', 'localOnly'],
+  },
+}
+```
+
+The adapter stores the JSON payload as a raw artifact, maps configured warning fields into human-readable warnings, and surfaces the selected fields under `test.rawDetails`.
+
 ## Direct Use
 
 ```js

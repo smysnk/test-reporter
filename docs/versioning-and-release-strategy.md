@@ -6,7 +6,7 @@ All publishable `@test-station/*` packages move in lockstep on the same version.
 
 Current baseline for external consumers:
 
-- `0.1.0`
+- `0.2.0`
 
 That version means:
 
@@ -31,7 +31,10 @@ Bump the major version when any of these break:
 Bump the minor version for additive changes:
 
 - new optional config fields
+- new optional CLI flags or aliases that do not break existing commands
 - new adapter capabilities
+- new machine-readable artifacts such as `modules.json` or `ownership.json`
+- new optional policy features such as threshold manifests or diagnostics reruns
 - new optional report metadata
 - new built-in plugins
 - new renderer features that do not break the report schema
@@ -67,14 +70,17 @@ Internal source layout inside `packages/*/src` is not a compatibility promise.
 ## Release checklist
 
 1. Run `yarn lint`.
-2. Run `yarn test`.
-3. Run `yarn build`.
-4. Run the external consumer example:
-   - `node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs`
-5. Verify the generated HTML report opens and renders module/package drilldown correctly.
-6. Push the validated release commit to the `release` branch.
-7. Let the publish workflow compute the npm package version from the GitHub Actions build number.
-8. Let the publish workflow run the npm release helper and publish all non-private `@test-station/*` packages at that computed version.
+2. Run `yarn test:node`.
+3. Run `yarn test`.
+4. Run `yarn build`.
+5. Run the external consumer example:
+   - `node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs --coverage`
+6. Verify the generated output contains `report.json`, `modules.json`, `ownership.json`, `index.html`, and expected raw artifacts.
+7. Verify the generated HTML report opens and renders module/package drilldown correctly.
+8. If the release touched thresholds, diagnostics, or adapter-specific coverage paths, verify those surfaces in the generated report and console summary.
+9. Push the validated release commit to the `release` branch.
+10. Let the publish workflow compute the npm package version from the GitHub Actions build number.
+11. Let the publish workflow run the npm release helper and publish all non-private `@test-station/*` packages at that computed version.
 
 Manual workflow dispatch can run the same npm release helper in validation-only mode, and only publishes when `publish_npm` is explicitly enabled.
 
@@ -82,7 +88,7 @@ Manual workflow dispatch can run the same npm release helper in validation-only 
 
 The npm release workflow uses a build-number versioning model:
 
-- checked-in package manifests keep the baseline semver line such as `0.1.0`
+- checked-in package manifests keep the baseline semver line such as `0.2.0`
 - the publish workflow computes a concrete publish version from CI metadata
 - the default mode is `major.minor.<github_run_number>`
 - all publishable `@test-station/*` packages are rewritten to that same concrete version before `npm pack` or `npm publish`
@@ -103,12 +109,12 @@ Versioning controls:
 
 Examples:
 
-- `PATCH_MODE=build`, `BUILD_NUMBER=412`, `VERSION_MAJOR=0`, `VERSION_MINOR=1` -> `0.1.412`
+- `PATCH_MODE=build`, `BUILD_NUMBER=412`, `VERSION_MAJOR=0`, `VERSION_MINOR=2` -> `0.2.412`
 - `PATCH_MODE=fixed-minus-build`, `PATCH_FIXED=10000`, `BUILD_NUMBER=412`, `VERSION_MAJOR=1`, `VERSION_MINOR=0` -> `1.0.9588`
 
 ## Consumer compatibility promise
 
-For `0.1.x` releases:
+For `0.2.x` releases:
 
 - config changes are additive only
 - report schema changes are additive only

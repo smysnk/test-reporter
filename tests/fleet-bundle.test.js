@@ -5,16 +5,16 @@ import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 
-test('fleet bundle files exist for unified portal and server deployment', () => {
+test('fleet bundle files exist for unified web and server deployment', () => {
   const expectedFiles = [
     'fleet.yaml',
     'fleet/test-station/Chart.yaml',
     'fleet/test-station/values.yaml',
     'fleet/test-station/templates/server-deployment.yaml',
     'fleet/test-station/templates/server-service.yaml',
-    'fleet/test-station/templates/portal-deployment.yaml',
-    'fleet/test-station/templates/portal-service.yaml',
-    'fleet/test-station/templates/portal-ingress.yaml',
+    'fleet/test-station/templates/web-deployment.yaml',
+    'fleet/test-station/templates/web-service.yaml',
+    'fleet/test-station/templates/web-ingress.yaml',
   ];
 
   for (const relativePath of expectedFiles) {

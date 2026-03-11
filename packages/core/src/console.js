@@ -47,6 +47,17 @@ export function createConsoleProgressReporter(options = {}) {
         return;
       }
 
+      if (event.type === 'suite-diagnostics-start') {
+        writeLine(stream, `    diagnostics: running ${event.diagnosticsLabel || 'diagnostics rerun'}`);
+        return;
+      }
+
+      if (event.type === 'suite-diagnostics-complete') {
+        const result = event.result || {};
+        writeLine(stream, `    diagnostics: ${formatStatus(result.status)} ${formatDuration(result.durationMs || 0)} ${result.command || ''}`.trimEnd());
+        return;
+      }
+
       if (event.type === 'package-complete') {
         writeLine(
           stream,
@@ -71,6 +82,11 @@ export function formatConsoleSummary(report, artifactPaths = {}, options = {}) {
   const coverageLine = formatCoverageLine(report?.summary?.coverage);
   if (coverageLine) {
     lines.push(coverageLine);
+  }
+
+  const policyLine = formatPolicyLine(report?.summary?.policy);
+  if (policyLine) {
+    lines.push(policyLine);
   }
 
   lines.push(`Duration: ${formatDuration(report?.durationMs || report?.summary?.durationMs || 0)}`);
@@ -100,6 +116,15 @@ export function formatConsoleSummary(report, artifactPaths = {}, options = {}) {
     lines.push(Number.isFinite(lineCoverage) ? `${prefix}  L ${lineCoverage.toFixed(2)}%` : prefix);
   }
 
+  const modules = Array.isArray(report?.modules) ? report.modules : [];
+  if (modules.length > 0) {
+    lines.push('-'.repeat(SECTION_WIDTH));
+    lines.push('Modules');
+    for (const moduleEntry of modules) {
+      lines.push(formatModuleLine(moduleEntry));
+    }
+  }
+
   lines.push('='.repeat(SECTION_WIDTH));
   return `${lines.join('\n')}\n`;
 }
@@ -123,14 +148,75 @@ function formatCoverageLine(coverage) {
   return `Coverage: ${metrics.map(([label, pct]) => `${label} ${pct.toFixed(2)}%`).join(' | ')}`;
 }
 
+function formatPolicyLine(policy) {
+  const metrics = [];
+  if (Number.isFinite(policy?.failedThresholds) && policy.failedThresholds > 0) {
+    metrics.push(`threshold failures ${policy.failedThresholds}`);
+  }
+  if (Number.isFinite(policy?.warningThresholds) && policy.warningThresholds > 0) {
+    metrics.push(`threshold warnings ${policy.warningThresholds}`);
+  }
+  if (Number.isFinite(policy?.diagnosticsSuites) && policy.diagnosticsSuites > 0) {
+    metrics.push(`diagnostic reruns ${policy.diagnosticsSuites}`);
+  }
+  if (Number.isFinite(policy?.failedDiagnostics) && policy.failedDiagnostics > 0) {
+    metrics.push(`failed diagnostics ${policy.failedDiagnostics}`);
+  }
+  if (metrics.length === 0) {
+    return null;
+  }
+  return `Policy: ${metrics.join(' | ')}`;
+}
+
 function formatSummaryInline(summary) {
   return `tests ${summary.total || 0} | pass ${summary.passed || 0} | fail ${summary.failed || 0} | skip ${summary.skipped || 0}`;
 }
 
 function formatStatus(status) {
   if (status === 'failed') return 'FAIL';
+  if (status === 'warn') return 'WARN';
   if (status === 'skipped') return 'SKIP';
   return 'PASS';
+}
+
+function formatModuleLine(moduleEntry) {
+  const status = resolveModuleStatus(moduleEntry);
+  const base = [
+    formatStatus(status).padEnd(5),
+    String(moduleEntry?.module || 'uncategorized').padEnd(20),
+    formatDuration(moduleEntry?.durationMs || 0),
+    formatSummaryInline(moduleEntry?.summary || zeroSummary()),
+  ].join('  ');
+  const details = [];
+
+  const lineCoverage = moduleEntry?.coverage?.lines?.pct;
+  if (Number.isFinite(lineCoverage)) {
+    details.push(`L ${lineCoverage.toFixed(2)}%`);
+  }
+  if (moduleEntry?.owner) {
+    details.push(`owner ${moduleEntry.owner}`);
+  }
+  if (moduleEntry?.threshold?.configured) {
+    details.push(`threshold ${moduleEntry.threshold.status}`);
+  }
+
+  return details.length > 0 ? `${base}  ${details.join(' | ')}` : base;
+}
+
+function resolveModuleStatus(moduleEntry) {
+  if (moduleEntry?.threshold?.status === 'failed') {
+    return 'failed';
+  }
+  if (moduleEntry?.threshold?.status === 'warn') {
+    return 'warn';
+  }
+  if ((moduleEntry?.summary?.failed || 0) > 0) {
+    return 'failed';
+  }
+  if ((moduleEntry?.summary?.total || 0) === 0 && !moduleEntry?.coverage) {
+    return 'skipped';
+  }
+  return 'passed';
 }
 
 function formatDuration(durationMs) {

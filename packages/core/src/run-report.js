@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { loadConfig, applyConfigOverrides, resolveProjectContext } from './config.js';
 import { preparePolicyContext, applyPolicyPipeline } from './policy.js';
 import { resolveAdapterForSuite } from './adapters.js';
@@ -25,6 +26,7 @@ export async function runReport(options = {}) {
     execution: {
       dryRun: options.dryRun ?? Boolean(effectiveConfig?.execution?.dryRun),
       coverage: options.coverage ?? Boolean(effectiveConfig?.execution?.defaultCoverage),
+      coverageExplicitlyDisabled: options.coverage === false,
     },
   };
   context.policy = await preparePolicyContext(effectiveLoaded, context.project);
@@ -123,6 +125,13 @@ export async function runReport(options = {}) {
               stderr: error instanceof Error ? error.stack || error.message : String(error),
             },
           }, suite, suite.packageName);
+        }
+      }
+
+      if (!context.execution.dryRun && normalized.status === 'failed') {
+        const diagnostics = await runSuiteDiagnostics(suite, context, options);
+        if (diagnostics) {
+          normalized = attachDiagnostics(normalized, diagnostics);
         }
       }
 
@@ -281,4 +290,255 @@ function relativePathSafe(fromPath, toPath) {
   } catch {
     return null;
   }
+}
+
+async function runSuiteDiagnostics(suite, context, options) {
+  const config = normalizeDiagnosticsConfig(suite);
+  if (!config) {
+    return null;
+  }
+
+  const label = config.label || 'Diagnostics rerun';
+  emitEvent(options, {
+    type: 'suite-diagnostics-start',
+    packageName: suite.packageName,
+    packageLocation: derivePackageLocation(suite, context.project),
+    suiteId: suite.id,
+    suiteLabel: suite.label,
+    diagnosticsLabel: label,
+  });
+
+  const startedAt = Date.now();
+  const command = config.command || suite.command;
+  const commandText = formatCommand(command);
+  const result = await executeDiagnosticCommand(command, {
+    cwd: config.cwd || suite.cwd || context.project.rootDir,
+    env: {
+      ...(suite.env || {}),
+      ...(config.env || {}),
+    },
+    timeoutMs: config.timeoutMs,
+  });
+
+  const durationMs = Date.now() - startedAt;
+  const artifactBase = `diagnostics/${slugify(suite.packageName || 'default')}-${slugify(suite.id)}-rerun`;
+  const rawArtifacts = [
+    {
+      relativePath: `${artifactBase}.log`,
+      label: `${label} log`,
+      content: buildDiagnosticsLog(result),
+    },
+    {
+      relativePath: `${artifactBase}.json`,
+      label: `${label} metadata`,
+      content: `${JSON.stringify({
+        label,
+        command: commandText,
+        cwd: config.cwd || suite.cwd || context.project.rootDir,
+        status: result.status,
+        exitCode: result.exitCode,
+        signal: result.signal,
+        timedOut: result.timedOut,
+        durationMs,
+      }, null, 2)}\n`,
+    },
+  ];
+
+  const diagnostics = {
+    label,
+    status: result.status,
+    command: commandText,
+    cwd: config.cwd || suite.cwd || context.project.rootDir,
+    durationMs,
+    exitCode: result.exitCode,
+    signal: result.signal,
+    timedOut: result.timedOut,
+    output: {
+      stdout: result.stdout,
+      stderr: result.stderr,
+    },
+    rawArtifacts,
+  };
+
+  emitEvent(options, {
+    type: 'suite-diagnostics-complete',
+    packageName: suite.packageName,
+    packageLocation: derivePackageLocation(suite, context.project),
+    suiteId: suite.id,
+    suiteLabel: suite.label,
+    diagnosticsLabel: label,
+    result: diagnostics,
+  });
+
+  return diagnostics;
+}
+
+function normalizeDiagnosticsConfig(suite) {
+  if (!suite?.diagnostics || typeof suite.diagnostics !== 'object') {
+    return null;
+  }
+  return {
+    label: typeof suite.diagnostics.label === 'string' && suite.diagnostics.label.trim().length > 0
+      ? suite.diagnostics.label.trim()
+      : 'Diagnostics rerun',
+    command: suite.diagnostics.command || suite.command,
+    cwd: suite.diagnostics.cwd || null,
+    env: suite.diagnostics.env && typeof suite.diagnostics.env === 'object'
+      ? suite.diagnostics.env
+      : {},
+    timeoutMs: Number.isFinite(suite.diagnostics.timeoutMs) ? suite.diagnostics.timeoutMs : null,
+  };
+}
+
+async function executeDiagnosticCommand(command, options) {
+  const spec = normalizeCommand(command);
+  if (!spec) {
+    return {
+      status: 'skipped',
+      exitCode: null,
+      signal: null,
+      timedOut: false,
+      stdout: '',
+      stderr: 'No diagnostic command configured.',
+    };
+  }
+
+  return new Promise((resolve) => {
+    const child = spawn(spec.command, spec.args, {
+      cwd: options.cwd,
+      env: {
+        ...process.env,
+        ...(options.env || {}),
+      },
+      shell: spec.shell,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+    let settled = false;
+    let timeoutId = null;
+
+    if (child.stdout) {
+      child.stdout.on('data', (chunk) => {
+        stdout += String(chunk);
+      });
+    }
+
+    if (child.stderr) {
+      child.stderr.on('data', (chunk) => {
+        stderr += String(chunk);
+      });
+    }
+
+    if (Number.isFinite(options.timeoutMs) && options.timeoutMs > 0) {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        child.kill('SIGTERM');
+      }, options.timeoutMs);
+    }
+
+    const finish = (payload) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      resolve(payload);
+    };
+
+    child.on('error', (error) => {
+      finish({
+        status: 'failed',
+        exitCode: null,
+        signal: null,
+        timedOut,
+        stdout,
+        stderr: `${stderr}${error instanceof Error ? error.stack || error.message : String(error)}\n`,
+      });
+    });
+
+    child.on('close', (code, signal) => {
+      finish({
+        status: timedOut
+          ? 'failed'
+          : (code === 0 ? 'passed' : 'failed'),
+        exitCode: Number.isFinite(code) ? code : null,
+        signal: signal || null,
+        timedOut,
+        stdout,
+        stderr,
+      });
+    });
+  });
+}
+
+function normalizeCommand(command) {
+  if (Array.isArray(command)) {
+    const parts = command.map((value) => String(value || '')).filter(Boolean);
+    if (parts.length === 0) {
+      return null;
+    }
+    return {
+      command: parts[0],
+      args: parts.slice(1),
+      shell: false,
+    };
+  }
+
+  if (typeof command === 'string' && command.trim().length > 0) {
+    return {
+      command,
+      args: [],
+      shell: true,
+    };
+  }
+
+  return null;
+}
+
+function attachDiagnostics(suiteResult, diagnostics) {
+  const warnings = [...(suiteResult.warnings || [])];
+  warnings.push(`Diagnostics rerun ${diagnostics.status} (${diagnostics.label}).`);
+  return {
+    ...suiteResult,
+    warnings,
+    diagnostics,
+    rawArtifacts: [
+      ...(suiteResult.rawArtifacts || []),
+      ...(diagnostics.rawArtifacts || []),
+    ],
+  };
+}
+
+function buildDiagnosticsLog(result) {
+  const sections = [
+    '# stdout',
+    result.stdout || '',
+    '',
+    '# stderr',
+    result.stderr || '',
+  ];
+  return `${sections.join('\n')}\n`;
+}
+
+function formatCommand(command) {
+  if (Array.isArray(command)) {
+    return command.map((entry) => shellEscape(entry)).join(' ');
+  }
+  return typeof command === 'string' ? command : '';
+}
+
+function shellEscape(value) {
+  const normalized = String(value || '');
+  if (/^[A-Za-z0-9_./:=+-]+$/.test(normalized)) {
+    return normalized;
+  }
+  return JSON.stringify(normalized);
+}
+
+function slugify(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 }

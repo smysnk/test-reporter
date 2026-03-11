@@ -8,13 +8,17 @@ server:
   replicaCount: 1
   args:
     - server
+  existingConfigMap: ""
+  existingSecret: ""
   service:
-    type: ClusterIP
+    type: NodePort
     port: 4400
-  env:
+    nodePort: null
+  config:
+    NODE_ENV: production
     SERVER_PORT: "4400"
-    PORTAL_URL: ""
-  secretEnv:
+    WEB_URL: ""
+  secret:
     DATABASE_URL: postgres://test-station:change-me@postgresql.default.svc.cluster.local:5432/test_station
     INGEST_API_KEYS: change-me
     INGEST_SHARED_KEY: ""
@@ -32,21 +36,25 @@ server:
     initialDelaySeconds: 10
     periodSeconds: 10
 
-portal:
+web:
   replicaCount: 1
   args:
-    - portal
+    - web
+  existingConfigMap: ""
+  existingSecret: ""
   service:
-    type: ClusterIP
+    type: NodePort
     port: 3001
-  env:
-    PORTAL_PORT: "3001"
-    PORTAL_GRAPHQL_PATH: /graphql
+    nodePort: null
+  config:
+    NODE_ENV: production
+    WEB_PORT: "3001"
+    WEB_GRAPHQL_PATH: /graphql
     SERVER_URL: ""
     NEXTAUTH_URL: https://test-station.example.com
-    PORTAL_DEFAULT_PROJECT_KEYS: "*"
-    PORTAL_ADMIN_EMAILS: ""
-  secretEnv:
+    WEB_DEFAULT_PROJECT_KEYS: "*"
+    WEB_ADMIN_EMAILS: ""
+  secret:
     NEXTAUTH_SECRET: change-me
     GITHUB_CLIENT_ID: ""
     GITHUB_CLIENT_SECRET: ""

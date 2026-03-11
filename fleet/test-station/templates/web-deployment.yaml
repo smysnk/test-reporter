@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "test-station.webName" . }}
+  labels:
+    {{- include "test-station.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: {{ .Values.web.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "test-station.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        {{- include "test-station.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+      annotations:
+        {{- toYaml .Values.web.podAnnotations | nindent 8 }}
+    spec:
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.image.pullSecrets }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: web
+          image: {{ include "test-station.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- toYaml .Values.web.args | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.service.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "test-station.webConfigMapName" . }}
+            - secretRef:
+                name: {{ include "test-station.webSecretName" . }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.web.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.web.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.web.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.web.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.web.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.web.readinessProbe.periodSeconds }}
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+      nodeSelector:
+        {{- toYaml .Values.web.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.web.tolerations | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.web.affinity | nindent 8 }}

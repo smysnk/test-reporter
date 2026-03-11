@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
-import * as coverageTrendMigration from '../packages/server/migrations/20260309_coverage_trend_points.js';
-import * as initialMigration from '../packages/server/migrations/20260309_initial_reporting_schema.js';
+import * as coverageTrendMigration from '../packages/server/migrations/20260309_0002_coverage_trend_points.js';
+import * as initialMigration from '../packages/server/migrations/20260309_0001_initial_reporting_schema.js';
 import { loadMigrations, runMigrations } from '../packages/server/migrations/runMigrations.js';
 import {
   Artifact,
@@ -26,6 +26,10 @@ test('loadMigrations includes the initial reporting schema migration', async () 
   const migrations = await loadMigrations();
   assert.ok(migrations.some((migration) => migration.id === initialMigration.id));
   assert.ok(migrations.some((migration) => migration.id === coverageTrendMigration.id));
+  assert.deepEqual(
+    migrations.map((migration) => migration.id),
+    [initialMigration.id, coverageTrendMigration.id],
+  );
 });
 
 test('runMigrations applies the initial reporting schema exactly once', async () => {

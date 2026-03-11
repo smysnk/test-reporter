@@ -1,0 +1,41 @@
+{{- if not .Values.web.existingConfigMap }}
+{{- $config := dict -}}
+{{- range $key, $value := default (dict) .Values.web.env }}
+{{- $_ := set $config $key $value -}}
+{{- end }}
+{{- range $key, $value := default (dict) .Values.web.config }}
+{{- $_ := set $config $key $value -}}
+{{- end }}
+{{- if or (not (hasKey $config "NODE_ENV")) (eq (printf "%v" (index $config "NODE_ENV")) "") }}
+{{- $_ := set $config "NODE_ENV" "production" -}}
+{{- end }}
+{{- if or (not (hasKey $config "WEB_PORT")) (eq (printf "%v" (index $config "WEB_PORT")) "") }}
+{{- $_ := set $config "WEB_PORT" (printf "%v" .Values.web.service.port) -}}
+{{- end }}
+{{- if or (not (hasKey $config "WEB_GRAPHQL_PATH")) (eq (printf "%v" (index $config "WEB_GRAPHQL_PATH")) "") }}
+{{- $_ := set $config "WEB_GRAPHQL_PATH" "/graphql" -}}
+{{- end }}
+{{- if or (not (hasKey $config "SERVER_URL")) (eq (printf "%v" (index $config "SERVER_URL")) "") }}
+{{- $_ := set $config "SERVER_URL" (printf "http://%s:%v" (include "test-station.serverName" .) .Values.server.service.port) -}}
+{{- end }}
+{{- if not (hasKey $config "NEXTAUTH_URL") }}
+{{- $_ := set $config "NEXTAUTH_URL" "" -}}
+{{- end }}
+{{- if not (hasKey $config "WEB_DEFAULT_PROJECT_KEYS") }}
+{{- $_ := set $config "WEB_DEFAULT_PROJECT_KEYS" "*" -}}
+{{- end }}
+{{- if not (hasKey $config "WEB_ADMIN_EMAILS") }}
+{{- $_ := set $config "WEB_ADMIN_EMAILS" "" -}}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "test-station.webConfigMapName" . }}
+  labels:
+    {{- include "test-station.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+data:
+  {{- range $key := keys $config | sortAlpha }}
+  {{ $key }}: {{ printf "%v" (index $config $key) | quote }}
+  {{- end }}
+{{- end }}

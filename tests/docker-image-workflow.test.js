@@ -5,7 +5,7 @@ import path from 'node:path';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 
-test('docker assets for the unified portal/server image exist', () => {
+test('docker assets for the unified web/server image exist', () => {
   const expectedFiles = [
     '.dockerignore',
     'docker/Dockerfile',
@@ -25,7 +25,7 @@ test('image build workflow targets main and uses the unified Dockerfile', () => 
 
   assert.match(workflow, /branches:\s*\n\s*-\s*main/);
   assert.match(workflow, /file:\s*docker\/Dockerfile/);
-  assert.match(workflow, /Build and publish unified portal\/server image/);
+  assert.match(workflow, /Build and publish unified web\/server image/);
   assert.match(workflow, /CONTAINER_REGISTRY/);
   assert.match(workflow, /CONTAINER_IMAGE_REPOSITORY/);
   assert.match(workflow, /CONTAINER_REGISTRY_USERNAME/);

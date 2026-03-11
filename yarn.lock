@@ -3520,25 +3520,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"portal@workspace:packages/portal":
-  version: 0.0.0-use.local
-  resolution: "portal@workspace:packages/portal"
-  dependencies:
-    "@apollo/client": "npm:^3.9.12"
-    "@reduxjs/toolkit": "npm:^1.9.5"
-    dotenv: "npm:^16.4.5"
-    env-var: "npm:^7.3.1"
-    graphql: "npm:^16.11.0"
-    next: "npm:^15.3.5"
-    next-auth: "npm:^4.24.11"
-    next-redux-wrapper: "npm:^8.1.0"
-    react: "npm:^18.2.0"
-    react-dom: "npm:^18.2.0"
-    react-redux: "npm:^8.1.1"
-    styled-components: "npm:^6.1.8"
-  languageName: unknown
-  linkType: soft
-
 "possible-typed-array-names@npm:^1.0.0":
   version: 1.1.0
   resolution: "possible-typed-array-names@npm:1.1.0"
@@ -4754,6 +4735,25 @@ __metadata:
   checksum: 10c0/b913cd32032c95f29ff08c931f4b4c6fd6d2da498908d6770952c561a1b8d75c62499a1f04cadf82fb89cc0f9a33f29fb5dfdb899f6dbb27686a9d91571be5fa
   languageName: node
   linkType: hard
+
+"web@workspace:packages/web":
+  version: 0.0.0-use.local
+  resolution: "web@workspace:packages/web"
+  dependencies:
+    "@apollo/client": "npm:^3.9.12"
+    "@reduxjs/toolkit": "npm:^1.9.5"
+    dotenv: "npm:^16.4.5"
+    env-var: "npm:^7.3.1"
+    graphql: "npm:^16.11.0"
+    next: "npm:^15.3.5"
+    next-auth: "npm:^4.24.11"
+    next-redux-wrapper: "npm:^8.1.0"
+    react: "npm:^18.2.0"
+    react-dom: "npm:^18.2.0"
+    react-redux: "npm:^8.1.1"
+    styled-components: "npm:^6.1.8"
+  languageName: unknown
+  linkType: soft
 
 "webidl-conversions@npm:^3.0.0":
   version: 3.0.1

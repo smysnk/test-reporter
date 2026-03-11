@@ -135,6 +135,16 @@ Example:
 }
 ```
 
+## Run outputs
+
+A normal run writes:
+
+- `report.json`: normalized machine-readable results
+- `modules.json`: module/theme rollups for machine consumers
+- `ownership.json`: ownership rollups for modules and themes
+- `index.html`: interactive HTML report
+- `raw/`: suite JSON, raw adapter output, and copied artifacts
+
 ## Package-manager scripts
 
 These examples assume `@test-station/cli` is installed.
@@ -145,7 +155,8 @@ These examples assume `@test-station/cli` is installed.
 {
   "scripts": {
     "test": "test-station run --config ./test-station.config.mjs",
-    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage",
+    "test:fast": "test-station run --config ./test-station.config.mjs --no-coverage"
   }
 }
 ```
@@ -156,7 +167,8 @@ These examples assume `@test-station/cli` is installed.
 {
   "scripts": {
     "test": "test-station run --config ./test-station.config.mjs",
-    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage",
+    "test:fast": "test-station run --config ./test-station.config.mjs --no-coverage"
   }
 }
 ```
@@ -167,10 +179,29 @@ These examples assume `@test-station/cli` is installed.
 {
   "scripts": {
     "test": "test-station run --config ./test-station.config.mjs",
-    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage"
+    "test:coverage": "test-station run --config ./test-station.config.mjs --coverage",
+    "test:fast": "test-station run --config ./test-station.config.mjs --no-coverage"
   }
 }
 ```
+
+## CLI commands and overrides
+
+The stable CLI commands are:
+
+```sh
+npx test-station inspect --config ./test-station.config.mjs
+npx test-station run --config ./test-station.config.mjs --coverage --workspace app --output-dir ./artifacts/app-report
+npx test-station render --input ./artifacts/test-report/report.json --output ./artifacts/test-report
+```
+
+Useful overrides:
+
+- `--coverage` and `--no-coverage` override `execution.defaultCoverage`
+- `--workspace <name>` and `--package <name>` are equivalent repeatable filters
+- `--output-dir <path>` overrides `project.outputDir` and rewrites `raw/` under that directory
+
+If filters match no suites, the run exits with a clear error. If `workspaceDiscovery.packages` still lists other workspaces, those unmatched packages remain visible as `skipped`.
 
 ## Optional manifests
 
@@ -201,6 +232,23 @@ If you want module/theme grouping and ownership in the HTML report, provide a lo
     "themes": [
       { "module": "runtime", "theme": "api", "owner": "runtime-api-team" }
     ]
+  },
+  "thresholds": {
+    "modules": [
+      {
+        "module": "runtime",
+        "coverage": { "linesPct": 80, "branchesPct": 70 },
+        "enforcement": "error"
+      }
+    ],
+    "themes": [
+      {
+        "module": "runtime",
+        "theme": "api",
+        "coverage": { "linesPct": 75 },
+        "enforcement": "warn"
+      }
+    ]
   }
 }
 ```
@@ -212,8 +260,30 @@ manifests: {
   classification: './test-modules.json',
   coverageAttribution: './test-modules.json',
   ownership: './test-modules.json',
+  thresholds: './test-modules.json',
 }
 ```
+
+Error-enforced threshold failures are reported in `report.json`, rendered in HTML, and cause `test-station run` to exit non-zero even when every suite itself passed. Warning-enforced thresholds stay visible in the report but do not fail the process.
+
+## Failure diagnostics
+
+Suites can define an optional diagnostics rerun. When the suite fails, `test-station` reruns the configured command, captures stdout/stderr, and writes diagnostic artifacts under `raw/diagnostics/`.
+
+```js
+{
+  id: 'web-unit',
+  adapter: 'vitest',
+  command: ['yarn', 'vitest', 'run', '--config', './vitest.config.js'],
+  diagnostics: {
+    label: 'Verbose rerun',
+    command: ['yarn', 'vitest', 'run', '--config', './vitest.config.js', '--reporter', 'verbose'],
+    timeoutMs: 120000,
+  },
+}
+```
+
+The rerun metadata is attached to the suite result as `suite.diagnostics`, linked from the HTML report, and summarized in the console output.
 
 ## Optional custom policy plugins
 
@@ -242,6 +312,12 @@ plugins: [
 If you define `workspaceDiscovery.packages` and one of those packages has no suites, the package remains visible in the report as `skipped` with zero suites. This is the recommended behavior for explicit monorepos that want report visibility for known packages.
 
 If a suite executes but its framework reports zero tests, the suite is normalized as `skipped`.
+
+## Adapter notes
+
+- `node-test` coverage works for direct `node --test ...` commands and package scripts that resolve directly to a single `node --test ...` invocation
+- `playwright` can collect browser Istanbul coverage when `suite.coverage.strategy` is `browser-istanbul`
+- `shell` supports `resultFormat: 'single-check-json-v1'` for structured single-check outputs with mapped warnings and raw details
 
 ## Playwright in CI
 

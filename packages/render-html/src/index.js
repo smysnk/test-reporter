@@ -12,6 +12,7 @@ export function renderHtmlReport(report, options = {}) {
   const generatedAt = typeof report?.generatedAt === 'string' ? report.generatedAt : 'unknown';
   const schemaVersion = report?.schemaVersion || '1';
   const projectName = report?.meta?.projectName || title;
+  const policySummary = summary?.policy || {};
   const moduleFilterOptions = Array.isArray(summary?.filterOptions?.modules) ? summary.filterOptions.modules : dedupe(modules.map((entry) => entry.module));
   const packageFilterOptions = Array.isArray(summary?.filterOptions?.packages) ? summary.filterOptions.packages : dedupe(packages.map((entry) => entry.name));
   const frameworkFilterOptions = Array.isArray(summary?.filterOptions?.frameworks)
@@ -479,6 +480,30 @@ export function renderHtmlReport(report, options = {}) {
     .status-pill.pass { background: color-mix(in srgb, var(--pass) 18%, transparent); color: var(--pass); }
     .status-pill.fail { background: color-mix(in srgb, var(--fail) 18%, transparent); color: var(--fail); }
     .status-pill.skip { background: color-mix(in srgb, var(--skip) 18%, transparent); color: var(--skip); }
+    .policy-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border: 1px solid rgba(124, 160, 224, 0.14);
+    }
+    .policy-pill--pass { background: color-mix(in srgb, var(--pass) 16%, transparent); color: var(--pass); }
+    .policy-pill--warn { background: color-mix(in srgb, var(--skip) 18%, transparent); color: var(--skip); }
+    .policy-pill--fail { background: color-mix(in srgb, var(--fail) 18%, transparent); color: var(--fail); }
+    .policy-pill--skip { background: rgba(124, 160, 224, 0.14); color: var(--muted); }
+    .module-card__badges,
+    .module-section__badges,
+    .theme-section__badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
     .test-row__name { min-width: 0; }
     .test-row__title {
       display: block;
@@ -620,6 +645,38 @@ export function renderHtmlReport(report, options = {}) {
       letter-spacing: 0.08em;
     }
     .coverage-table code { font-size: 0.8rem; color: #d7e5ff; }
+    .policy-block {
+      margin: 0 0 16px;
+      padding: 14px;
+      border-radius: 16px;
+      border: 1px solid rgba(124, 160, 224, 0.14);
+      background: rgba(8, 16, 29, 0.68);
+    }
+    .policy-block__header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .policy-block__title {
+      margin: 0;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+    .policy-block__meta {
+      font-size: 0.85rem;
+      color: var(--muted);
+      word-break: break-word;
+    }
+    .policy-block__list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 8px;
+    }
     @media (max-width: 920px) {
       main { width: min(100vw - 24px, 1400px); }
       .toolbar { align-items: flex-start; }
@@ -642,6 +699,9 @@ export function renderHtmlReport(report, options = {}) {
         ${renderSummaryCard('Passed', summary.passedTests || 0)}
         ${renderSummaryCard('Failed', summary.failedTests || 0)}
         ${renderSummaryCard('Skipped', summary.skippedTests || 0)}
+        ${policySummary.failedThresholds > 0 ? renderSummaryCard('Threshold Failures', policySummary.failedThresholds) : ''}
+        ${policySummary.warningThresholds > 0 ? renderSummaryCard('Threshold Warnings', policySummary.warningThresholds) : ''}
+        ${policySummary.diagnosticsSuites > 0 ? renderSummaryCard('Diagnostic Reruns', policySummary.diagnosticsSuites) : ''}
         ${renderSummaryCard('Line Coverage', summary.coverage?.lines ? `${summary.coverage.lines.pct.toFixed(2)}%` : 'n/a')}
         ${renderSummaryCard('Branch Coverage', summary.coverage?.branches ? `${summary.coverage.branches.pct.toFixed(2)}%` : 'n/a')}
         ${renderSummaryCard('Function Coverage', summary.coverage?.functions ? `${summary.coverage.functions.pct.toFixed(2)}%` : 'n/a')}
@@ -916,6 +976,67 @@ function renderOwnerPill(owner) {
   return `<span class="owner-pill">Owner: ${escapeHtml(owner)}</span>`;
 }
 
+function renderThresholdPill(threshold) {
+  if (!threshold?.configured) {
+    return '';
+  }
+  const statusClass = threshold.status === 'failed'
+    ? 'fail'
+    : (threshold.status === 'warn' ? 'warn' : (threshold.status === 'skipped' ? 'skip' : 'pass'));
+  const label = threshold.status === 'failed'
+    ? 'Threshold failed'
+    : (threshold.status === 'warn' ? 'Threshold warning' : (threshold.status === 'skipped' ? 'Threshold skipped' : 'Threshold met'));
+  return `<span class="policy-pill policy-pill--${statusClass}">${escapeHtml(label)}</span>`;
+}
+
+function renderThresholdBlock(threshold) {
+  if (!threshold?.configured) {
+    return '';
+  }
+  const items = (Array.isArray(threshold.metrics) ? threshold.metrics : [])
+    .map((metric) => {
+      const actual = Number.isFinite(metric.actualPct) ? `${metric.actualPct.toFixed(2)}%` : 'n/a';
+      const annotation = metric.passed
+        ? ''
+        : (Number.isFinite(metric.actualPct) ? ' <strong>(below threshold)</strong>' : ' <strong>(not evaluated)</strong>');
+      return `<li>${escapeHtml(capitalize(metric.metric))} ${escapeHtml(actual)} / minimum ${escapeHtml(metric.minPct.toFixed(2))}%${annotation}</li>`;
+    })
+    .join('');
+  return `
+    <section class="policy-block">
+      <div class="policy-block__header">
+        <h4 class="policy-block__title">Coverage Policy</h4>
+        ${renderThresholdPill(threshold)}
+      </div>
+      <div class="policy-block__meta">${escapeHtml(threshold.reason || `Enforcement: ${threshold.enforcement}`)}</div>
+      <ul class="policy-block__list">
+        ${items}
+      </ul>
+    </section>
+  `;
+}
+
+function renderDiagnosticsBlock(diagnostics) {
+  if (!diagnostics || typeof diagnostics !== 'object') {
+    return '';
+  }
+  const meta = [
+    formatDuration(diagnostics.durationMs || 0),
+    diagnostics.command || '',
+  ].filter(Boolean).join(' • ');
+  const timeoutNote = diagnostics.timedOut ? '<div class="policy-block__meta">The diagnostics rerun timed out before completion.</div>' : '';
+  return `
+    <section class="policy-block">
+      <div class="policy-block__header">
+        <h4 class="policy-block__title">${escapeHtml(diagnostics.label || 'Diagnostics')}</h4>
+        ${renderStatusPill(diagnostics.status || 'skipped')}
+      </div>
+      <div class="policy-block__meta">${escapeHtml(meta || 'No diagnostics metadata recorded.')}</div>
+      ${timeoutNote}
+    </section>
+  `;
+}
+
 function renderFilterAttributes({ nodeType, moduleNames = [], packageNames = [], frameworks = [], hasFailures = false, lineCoverage = null }) {
   const attributes = [
     ['data-filter-node', nodeType || 'node'],
@@ -954,7 +1075,10 @@ function renderModuleCard(moduleEntry) {
         </div>
         ${renderStatusPill(status)}
       </div>
-      ${renderOwnerPill(moduleEntry.owner)}
+      <div class="module-card__badges">
+        ${renderOwnerPill(moduleEntry.owner)}
+        ${renderThresholdPill(moduleEntry.threshold)}
+      </div>
       <div class="module-card__coverage">
         ${renderCoverageMiniMetric('Lines', moduleEntry.coverage?.lines)}
         ${renderCoverageMiniMetric('Branches', moduleEntry.coverage?.branches)}
@@ -1020,8 +1144,12 @@ function renderModuleSection(moduleEntry, rootDir) {
         <div class="module-section__meta">${escapeHtml(formatSummary(moduleEntry.summary))} • ${escapeHtml(formatDuration(moduleEntry.durationMs || 0))} • ${escapeHtml(`${moduleEntry.packageCount || 0} package${moduleEntry.packageCount === 1 ? '' : 's'}`)}</div>
       </summary>
       <div class="module-section__body">
-        ${renderOwnerPill(moduleEntry.owner)}
+        <div class="module-section__badges">
+          ${renderOwnerPill(moduleEntry.owner)}
+          ${renderThresholdPill(moduleEntry.threshold)}
+        </div>
         <div class="module-section__packages">Dominant packages: ${escapeHtml((moduleEntry.dominantPackages || []).join(', ') || 'n/a')}</div>
+        ${renderThresholdBlock(moduleEntry.threshold)}
         ${renderCoverageBlock(moduleEntry.coverage, rootDir)}
         <div class="theme-list">${themeMarkup}</div>
       </div>
@@ -1085,7 +1213,11 @@ function renderThemeSection(moduleEntry, themeEntry, rootDir) {
         <div class="theme-section__meta">${escapeHtml(formatSummary(themeEntry.summary))} • ${escapeHtml(formatDuration(themeEntry.durationMs || 0))} • ${escapeHtml(`${themeEntry.packageCount || 0} package${themeEntry.packageCount === 1 ? '' : 's'}`)}</div>
       </summary>
       <div class="theme-section__body">
-        ${renderOwnerPill(themeEntry.owner)}
+        <div class="theme-section__badges">
+          ${renderOwnerPill(themeEntry.owner)}
+          ${renderThresholdPill(themeEntry.threshold)}
+        </div>
+        ${renderThresholdBlock(themeEntry.threshold)}
         ${renderCoverageBlock(themeEntry.coverage, rootDir)}
         <div class="package-list">${packageMarkup}</div>
       </div>
@@ -1130,6 +1262,7 @@ function renderSuite(suite, rootDir, filterContext = {}) {
     ? `<ul class="suite__warnings">${warnings.map((warning) => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>`
     : '';
   const coverageMarkup = renderCoverageBlock(suite.coverage, rootDir);
+  const diagnosticsMarkup = renderDiagnosticsBlock(suite.diagnostics);
   const artifactMarkup = rawArtifacts.length > 0 ? renderRawArtifactBlock(rawArtifacts) : '';
   const testsMarkup = tests.length === 0
     ? '<div class="test-row"><div class="test-row__summary"><span class="status-pill skip">skip</span><div class="test-row__name"><span class="test-row__title">No test results emitted</span></div></div></div>'
@@ -1154,6 +1287,7 @@ function renderSuite(suite, rootDir, filterContext = {}) {
       <div class="suite__body">
         ${warningMarkup}
         ${coverageMarkup}
+        ${diagnosticsMarkup}
         ${artifactMarkup}
         <div class="test-list">${testsMarkup}</div>
       </div>
@@ -1185,6 +1319,11 @@ function renderRawArtifactItem(artifact) {
       <span class="suite__artifactMeta">${escapeHtml(meta || artifact?.relativePath || '')}</span>
     </li>
   `;
+}
+
+function capitalize(value) {
+  const normalized = String(value || '');
+  return normalized.length > 0 ? normalized[0].toUpperCase() + normalized.slice(1) : normalized;
 }
 
 function renderTest(suite, test, rootDir, filterContext = {}) {

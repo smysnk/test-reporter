@@ -15,8 +15,32 @@ npm install --save-dev @test-station/adapter-playwright
 - runs Playwright with JSON reporter output
 - normalizes browser suite and test results into the shared report model
 - writes raw Playwright JSON artifacts under `raw/`
+- optionally collects browser Istanbul coverage when `suite.coverage.strategy` is `browser-istanbul`
+- writes suite-scoped browser coverage artifacts under `raw/`
 
 Playwright browsers must already be installed in CI or on the machine executing the suite.
+
+## Browser Coverage
+
+When coverage is enabled for the run and the suite declares:
+
+```js
+coverage: {
+  enabled: true,
+  strategy: 'browser-istanbul',
+}
+```
+
+the adapter sets:
+
+- `PLAYWRIGHT_BROWSER_COVERAGE=1`
+- `PLAYWRIGHT_BROWSER_COVERAGE_DIR=<temp dir>`
+
+The Playwright suite can use those environment variables to persist `window.__coverage__` payloads. Test Station merges those payloads into the normalized suite coverage summary and retains the raw files under a stable suite-scoped artifact directory such as:
+
+```text
+raw/<package>-<suite>-playwright-coverage/
+```
 
 ## Direct Use
 

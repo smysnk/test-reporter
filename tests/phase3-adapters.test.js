@@ -22,6 +22,22 @@ function createProject() {
   };
 }
 
+function createWrappedNodeTestFixture() {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-station-node-wrapper-'));
+  const sourceDir = path.join(fixtureRoot, 'node-test');
+  for (const fileName of ['env.test.js']) {
+    fs.copyFileSync(path.join(sourceDir, fileName), path.join(tempDir, fileName));
+  }
+  fs.writeFileSync(path.join(tempDir, 'package.json'), JSON.stringify({
+    name: 'node-test-wrapper-fixture',
+    private: true,
+    scripts: {
+      'test:wrapped': 'TEST_STATION_PHASE3_ENV=enabled node --test ./env.test.js',
+    },
+  }, null, 2));
+  return tempDir;
+}
+
 test('node:test adapter executes and normalizes suite output', async () => {
   const project = createProject();
   const cwd = path.join(fixtureRoot, 'node-test');
@@ -44,6 +60,30 @@ test('node:test adapter executes and normalizes suite output', async () => {
   assert.equal(result.tests.length, 3);
   assert.equal(result.coverage?.lines?.total > 0, true);
   assert.match(result.rawArtifacts[0].relativePath, /node\.ndjson$/);
+});
+
+test('node:test adapter collects coverage for supported package-script wrappers', async () => {
+  const project = createProject();
+  const cwd = createWrappedNodeTestFixture();
+  const adapter = createNodeTestAdapter();
+  const result = await adapter.run({
+    project,
+    suite: {
+      id: 'node-package-script',
+      label: 'Node Package Script Fixture',
+      packageName: 'fixtures',
+      cwd,
+      command: ['yarn', 'test:wrapped'],
+      coverage: { enabled: true },
+    },
+    execution: { coverage: true },
+  });
+
+  assert.equal(result.status, 'passed');
+  assert.deepEqual(result.summary, { total: 1, passed: 1, failed: 0, skipped: 0 });
+  assert.equal(result.coverage?.lines?.total > 0, true);
+  assert.deepEqual(result.warnings, []);
+  assert.equal(result.rawArtifacts.some((artifact) => /node-coverage\.ndjson$/.test(artifact.relativePath)), true);
 });
 
 test('vitest adapter executes and parses json report plus coverage', async () => {
@@ -90,6 +130,39 @@ test('playwright adapter executes and parses json report', async () => {
   assert.deepEqual(result.summary, { total: 3, passed: 1, failed: 1, skipped: 1 });
   assert.equal(result.tests.length, 3);
   assert.match(result.rawArtifacts[0].relativePath, /playwright\.json$/);
+});
+
+test('playwright adapter collects suite-scoped browser Istanbul coverage when requested', async () => {
+  const project = createProject();
+  const cwd = path.join(fixtureRoot, 'playwright');
+  const adapter = createPlaywrightAdapter();
+  const result = await adapter.run({
+    project,
+    suite: {
+      id: 'playwright-browser-coverage',
+      label: 'Playwright Browser Coverage Fixture',
+      packageName: 'fixtures',
+      cwd,
+      command: ['yarn', 'playwright', 'test', './coverage.spec.js', '--config', './playwright.config.mjs'],
+      coverage: {
+        enabled: true,
+        strategy: 'browser-istanbul',
+      },
+    },
+    execution: { coverage: true },
+  });
+
+  assert.equal(result.status, 'passed');
+  assert.deepEqual(result.summary, { total: 1, passed: 1, failed: 0, skipped: 0 });
+  assert.equal(result.coverage?.lines?.total, 1);
+  assert.equal(result.coverage?.files.length, 1);
+  assert.match(result.coverage?.files[0].path || '', /coverage-target\.js$/);
+  assert.equal(result.warnings.length, 0);
+  assert.equal(result.rawArtifacts.some((artifact) => /playwright-coverage$/.test(artifact.relativePath)), true);
+  assert.equal(
+    result.rawArtifacts.some((artifact) => /playwright-coverage\/coverage-summary\.json$/.test(artifact.relativePath)),
+    true,
+  );
 });
 
 test('shell adapter executes command and synthesizes suite result', async () => {

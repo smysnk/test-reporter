@@ -31,8 +31,40 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-server" (include "test-station.fullname" .) -}}
 {{- end -}}
 
-{{- define "test-station.portalName" -}}
-{{- printf "%s-portal" (include "test-station.fullname" .) -}}
+{{- define "test-station.webName" -}}
+{{- printf "%s-web" (include "test-station.fullname" .) -}}
+{{- end -}}
+
+{{- define "test-station.serverConfigMapName" -}}
+{{- if .Values.server.existingConfigMap -}}
+{{- .Values.server.existingConfigMap -}}
+{{- else -}}
+{{- printf "%s-env" (include "test-station.serverName" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "test-station.serverSecretName" -}}
+{{- if .Values.server.existingSecret -}}
+{{- .Values.server.existingSecret -}}
+{{- else -}}
+{{- printf "%s-secret" (include "test-station.serverName" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "test-station.webConfigMapName" -}}
+{{- if .Values.web.existingConfigMap -}}
+{{- .Values.web.existingConfigMap -}}
+{{- else -}}
+{{- printf "%s-env" (include "test-station.webName" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "test-station.webSecretName" -}}
+{{- if .Values.web.existingSecret -}}
+{{- .Values.web.existingSecret -}}
+{{- else -}}
+{{- printf "%s-secret" (include "test-station.webName" .) -}}
+{{- end -}}
 {{- end -}}
 
 {{- define "test-station.image" -}}

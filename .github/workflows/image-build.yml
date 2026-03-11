@@ -66,7 +66,7 @@ jobs:
             type=raw,value=main,enable={{is_default_branch}}
             type=sha,format=long
 
-      - name: Build and publish unified portal/server image
+      - name: Build and publish unified web/server image
         uses: docker/build-push-action@v6
         with:
           context: .

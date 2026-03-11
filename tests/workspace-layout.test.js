@@ -18,7 +18,7 @@ const expectedPackages = [
 
 const expectedAppPackages = [
   'server',
-  'portal',
+  'web',
 ];
 
 test('workspace contains expected reporter packages', () => {

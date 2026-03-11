@@ -37,9 +37,9 @@ spec:
               protocol: TCP
           envFrom:
             - configMapRef:
-                name: {{ include "test-station.serverName" . }}-env
+                name: {{ include "test-station.serverConfigMapName" . }}
             - secretRef:
-                name: {{ include "test-station.serverName" . }}-secret
+                name: {{ include "test-station.serverSecretName" . }}
           livenessProbe:
             httpGet:
               path: {{ .Values.server.livenessProbe.path }}

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadRepoEnv } from '../config/env.mjs';
-import { createServer } from '../packages/server/index.js';
+import { createServer, resolveCorsOrigin } from '../packages/server/index.js';
 
 test('loadRepoEnv loads .env and lets .env.local override values', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'test-station-env-'));
@@ -66,5 +66,29 @@ test('server scaffold exposes health and GraphQL endpoints', async () => {
         resolve();
       });
     });
+  }
+});
+
+test('server defaults WEB_URL to localhost using WEB_PORT when unset', () => {
+  const originalWebUrl = process.env.WEB_URL;
+  const originalWebPort = process.env.WEB_PORT;
+
+  try {
+    delete process.env.WEB_URL;
+    process.env.WEB_PORT = '3015';
+
+    assert.equal(resolveCorsOrigin(), 'http://localhost:3015');
+  } finally {
+    if (originalWebUrl === undefined) {
+      delete process.env.WEB_URL;
+    } else {
+      process.env.WEB_URL = originalWebUrl;
+    }
+
+    if (originalWebPort === undefined) {
+      delete process.env.WEB_PORT;
+    } else {
+      process.env.WEB_PORT = originalWebPort;
+    }
   }
 });

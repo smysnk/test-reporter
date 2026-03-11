@@ -76,12 +76,20 @@ function resolvePort(options = {}) {
   return env.get('SERVER_PORT').default(4400).asPortNumber();
 }
 
-function resolveCorsOrigin(options = {}) {
+export function resolveWebPort() {
+  return env.get('WEB_PORT').default(3001).asPortNumber();
+}
+
+export function resolveWebUrl() {
+  const configured = env.get('WEB_URL').default('').asString().trim();
+  return configured || `http://localhost:${resolveWebPort()}`;
+}
+
+export function resolveCorsOrigin(options = {}) {
   if (options.corsOrigin) {
     return options.corsOrigin;
   }
-  const configured = env.get('PORTAL_URL').default('').asString().trim();
-  return configured || true;
+  return resolveWebUrl();
 }
 
 function isDirectInvocation(moduleUrl) {

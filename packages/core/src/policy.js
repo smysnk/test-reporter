@@ -21,6 +21,73 @@ export async function preparePolicyContext(loadedConfig, project) {
   };
 }
 
+export function evaluateCoverageThresholds(policy, modules, options = {}) {
+  const thresholdManifest = policy?.manifests?.thresholds?.thresholds || {};
+  const moduleRules = buildThresholdRuleMap(thresholdManifest.modules || [], 'module');
+  const themeRules = buildThresholdRuleMap(thresholdManifest.themes || [], 'theme');
+  const coverageEnabled = options.coverageEnabled !== false;
+  const violations = [];
+  let configuredRules = moduleRules.size + themeRules.size;
+  let evaluatedRules = 0;
+  let passedRules = 0;
+  let failedRules = 0;
+  let warningRules = 0;
+
+  const annotatedModules = (Array.isArray(modules) ? modules : []).map((moduleEntry) => {
+    const moduleRule = moduleRules.get(moduleEntry.module) || null;
+    const evaluatedModuleThreshold = evaluateThresholdRule(coverageEnabled ? moduleEntry.coverage : null, moduleRule, {
+      scopeType: 'module',
+      module: moduleEntry.module,
+      theme: null,
+      label: moduleEntry.module,
+    });
+    if (evaluatedModuleThreshold && evaluatedModuleThreshold.status !== 'skipped') {
+      evaluatedRules += 1;
+      if (evaluatedModuleThreshold.status === 'failed') failedRules += 1;
+      if (evaluatedModuleThreshold.status === 'warn') warningRules += 1;
+      if (evaluatedModuleThreshold.status === 'passed') passedRules += 1;
+      violations.push(...evaluatedModuleThreshold.violations);
+    }
+
+    return {
+      ...moduleEntry,
+      threshold: evaluatedModuleThreshold,
+      themes: (Array.isArray(moduleEntry.themes) ? moduleEntry.themes : []).map((themeEntry) => {
+        const themeRule = themeRules.get(`${moduleEntry.module}/${themeEntry.theme}`) || null;
+        const evaluatedThemeThreshold = evaluateThresholdRule(coverageEnabled ? themeEntry.coverage : null, themeRule, {
+          scopeType: 'theme',
+          module: moduleEntry.module,
+          theme: themeEntry.theme,
+          label: `${moduleEntry.module} / ${themeEntry.theme}`,
+        });
+        if (evaluatedThemeThreshold && evaluatedThemeThreshold.status !== 'skipped') {
+          evaluatedRules += 1;
+          if (evaluatedThemeThreshold.status === 'failed') failedRules += 1;
+          if (evaluatedThemeThreshold.status === 'warn') warningRules += 1;
+          if (evaluatedThemeThreshold.status === 'passed') passedRules += 1;
+          violations.push(...evaluatedThemeThreshold.violations);
+        }
+        return {
+          ...themeEntry,
+          threshold: evaluatedThemeThreshold,
+        };
+      }),
+    };
+  });
+
+  return {
+    modules: annotatedModules,
+    summary: {
+      totalRules: configuredRules,
+      evaluatedRules,
+      passedRules,
+      failedRules,
+      warningRules,
+      violations,
+    },
+  };
+}
+
 export async function applyPolicyPipeline(context, suiteResults) {
   if (!context?.policy) {
     return suiteResults;
@@ -370,6 +437,7 @@ function loadPolicyManifests(config, configDir) {
     classification: loadManifestEntry(resolveManifestPath(config, 'classification'), configDir, cache),
     coverageAttribution: loadManifestEntry(resolveManifestPath(config, 'coverageAttribution'), configDir, cache),
     ownership: loadManifestEntry(resolveManifestPath(config, 'ownership'), configDir, cache),
+    thresholds: loadManifestEntry(resolveManifestPath(config, 'thresholds'), configDir, cache),
   };
 }
 
@@ -404,6 +472,10 @@ function loadManifestEntry(manifestPath, configDir, cache) {
     ownership: {
       modules: Array.isArray(payload.ownership?.modules) ? payload.ownership.modules : [],
       themes: Array.isArray(payload.ownership?.themes) ? payload.ownership.themes : [],
+    },
+    thresholds: {
+      modules: Array.isArray(payload.thresholds?.modules) ? payload.thresholds.modules : [],
+      themes: Array.isArray(payload.thresholds?.themes) ? payload.thresholds.themes : [],
     },
     raw: payload,
   };
@@ -532,6 +604,164 @@ function getPackageRelativeCandidates(context, suite, filePath) {
   }
 
   return dedupe(candidates);
+}
+
+function buildThresholdRuleMap(entries, scopeType) {
+  const ruleMap = new Map();
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const normalized = normalizeThresholdRule(entry, scopeType);
+    if (!normalized) {
+      continue;
+    }
+    ruleMap.set(normalized.key, normalized);
+  }
+  return ruleMap;
+}
+
+function normalizeThresholdRule(entry, scopeType) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+  const moduleName = typeof entry.module === 'string' && entry.module.trim().length > 0
+    ? entry.module.trim()
+    : null;
+  const themeName = typeof entry.theme === 'string' && entry.theme.trim().length > 0
+    ? entry.theme.trim()
+    : null;
+
+  if (!moduleName) {
+    return null;
+  }
+  if (scopeType === 'theme' && !themeName) {
+    return null;
+  }
+
+  const metrics = normalizeThresholdMetrics(entry.coverage || entry.minimums || entry.thresholds || {});
+  if (metrics.length === 0) {
+    return null;
+  }
+
+  const enforcement = entry.enforcement === 'warn' || entry.severity === 'warn'
+    ? 'warn'
+    : 'error';
+
+  return {
+    key: scopeType === 'theme' ? `${moduleName}/${themeName}` : moduleName,
+    module: moduleName,
+    theme: themeName,
+    scopeType,
+    enforcement,
+    reason: typeof entry.reason === 'string' && entry.reason.trim().length > 0
+      ? entry.reason.trim()
+      : null,
+    metrics,
+  };
+}
+
+function normalizeThresholdMetrics(source) {
+  const metrics = [];
+  for (const metricKey of ['lines', 'branches', 'functions', 'statements']) {
+    const minPct = resolveThresholdMetric(source, metricKey);
+    if (!Number.isFinite(minPct)) {
+      continue;
+    }
+    metrics.push({
+      metric: metricKey,
+      minPct: Number(Number(minPct).toFixed(2)),
+    });
+  }
+  return metrics;
+}
+
+function resolveThresholdMetric(source, metricKey) {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  if (Number.isFinite(source[`${metricKey}Pct`])) {
+    return source[`${metricKey}Pct`];
+  }
+
+  if (Number.isFinite(source[metricKey])) {
+    return source[metricKey];
+  }
+
+  const nested = source[metricKey];
+  if (!nested || typeof nested !== 'object') {
+    return null;
+  }
+
+  for (const key of ['minPct', 'minimum', 'pct', 'threshold']) {
+    if (Number.isFinite(nested[key])) {
+      return nested[key];
+    }
+  }
+
+  return null;
+}
+
+function evaluateThresholdRule(coverage, rule, scope) {
+  if (!rule) {
+    return null;
+  }
+
+  const metrics = rule.metrics.map((metric) => {
+    const actualPct = coverage?.[metric.metric]?.pct;
+    return {
+      metric: metric.metric,
+      minPct: metric.minPct,
+      actualPct: Number.isFinite(actualPct) ? Number(Number(actualPct).toFixed(2)) : null,
+      passed: Number.isFinite(actualPct) && actualPct >= metric.minPct,
+    };
+  });
+
+  if (!metrics.some((metric) => Number.isFinite(metric.actualPct))) {
+    return {
+      configured: true,
+      scopeType: scope.scopeType,
+      module: scope.module,
+      theme: scope.theme,
+      label: scope.label,
+      enforcement: rule.enforcement,
+      reason: rule.reason,
+      status: 'skipped',
+      metrics,
+      violations: [],
+    };
+  }
+
+  const failures = metrics.filter((metric) => !metric.passed);
+  const status = failures.length === 0
+    ? 'passed'
+    : (rule.enforcement === 'warn' ? 'warn' : 'failed');
+
+  return {
+    configured: true,
+    scopeType: scope.scopeType,
+    module: scope.module,
+    theme: scope.theme,
+    label: scope.label,
+    enforcement: rule.enforcement,
+    reason: rule.reason,
+    status,
+    metrics,
+    violations: failures.map((metric) => ({
+      scopeType: scope.scopeType,
+      module: scope.module,
+      theme: scope.theme,
+      label: scope.label,
+      enforcement: rule.enforcement,
+      metric: metric.metric,
+      minPct: metric.minPct,
+      actualPct: metric.actualPct,
+      message: formatThresholdViolation(scope.label, metric),
+    })),
+  };
+}
+
+function formatThresholdViolation(label, metric) {
+  const actual = Number.isFinite(metric.actualPct) ? `${metric.actualPct.toFixed(2)}%` : 'n/a';
+  return `${label} ${metric.metric} coverage ${actual} is below ${metric.minPct.toFixed(2)}%`;
 }
 
 function normalizeProjectRelative(rootDir, filePath) {
