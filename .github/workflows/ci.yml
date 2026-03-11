@@ -34,6 +34,9 @@ jobs:
       - name: Lint
         run: yarn lint
 
+      - name: Run node test suite
+        run: yarn test:node
+
       - name: Run self-test report
         id: self_test
         shell: bash
@@ -63,6 +66,14 @@ jobs:
         run: |
           rm -rf ./examples/generic-node-library/artifacts/test-report
           node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs --coverage
+          test -f ./examples/generic-node-library/artifacts/test-report/report.json
+          test -f ./examples/generic-node-library/artifacts/test-report/modules.json
+          test -f ./examples/generic-node-library/artifacts/test-report/ownership.json
+          test -f ./examples/generic-node-library/artifacts/test-report/index.html
+          test -d ./examples/generic-node-library/artifacts/test-report/raw
+
+      - name: Validate unified image build
+        run: docker build --file docker/Dockerfile --tag test-station-ci .
 
       - name: Upload smoke artifacts
         if: always()

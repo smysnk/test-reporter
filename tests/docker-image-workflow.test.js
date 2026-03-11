@@ -32,3 +32,14 @@ test('image build workflow targets main and uses the unified Dockerfile', () => 
   assert.match(workflow, /secrets\.CONTAINER_REGISTRY_PASSWORD/);
   assert.match(workflow, /images:\s*\$\{\{ env\.CONTAINER_REGISTRY \}\}\/\$\{\{ env\.CONTAINER_IMAGE_REPOSITORY \}\}/);
 });
+
+test('ci workflow validates the smoke artifacts and Dockerfile build path', () => {
+  const workflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
+
+  assert.match(workflow, /yarn install --immutable/);
+  assert.match(workflow, /yarn test:node/);
+  assert.match(workflow, /yarn test:coverage/);
+  assert.match(workflow, /test -f \.\/examples\/generic-node-library\/artifacts\/test-report\/modules\.json/);
+  assert.match(workflow, /test -f \.\/examples\/generic-node-library\/artifacts\/test-report\/ownership\.json/);
+  assert.match(workflow, /docker build --file docker\/Dockerfile --tag test-station-ci \./);
+});
