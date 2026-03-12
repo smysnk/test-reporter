@@ -59,6 +59,7 @@ test('fleet values and workflow use the unified image contract without stray ref
   assert.match(valuesYaml, /INGEST_SHARED_KEY:\s*change-me/);
   assert.match(valuesYaml, /secretName:\s*""/);
   assert.match(valuesYaml, /repository:\s*ghcr\.io\/smysnk\/test-station/);
+  assert.match(valuesYaml, /pullPolicy:\s*Always/);
   assert.match(webIngressYaml, /test-station\.publicDomain/);
   assert.match(webIngressYaml, /test-station\.defaultTlsSecretName/);
   assert.match(webIngressYaml, /test-station\.serverName/);

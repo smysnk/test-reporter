@@ -287,10 +287,11 @@ Shared-key auth:
 
 Optional S3-backed artifact storage:
 
-- set `vars.TEST_STATION_ARTIFACT_S3_BUCKET` to enable `aws s3 sync` of the report directory
-- optionally set `vars.TEST_STATION_ARTIFACT_STORAGE_PREFIX` to control the object prefix
-- optionally set `vars.TEST_STATION_ARTIFACT_BASE_URL` when the uploaded artifacts are browser-accessible through S3 static hosting, CloudFront, or another CDN
-- set `secrets.TEST_STATION_ARTIFACT_AWS_ACCESS_KEY_ID` and `secrets.TEST_STATION_ARTIFACT_AWS_SECRET_ACCESS_KEY` for the sync credentials
+- set `vars.S3_BUCKET` to enable `aws s3 sync` of the report directory
+- optionally set `vars.S3_STORAGE_PREFIX` to control the object prefix
+- optionally set `vars.S3_PUBLIC_URL` when the uploaded artifacts are browser-accessible through S3 static hosting, CloudFront, or another CDN
+- set `secrets.S3_AWS_ACCESS_KEY_ID` and `secrets.S3_AWS_SECRET_ACCESS_KEY` for the sync credentials
+- optionally set `vars.S3_AWS_REGION` to override the default `us-east-1`
 
 Current storage model:
 

@@ -19,9 +19,9 @@ async function main() {
     buildCompletedAt: args.buildCompletedAt || process.env.TEST_STATION_BUILD_COMPLETED_AT,
     jobStatus: args.jobStatus || process.env.TEST_STATION_CI_STATUS,
     storage: normalizeStorageOptions({
-      bucket: args.artifactS3Bucket || process.env.TEST_STATION_ARTIFACT_S3_BUCKET,
-      prefix: args.artifactStoragePrefix || process.env.TEST_STATION_ARTIFACT_STORAGE_PREFIX,
-      baseUrl: args.artifactBaseUrl || process.env.TEST_STATION_ARTIFACT_BASE_URL,
+      bucket: args.artifactS3Bucket || process.env.S3_BUCKET,
+      prefix: args.artifactStoragePrefix || process.env.S3_STORAGE_PREFIX,
+      baseUrl: args.artifactBaseUrl || process.env.S3_PUBLIC_URL,
     }),
   });
   const response = await publishIngestPayload({

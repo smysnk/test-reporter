@@ -278,3 +278,16 @@ export const RUN_DETAIL_QUERY = `
     }
   }
 `;
+
+export const RUN_REPORT_QUERY = `
+  query WebRunReport($runId: ID!) {
+    run(id: $runId) {
+      id
+      externalKey
+      project {
+        name
+      }
+      rawReport
+    }
+  }
+`;

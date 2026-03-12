@@ -63,6 +63,7 @@ test('GraphQL exposes project, run, file, test, artifact, trend, and release-not
           id
           externalKey
           status
+          rawReport
           coverageSnapshot {
             linesPct
           }
@@ -187,6 +188,7 @@ test('GraphQL exposes project, run, file, test, artifact, trend, and release-not
   assert.equal(response.payload.data.run.suites.length, 1);
   assert.equal(response.payload.data.run.suites[0].tests.length, 2);
   assert.equal(response.payload.data.run.artifacts[0].href, 'raw/workspace/repo-node.log');
+  assert.equal(response.payload.data.run.rawReport.summary.totalTests, 2);
   assert.deepEqual(response.payload.data.runPackages, [
     {
       name: 'workspace',

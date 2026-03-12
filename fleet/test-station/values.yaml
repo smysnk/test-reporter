@@ -5,7 +5,7 @@ global:
 image:
   repository: ghcr.io/smysnk/test-station
   tag: main
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   pullSecrets: []
 
 server:

@@ -41,7 +41,10 @@ test('ci workflow validates the smoke artifacts and Dockerfile build path', () =
   assert.match(workflow, /yarn test:coverage/);
   assert.match(workflow, /https:\/\/test-station\.smysnk\.com\/api\/ingest/);
   assert.match(workflow, /TEST_STATION_INGEST_SHARED_KEY/);
-  assert.match(workflow, /TEST_STATION_ARTIFACT_S3_BUCKET/);
+  assert.match(workflow, /S3_BUCKET/);
+  assert.match(workflow, /S3_AWS_ACCESS_KEY_ID/);
+  assert.match(workflow, /S3_AWS_SECRET_ACCESS_KEY/);
+  assert.match(workflow, /S3_AWS_REGION/);
   assert.match(workflow, /aws s3 sync \.\/\.test-results\/self-test-report/);
   assert.match(workflow, /publish-ingest-report\.mjs/);
   assert.match(workflow, /test -f \.\/examples\/generic-node-library\/artifacts\/test-report\/modules\.json/);

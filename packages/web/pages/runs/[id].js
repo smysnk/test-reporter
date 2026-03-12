@@ -3,10 +3,12 @@ import Link from 'next/link';
 import { EmptyState, InlineList, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCoveragePct, formatDateTime, formatDuration, formatSignedDelta } from '../../lib/format.js';
 import { requireWebSession } from '../../lib/auth.js';
+import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../../lib/runReportTemplate.js';
+import { buildRunTemplateHref, resolveRunTemplateMode } from '../../lib/runTemplateRouting.js';
 import { loadRunExplorerPage } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
 
-export default function RunDetailPage({ data }) {
+export default function RunDetailPage({ data, templateMode = 'runner' }) {
   const run = data?.run || null;
   if (!run) {
     return React.createElement(
@@ -19,12 +21,6 @@ export default function RunDetailPage({ data }) {
     );
   }
 
-  const runPackages = Array.isArray(data?.runPackages) ? data.runPackages : [];
-  const runModules = Array.isArray(data?.runModules) ? data.runModules : [];
-  const runFiles = Array.isArray(data?.runFiles) ? data.runFiles : [];
-  const failedTests = Array.isArray(data?.failedTests) ? data.failedTests : [];
-  const coverageComparison = data?.coverageComparison || null;
-
   return React.createElement(
     React.Fragment,
     null,
@@ -33,13 +29,23 @@ export default function RunDetailPage({ data }) {
       {
         eyebrow: 'Run Detail',
         title: run.externalKey,
-        copy: 'A single execution view that combines summary counts, suite health, failure details, files, and raw artifacts.',
+        copy: templateMode === 'runner'
+          ? 'Switch between the web operator view and the exact HTML template emitted by the test runner.'
+          : 'A single execution view that combines summary counts, suite health, failure details, files, and raw artifacts.',
       },
       React.createElement(
         'div',
-        { className: 'web-list__row' },
-        React.createElement(Link, { href: `/projects/${run.project?.slug}` }, run.project?.name || 'Project'),
-        React.createElement(StatusPill, { status: run.status }),
+        { className: 'web-run-detail__header' },
+        React.createElement(
+          'div',
+          { className: 'web-list__row' },
+          React.createElement(Link, { href: `/projects/${run.project?.slug}` }, run.project?.name || 'Project'),
+          React.createElement(StatusPill, { status: run.status }),
+        ),
+        React.createElement(TemplateSwitch, {
+          runId: run.id,
+          activeTemplate: templateMode,
+        }),
       ),
       React.createElement(MetricGrid, {
         items: [
@@ -49,6 +55,26 @@ export default function RunDetailPage({ data }) {
         ],
       }),
     ),
+    templateMode === 'runner'
+      ? React.createElement(RunnerReportSection, {
+        runId: run.id,
+        externalKey: run.externalKey,
+      })
+      : React.createElement(OperationsRunDetail, { data }),
+  );
+}
+
+function OperationsRunDetail({ data }) {
+  const run = data?.run || null;
+  const runPackages = Array.isArray(data?.runPackages) ? data.runPackages : [];
+  const runModules = Array.isArray(data?.runModules) ? data.runModules : [];
+  const runFiles = Array.isArray(data?.runFiles) ? data.runFiles : [];
+  const failedTests = Array.isArray(data?.failedTests) ? data.failedTests : [];
+  const coverageComparison = data?.coverageComparison || null;
+
+  return React.createElement(
+    React.Fragment,
+    null,
     React.createElement(
       'div',
       { className: 'web-grid web-grid--two' },
@@ -150,7 +176,12 @@ export default function RunDetailPage({ data }) {
                 React.createElement('span', { className: 'web-chip' }, artifact.kind),
               ),
               artifact.href
-                ? React.createElement('a', { href: artifact.href, target: '_blank', rel: 'noreferrer' }, artifact.href)
+                ? React.createElement('a', {
+                  href: artifact.href,
+                  target: '_blank',
+                  rel: 'noreferrer',
+                  className: 'web-link--break',
+                }, artifact.href)
                 : React.createElement('span', { className: 'web-list__meta' }, artifact.relativePath || 'No public href'),
             )),
           )
@@ -237,33 +268,37 @@ export default function RunDetailPage({ data }) {
             }),
           runFiles.length > 0
             ? React.createElement(
-              'table',
-              { className: 'web-table' },
+              'div',
+              { className: 'web-table-wrap' },
               React.createElement(
-                'thead',
-                null,
+                'table',
+                { className: 'web-table' },
                 React.createElement(
-                  'tr',
+                  'thead',
                   null,
-                  React.createElement('th', null, 'File'),
-                  React.createElement('th', null, 'Module'),
-                  React.createElement('th', null, 'Status'),
-                  React.createElement('th', null, 'Tests'),
-                  React.createElement('th', null, 'Coverage'),
+                  React.createElement(
+                    'tr',
+                    null,
+                    React.createElement('th', null, 'File'),
+                    React.createElement('th', null, 'Module'),
+                    React.createElement('th', null, 'Status'),
+                    React.createElement('th', null, 'Tests'),
+                    React.createElement('th', null, 'Coverage'),
+                  ),
                 ),
-              ),
-              React.createElement(
-                'tbody',
-                null,
-                ...runFiles.map((file) => React.createElement(
-                  'tr',
-                  { key: file.path },
-                  React.createElement('td', null, file.path),
-                  React.createElement('td', null, file.moduleName || 'uncategorized'),
-                  React.createElement('td', null, React.createElement(StatusPill, { status: file.status })),
-                  React.createElement('td', null, `${file.failedTestCount}/${file.testCount}`),
-                  React.createElement('td', null, formatCoveragePct(file.coverage?.linesPct)),
-                )),
+                React.createElement(
+                  'tbody',
+                  null,
+                  ...runFiles.map((file) => React.createElement(
+                    'tr',
+                    { key: file.path },
+                    React.createElement('td', { className: 'web-table__path' }, file.path),
+                    React.createElement('td', null, file.moduleName || 'uncategorized'),
+                    React.createElement('td', null, React.createElement(StatusPill, { status: file.status })),
+                    React.createElement('td', null, `${file.failedTestCount}/${file.testCount}`),
+                    React.createElement('td', null, formatCoveragePct(file.coverage?.linesPct)),
+                  )),
+                ),
               ),
             )
             : null,
@@ -311,6 +346,87 @@ export default function RunDetailPage({ data }) {
   );
 }
 
+function TemplateSwitch({ runId, activeTemplate }) {
+  return React.createElement(
+    'nav',
+    { className: 'web-segmented-control', 'aria-label': 'Run report templates' },
+    React.createElement(
+      Link,
+      {
+        href: buildRunTemplateHref(runId, 'web'),
+        className: activeTemplate === 'web'
+          ? 'web-segmented-control__link web-segmented-control__link--active'
+          : 'web-segmented-control__link',
+      },
+      'Operations view',
+    ),
+    React.createElement(
+      Link,
+      {
+        href: buildRunTemplateHref(runId, 'runner'),
+        className: activeTemplate === 'runner'
+          ? 'web-segmented-control__link web-segmented-control__link--active'
+          : 'web-segmented-control__link',
+      },
+      'Runner report',
+    ),
+  );
+}
+
+function RunnerReportSection({ runId, externalKey }) {
+  return React.createElement(
+    SectionCard,
+    {
+      eyebrow: 'Runner Template',
+      title: 'Exact runner HTML report',
+      copy: 'This view loads the same HTML template emitted by the test runner. Artifact links open directly when the run carries public source URLs.',
+    },
+    React.createElement(RunnerReportFrame, {
+      runId,
+      title: `${externalKey} runner report`,
+    }),
+  );
+}
+
+function RunnerReportFrame({ runId, title }) {
+  const iframeRef = React.useRef(null);
+  const [frameHeight, setFrameHeight] = React.useState(1200);
+
+  React.useEffect(() => {
+    const handleMessage = (event) => {
+      const frame = iframeRef.current;
+      if (!frame || event.source !== frame.contentWindow) {
+        return;
+      }
+
+      if (event.data?.type !== RUNNER_REPORT_HEIGHT_MESSAGE_TYPE) {
+        return;
+      }
+
+      const nextHeight = Number.parseInt(event.data.height, 10);
+      if (Number.isFinite(nextHeight) && nextHeight > 0) {
+        setFrameHeight(Math.max(960, nextHeight + 24));
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
+  return React.createElement('iframe', {
+    ref: iframeRef,
+    src: `/api/runs/${encodeURIComponent(runId)}/report`,
+    title,
+    className: 'web-runner-frame',
+    sandbox: 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox',
+    style: {
+      height: `${frameHeight}px`,
+    },
+  });
+}
+
 function ChangeListCard({ title, changes }) {
   return React.createElement(
     'div',
@@ -352,6 +468,7 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   }
 
   const runId = typeof context.params?.id === 'string' ? context.params.id : '';
+  const templateMode = resolveRunTemplateMode(context.query?.template);
   const data = await loadRunExplorerPage({
     session: auth.session,
     runId,
@@ -373,6 +490,7 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
     props: {
       session: auth.session,
       data,
+      templateMode,
     },
   };
 });

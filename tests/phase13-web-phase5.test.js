@@ -14,9 +14,12 @@ import {
   loadWebHomePage,
   loadProjectExplorerPage,
   loadRunExplorerPage,
+  loadRunReportHtml,
   resolveWebServerUrl,
 } from '../packages/web/lib/serverGraphql.js';
+import { buildRunTemplateHref, resolveRunTemplateMode } from '../packages/web/lib/runTemplateRouting.js';
 import { buildSignInRedirectUrl, isProtectedWebPath } from '../packages/web/lib/routeProtection.js';
+import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
 import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nextauth].js';
 
 test('web auth options expose the sign-in page and session actor metadata', async () => {
@@ -563,3 +566,168 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(formatDuration(1250), '1.3 s');
   assert.equal(formatCoveragePct(80), '80%');
 });
+
+test('web can render the runner report template from stored raw report data', async () => {
+  const session = {
+    userId: 'user-1',
+    user: {
+      email: 'user@example.com',
+      name: 'Web User',
+    },
+    role: 'member',
+    projectKeys: ['workspace'],
+  };
+
+  const fetchImpl = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    if (!request.query.includes('WebRunReport')) {
+      throw new Error(`Unexpected report request: ${request.query}`);
+    }
+
+    return new Response(JSON.stringify({
+      data: {
+        run: {
+          id: 'run-1',
+          externalKey: 'workspace:github-actions:1001',
+          project: {
+            name: 'Workspace',
+          },
+          rawReport: createRunnerReportFixture(),
+        },
+      },
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const html = await loadRunReportHtml({
+    session,
+    runId: 'run-1',
+    fetchImpl,
+  });
+
+  assert.match(html, /Group by Module/);
+  assert.match(html, /Group by Package/);
+  assert.match(html, /Workspace Report - workspace:github-actions:1001/);
+  assert.match(html, /<base target="_blank" \/>/);
+  assert.match(html, new RegExp(RUNNER_REPORT_HEIGHT_MESSAGE_TYPE));
+  assert.match(html, /href="https:\/\/artifacts\.example\.com\/workspace\/unit\.log"/);
+});
+
+test('web run template routing defaults to the runner report and keeps the operations view addressable', () => {
+  assert.equal(resolveRunTemplateMode(undefined), 'runner');
+  assert.equal(resolveRunTemplateMode('runner'), 'runner');
+  assert.equal(resolveRunTemplateMode('web'), 'web');
+  assert.equal(buildRunTemplateHref('run-1', 'runner'), '/runs/run-1');
+  assert.equal(buildRunTemplateHref('run-1', 'web'), '/runs/run-1?template=web');
+});
+
+function createRunnerReportFixture() {
+  return {
+    schemaVersion: '1',
+    generatedAt: '2026-03-09T15:00:00.000Z',
+    meta: {
+      projectName: 'Workspace',
+    },
+    summary: {
+      totalPackages: 1,
+      totalModules: 1,
+      totalSuites: 1,
+      totalTests: 1,
+      passedTests: 1,
+      failedTests: 0,
+      skippedTests: 0,
+      coverage: {
+        lines: { covered: 8, total: 10, pct: 80 },
+        branches: { covered: 3, total: 4, pct: 75 },
+        functions: { covered: 2, total: 3, pct: 66.67 },
+        statements: { covered: 8, total: 10, pct: 80 },
+        files: [],
+      },
+      filterOptions: {
+        modules: ['runtime'],
+        packages: ['workspace'],
+        frameworks: ['node-test'],
+      },
+    },
+    packages: [
+      {
+        name: 'workspace',
+        location: 'packages/workspace',
+        status: 'passed',
+        durationMs: 3000,
+        summary: { total: 1, passed: 1, failed: 0, skipped: 0 },
+        coverage: {
+          lines: { covered: 8, total: 10, pct: 80 },
+          branches: { covered: 3, total: 4, pct: 75 },
+          functions: { covered: 2, total: 3, pct: 66.67 },
+          statements: { covered: 8, total: 10, pct: 80 },
+          files: [],
+        },
+        modules: ['runtime'],
+        frameworks: ['node-test'],
+        suites: [
+          {
+            id: 'workspace-node',
+            label: 'Workspace Node Tests',
+            runtime: 'node-test',
+            command: 'node --test',
+            status: 'passed',
+            durationMs: 3000,
+            summary: { total: 1, passed: 1, failed: 0, skipped: 0 },
+            warnings: [],
+            rawArtifacts: [
+              {
+                label: 'Unit log',
+                relativePath: 'workspace/unit.log',
+                href: 'raw/workspace/unit.log',
+                sourceUrl: 'https://artifacts.example.com/workspace/unit.log',
+                kind: 'file',
+                mediaType: 'text/plain',
+              },
+            ],
+            tests: [
+              {
+                name: 'passes',
+                fullName: 'workspace passes',
+                status: 'passed',
+                durationMs: 12,
+                file: '/repo/packages/core/src/index.js',
+                line: 10,
+                column: 2,
+                assertions: [],
+                setup: [],
+                mocks: [],
+                failureMessages: [],
+                rawDetails: {},
+                module: 'runtime',
+                theme: 'core',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    modules: [
+      {
+        module: 'runtime',
+        owner: 'platform',
+        summary: { total: 1, passed: 1, failed: 0, skipped: 0 },
+        durationMs: 3000,
+        packageCount: 1,
+        packages: ['workspace'],
+        frameworks: ['node-test'],
+        dominantPackages: ['workspace'],
+        coverage: {
+          lines: { covered: 8, total: 10, pct: 80 },
+          branches: { covered: 3, total: 4, pct: 75 },
+          functions: { covered: 2, total: 3, pct: 66.67 },
+          statements: { covered: 8, total: 10, pct: 80 },
+          files: [],
+        },
+        themes: [],
+      },
+    ],
+  };
+}

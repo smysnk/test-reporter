@@ -9,17 +9,23 @@ import { wrapper } from '../store/index.js';
 
 const theme = {
   colors: {
-    background: '#f3efe6',
-    panel: '#fffaf3',
-    border: '#d6c9b2',
-    text: '#1e1a16',
-    muted: '#6f6558',
-    accent: '#ad4f2d',
-    accentSoft: '#f5d2c2',
+    background: '#07111f',
+    panel: 'rgba(16, 28, 49, 0.84)',
+    panelStrong: 'rgba(22, 36, 61, 0.94)',
+    panelSoft: 'rgba(11, 20, 36, 0.82)',
+    border: 'rgba(124, 160, 224, 0.18)',
+    borderStrong: 'rgba(124, 160, 224, 0.32)',
+    text: '#eef4ff',
+    muted: '#99a9c4',
+    accent: '#6bb2ff',
+    accentSoft: 'rgba(107, 178, 255, 0.14)',
+    success: '#4ee38b',
+    danger: '#ff6f8f',
+    warning: '#f7c55a',
   },
-  shadow: '0 20px 60px rgba(75, 48, 26, 0.12)',
-  radius: '24px',
-  font: '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif',
+  shadow: '0 22px 80px rgba(2, 8, 20, 0.45)',
+  radius: '28px',
+  font: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
 };
 
 const GlobalStyle = createGlobalStyle`
@@ -28,8 +34,9 @@ const GlobalStyle = createGlobalStyle`
   body {
     margin: 0;
     background:
-      radial-gradient(circle at top left, rgba(173, 79, 45, 0.18), transparent 28%),
-      linear-gradient(180deg, #f9f4ec 0%, #f3efe6 52%, #efe8dc 100%);
+      radial-gradient(circle at top left, rgba(107, 178, 255, 0.22), transparent 30%),
+      radial-gradient(circle at top right, rgba(78, 227, 139, 0.1), transparent 24%),
+      linear-gradient(180deg, #08101b 0%, #07111f 55%, #050c16 100%);
     color: ${(props) => props.theme.colors.text};
     font-family: ${(props) => props.theme.font};
   }
@@ -47,6 +54,7 @@ const GlobalStyle = createGlobalStyle`
     background: ${(props) => props.theme.colors.panel};
     border-radius: ${(props) => props.theme.radius};
     box-shadow: ${(props) => props.theme.shadow};
+    backdrop-filter: blur(18px);
   }
   .web-shell__header {
     display: grid;
@@ -54,6 +62,9 @@ const GlobalStyle = createGlobalStyle`
     padding: 28px;
     margin: 0 auto 24px;
     max-width: 1120px;
+    background:
+      radial-gradient(circle at top left, rgba(107, 178, 255, 0.18), transparent 34%),
+      linear-gradient(145deg, rgba(24, 39, 65, 0.96), rgba(10, 18, 34, 0.92));
   }
   .web-shell__eyebrow {
     margin: 0 0 8px;
@@ -82,6 +93,7 @@ const GlobalStyle = createGlobalStyle`
     padding: 10px 14px;
     border-radius: 999px;
     background: ${(props) => props.theme.colors.accentSoft};
+    border: 1px solid ${(props) => props.theme.colors.border};
     font-size: 0.95rem;
   }
   .web-shell__main {
@@ -90,8 +102,12 @@ const GlobalStyle = createGlobalStyle`
     display: grid;
     gap: 24px;
   }
+  .web-shell__main > * {
+    min-width: 0;
+  }
   .web-card {
     padding: 28px;
+    min-width: 0;
   }
   .web-card--compact {
     padding: 22px;
@@ -106,11 +122,13 @@ const GlobalStyle = createGlobalStyle`
   .web-card__title {
     margin: 0 0 10px;
     font-size: 1.8rem;
+    overflow-wrap: anywhere;
   }
   .web-card__copy {
     margin: 0;
     color: ${(props) => props.theme.colors.muted};
     line-height: 1.6;
+    overflow-wrap: anywhere;
   }
   .web-shell__toolbar {
     display: grid;
@@ -138,6 +156,9 @@ const GlobalStyle = createGlobalStyle`
     display: grid;
     gap: 24px;
   }
+  .web-grid > * {
+    min-width: 0;
+  }
   .web-grid--two {
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
@@ -152,8 +173,9 @@ const GlobalStyle = createGlobalStyle`
     gap: 6px;
     padding: 18px;
     border-radius: 18px;
-    background: rgba(173, 79, 45, 0.08);
-    border: 1px solid rgba(173, 79, 45, 0.16);
+    background: ${(props) => props.theme.colors.panelSoft};
+    border: 1px solid ${(props) => props.theme.colors.border};
+    min-width: 0;
   }
   .web-metric__label {
     font-size: 0.78rem;
@@ -163,10 +185,12 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-metric__value {
     font-size: 1.6rem;
+    overflow-wrap: anywhere;
   }
   .web-metric__copy {
     color: ${(props) => props.theme.colors.muted};
     font-size: 0.9rem;
+    overflow-wrap: anywhere;
   }
   .web-list {
     display: grid;
@@ -179,21 +203,29 @@ const GlobalStyle = createGlobalStyle`
     padding: 18px;
     border-radius: 18px;
     border: 1px solid ${(props) => props.theme.colors.border};
-    background: rgba(255, 255, 255, 0.35);
+    background: rgba(11, 20, 36, 0.58);
+    min-width: 0;
   }
   .web-list__row {
     display: flex;
     gap: 12px;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     flex-wrap: wrap;
+  }
+  .web-list__row > * {
+    min-width: 0;
   }
   .web-list__title {
     font-size: 1.1rem;
+    flex: 1 1 220px;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .web-list__meta {
     color: ${(props) => props.theme.colors.muted};
     font-size: 0.92rem;
+    overflow-wrap: anywhere;
   }
   .web-pill {
     display: inline-flex;
@@ -208,26 +240,31 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-pill--passed,
   .web-pill--covered {
-    background: rgba(64, 136, 91, 0.12);
-    color: #2f6f45;
-    border-color: rgba(64, 136, 91, 0.2);
+    background: color-mix(in srgb, ${(props) => props.theme.colors.success} 16%, transparent);
+    color: ${(props) => props.theme.colors.success};
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.success} 28%, transparent);
   }
   .web-pill--failed {
-    background: rgba(173, 79, 45, 0.12);
-    color: #9a3b1a;
-    border-color: rgba(173, 79, 45, 0.24);
+    background: color-mix(in srgb, ${(props) => props.theme.colors.danger} 16%, transparent);
+    color: ${(props) => props.theme.colors.danger};
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.danger} 28%, transparent);
   }
   .web-pill--unknown,
   .web-pill--skipped {
-    background: rgba(111, 101, 88, 0.12);
+    background: color-mix(in srgb, ${(props) => props.theme.colors.warning} 14%, transparent);
     color: ${(props) => props.theme.colors.muted};
-    border-color: rgba(111, 101, 88, 0.18);
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.warning} 24%, transparent);
   }
   .web-table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 20px;
     font-size: 0.96rem;
+    table-layout: fixed;
+  }
+  .web-table-wrap {
+    width: 100%;
+    overflow-x: auto;
   }
   .web-table th,
   .web-table td {
@@ -235,6 +272,8 @@ const GlobalStyle = createGlobalStyle`
     border-bottom: 1px solid ${(props) => props.theme.colors.border};
     text-align: left;
     vertical-align: top;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .web-table th {
     color: ${(props) => props.theme.colors.muted};
@@ -242,10 +281,15 @@ const GlobalStyle = createGlobalStyle`
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
+  .web-table__path {
+    font-family: "SFMono-Regular", "SFMono", "Menlo", "Consolas", monospace;
+    font-size: 0.9rem;
+  }
   .web-inline-list {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    min-width: 0;
   }
   .web-inline-list__item,
   .web-chip {
@@ -253,9 +297,57 @@ const GlobalStyle = createGlobalStyle`
     align-items: center;
     padding: 6px 10px;
     border-radius: 999px;
-    background: rgba(30, 26, 22, 0.06);
+    background: rgba(107, 178, 255, 0.08);
+    border: 1px solid ${(props) => props.theme.colors.border};
     color: ${(props) => props.theme.colors.text};
     font-size: 0.84rem;
+    max-width: 100%;
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-align: left;
+  }
+  .web-link--break {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .web-run-detail__header {
+    display: grid;
+    gap: 16px;
+    margin-top: 18px;
+  }
+  .web-segmented-control {
+    display: inline-flex;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 999px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    background: ${(props) => props.theme.colors.panelSoft};
+    width: fit-content;
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+  .web-segmented-control__link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 14px;
+    border-radius: 999px;
+    color: ${(props) => props.theme.colors.muted};
+    font-size: 0.92rem;
+    white-space: nowrap;
+  }
+  .web-segmented-control__link--active {
+    background: ${(props) => props.theme.colors.accent};
+    color: #07111f;
+  }
+  .web-runner-frame {
+    width: 100%;
+    margin-top: 22px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    border-radius: 22px;
+    background: #0b1424;
+    display: block;
   }
   .web-kv {
     display: grid;
@@ -276,7 +368,7 @@ const GlobalStyle = createGlobalStyle`
     margin-top: 18px;
     padding: 18px;
     border-radius: 18px;
-    background: rgba(111, 101, 88, 0.08);
+    background: rgba(11, 20, 36, 0.48);
     border: 1px dashed ${(props) => props.theme.colors.border};
   }
   .web-empty__title {
@@ -302,17 +394,20 @@ const GlobalStyle = createGlobalStyle`
   .web-button {
     border: 1px solid ${(props) => props.theme.colors.accent};
     background: ${(props) => props.theme.colors.accent};
-    color: #fff8f3;
+    color: #07111f;
     border-radius: 999px;
     padding: 10px 16px;
     font: inherit;
+    font-weight: 600;
+    cursor: pointer;
   }
   .web-button--primary {
+    display: inline-flex;
     width: 100%;
     justify-content: center;
   }
   .web-button--ghost {
-    background: transparent;
+    background: rgba(107, 178, 255, 0.06);
     color: ${(props) => props.theme.colors.accent};
   }
   .web-auth {
@@ -340,7 +435,8 @@ const GlobalStyle = createGlobalStyle`
     border-radius: 14px;
     padding: 12px 14px;
     font: inherit;
-    background: #fffdf9;
+    background: rgba(7, 17, 31, 0.88);
+    color: ${(props) => props.theme.colors.text};
   }
   .web-trend-list {
     display: grid;
@@ -354,16 +450,17 @@ const GlobalStyle = createGlobalStyle`
   .web-trend-list__bar {
     height: 10px;
     border-radius: 999px;
-    background: rgba(173, 79, 45, 0.12);
+    background: rgba(107, 178, 255, 0.12);
     overflow: hidden;
   }
   .web-trend-list__fill {
     height: 100%;
-    background: linear-gradient(90deg, #ad4f2d 0%, #d67f56 100%);
+    background: linear-gradient(90deg, #6bb2ff 0%, #4ee38b 100%);
   }
   .web-stack {
     display: grid;
     gap: 18px;
+    min-width: 0;
   }
   .web-trend-card {
     display: grid;
@@ -371,7 +468,7 @@ const GlobalStyle = createGlobalStyle`
     padding: 20px;
     border-radius: 20px;
     border: 1px solid ${(props) => props.theme.colors.border};
-    background: rgba(255, 255, 255, 0.42);
+    background: rgba(11, 20, 36, 0.58);
   }
   .web-trend-card--compact {
     padding: 18px;
@@ -385,7 +482,7 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-trend-card__baseline {
     fill: none;
-    stroke: rgba(111, 101, 88, 0.24);
+    stroke: rgba(124, 160, 224, 0.24);
     stroke-width: 1;
   }
   .web-trend-card__line {
@@ -397,20 +494,20 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-trend-card__dot {
     fill: ${(props) => props.theme.colors.accent};
-    stroke: #fff8f3;
+    stroke: #07111f;
     stroke-width: 2;
   }
   .web-trend-card__overlay line {
-    stroke: rgba(30, 26, 22, 0.18);
+    stroke: rgba(124, 160, 224, 0.18);
     stroke-dasharray: 3 4;
   }
   .web-trend-card__overlay circle {
-    fill: #fff8f3;
+    fill: #07111f;
     stroke: ${(props) => props.theme.colors.accent};
     stroke-width: 2;
   }
   .web-chip--release {
-    background: rgba(173, 79, 45, 0.14);
+    background: rgba(107, 178, 255, 0.12);
   }
   @media (min-width: 900px) {
     .web-shell__header {

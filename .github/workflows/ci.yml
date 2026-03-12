@@ -69,23 +69,23 @@ jobs:
           fi
 
       - name: Configure AWS credentials for report archive sync
-        if: ${{ always() && github.event_name == 'push' && vars.TEST_STATION_ARTIFACT_S3_BUCKET != '' }}
+        if: ${{ always() && github.event_name == 'push' && vars.S3_BUCKET != '' }}
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.TEST_STATION_ARTIFACT_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.TEST_STATION_ARTIFACT_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.TEST_STATION_ARTIFACT_AWS_REGION != '' && vars.TEST_STATION_ARTIFACT_AWS_REGION || 'us-east-1' }}
+          aws-access-key-id: ${{ secrets.S3_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.S3_AWS_REGION != '' && vars.S3_AWS_REGION || 'us-east-1' }}
 
       - name: Sync self-test report to S3
-        if: ${{ always() && github.event_name == 'push' && vars.TEST_STATION_ARTIFACT_S3_BUCKET != '' }}
+        if: ${{ always() && github.event_name == 'push' && vars.S3_BUCKET != '' }}
         shell: bash
         env:
-          TEST_STATION_ARTIFACT_S3_BUCKET: ${{ vars.TEST_STATION_ARTIFACT_S3_BUCKET }}
-          TEST_STATION_ARTIFACT_STORAGE_PREFIX: ${{ vars.TEST_STATION_ARTIFACT_STORAGE_PREFIX }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          S3_STORAGE_PREFIX: ${{ vars.S3_STORAGE_PREFIX }}
         run: |
-          storage_prefix="${TEST_STATION_ARTIFACT_STORAGE_PREFIX:-ci/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}}"
-          echo "TEST_STATION_ARTIFACT_STORAGE_PREFIX=$storage_prefix" >> "$GITHUB_ENV"
-          aws s3 sync ./.test-results/self-test-report "s3://${TEST_STATION_ARTIFACT_S3_BUCKET}/${storage_prefix}" --no-progress
+          storage_prefix="${S3_STORAGE_PREFIX:-ci/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}}"
+          echo "S3_STORAGE_PREFIX=$storage_prefix" >> "$GITHUB_ENV"
+          aws s3 sync ./.test-results/self-test-report "s3://${S3_BUCKET}/${storage_prefix}" --no-progress
 
       - name: Publish self-test report to ingest endpoint
         if: ${{ always() && github.event_name == 'push' }}
@@ -94,12 +94,12 @@ jobs:
           TEST_STATION_INGEST_ENDPOINT: https://test-station.smysnk.com/api/ingest
           TEST_STATION_INGEST_PROJECT_KEY: test-station
           TEST_STATION_INGEST_SHARED_KEY: ${{ secrets.TEST_STATION_INGEST_SHARED_KEY }}
-          TEST_STATION_ARTIFACT_BASE_URL: ${{ vars.TEST_STATION_ARTIFACT_BASE_URL }}
-          TEST_STATION_ARTIFACT_S3_BUCKET: ${{ vars.TEST_STATION_ARTIFACT_S3_BUCKET }}
+          S3_PUBLIC_URL: ${{ vars.S3_PUBLIC_URL }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
         run: |
           test -n "$TEST_STATION_INGEST_SHARED_KEY" || { echo "Missing TEST_STATION_INGEST_SHARED_KEY secret"; exit 1; }
           export TEST_STATION_BUILD_COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          export TEST_STATION_ARTIFACT_STORAGE_PREFIX="${TEST_STATION_ARTIFACT_STORAGE_PREFIX:-ci/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}}"
+          export S3_STORAGE_PREFIX="${S3_STORAGE_PREFIX:-ci/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}}"
           node ./scripts/publish-ingest-report.mjs --input ./.test-results/self-test-report/report.json
 
       - name: Assert self-test pass

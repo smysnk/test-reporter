@@ -5,8 +5,13 @@ import {
   PROJECT_BY_SLUG_QUERY,
   RUN_SCOPE_TREND_CATALOG_QUERY,
   RUN_DETAIL_QUERY,
+  RUN_REPORT_QUERY,
   SCOPED_COVERAGE_TREND_QUERY,
 } from './queries.js';
+import {
+  decorateEmbeddedRunnerReportHtml,
+  prepareEmbeddedRunnerReport,
+} from './runReportTemplate.js';
 
 function normalizeEnvValue(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -131,6 +136,29 @@ export async function loadRunExplorerPage({ session, runId, fetchImpl = fetch, r
     failedTests: Array.isArray(data.tests) ? data.tests : [],
     coverageComparison: data.runCoverageComparison || null,
   };
+}
+
+export async function loadRunReportHtml({ session, runId, fetchImpl = fetch, requestId = null }) {
+  const data = await executeWebGraphql({
+    session,
+    query: RUN_REPORT_QUERY,
+    variables: { runId },
+    fetchImpl,
+    requestId,
+  });
+
+  const run = data.run || null;
+  if (!run || !run.rawReport) {
+    return null;
+  }
+
+  const { renderHtmlReport } = await import('@test-station/render-html');
+  const embeddedReport = prepareEmbeddedRunnerReport(run.rawReport);
+  const html = renderHtmlReport(embeddedReport, {
+    title: `${run.project?.name || 'Test Station'} Report - ${run.externalKey}`,
+  });
+
+  return decorateEmbeddedRunnerReportHtml(html);
 }
 
 async function loadProjectTrendPanels({

@@ -141,6 +141,7 @@ export const queryTypeDefs = `#graphql
     durationMs: Int
     status: String!
     reportSchemaVersion: String
+    rawReport: JSON
     summary: JSON
     metadata: JSON
     project: Project

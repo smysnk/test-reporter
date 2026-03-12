@@ -87,9 +87,9 @@ test('publish-ingest-report CLI posts bearer-authenticated payloads', async () =
     TEST_STATION_BUILD_STARTED_AT: '2026-03-12T12:00:00.000Z',
     TEST_STATION_BUILD_COMPLETED_AT: '2026-03-12T12:03:00.000Z',
     TEST_STATION_CI_STATUS: 'failed',
-    TEST_STATION_ARTIFACT_S3_BUCKET: 'artifact-bucket',
-    TEST_STATION_ARTIFACT_STORAGE_PREFIX: 'ci/test-station/100/1',
-    TEST_STATION_ARTIFACT_BASE_URL: 'https://artifacts.example.com/test-station',
+    S3_BUCKET: 'artifact-bucket',
+    S3_STORAGE_PREFIX: 'ci/test-station/100/1',
+    S3_PUBLIC_URL: 'https://artifacts.example.com/test-station',
   };
 
   const { stdout } = await execFileAsync('node', [
