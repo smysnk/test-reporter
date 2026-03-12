@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildWebActorHeaders, createAuthOptions, resolveNextAuthUrl } from '../packages/web/lib/auth.js';
+import {
+  buildWebActorHeaders,
+  createAuthOptions,
+  resolveAutoSignInProviderId,
+  resolveDemoAuthEnabled,
+  resolveNextAuthUrl,
+} from '../packages/web/lib/auth.js';
 import { ensureNextAuthUrl } from '../packages/web/lib/nextAuthEnv.js';
 import { formatCoveragePct, formatDuration } from '../packages/web/lib/format.js';
 import {
@@ -62,6 +68,95 @@ test('web exposes Google as an OAuth provider when configured', () => {
 
     assert.equal(authOptions.providers.some((provider) => provider.id === 'google'), true);
   } finally {
+    if (originalGoogleClientId === undefined) {
+      delete process.env.GOOGLE_CLIENT_ID;
+    } else {
+      process.env.GOOGLE_CLIENT_ID = originalGoogleClientId;
+    }
+
+    if (originalGoogleClientSecret === undefined) {
+      delete process.env.GOOGLE_CLIENT_SECRET;
+    } else {
+      process.env.GOOGLE_CLIENT_SECRET = originalGoogleClientSecret;
+    }
+  }
+});
+
+test('web demo auth defaults off unless explicitly enabled', () => {
+  const originalDemoAuthEnabled = process.env.WEB_DEMO_AUTH_ENABLED;
+
+  try {
+    delete process.env.WEB_DEMO_AUTH_ENABLED;
+
+    assert.equal(resolveDemoAuthEnabled(), false);
+
+    const authOptions = createAuthOptions();
+    assert.equal(authOptions.providers.some((provider) => provider.type === 'credentials'), false);
+  } finally {
+    if (originalDemoAuthEnabled === undefined) {
+      delete process.env.WEB_DEMO_AUTH_ENABLED;
+    } else {
+      process.env.WEB_DEMO_AUTH_ENABLED = originalDemoAuthEnabled;
+    }
+  }
+});
+
+test('web demo auth can be enabled from WEB_DEMO_AUTH_ENABLED', () => {
+  const originalDemoAuthEnabled = process.env.WEB_DEMO_AUTH_ENABLED;
+  const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+  const originalGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  try {
+    process.env.WEB_DEMO_AUTH_ENABLED = 'true';
+    delete process.env.GOOGLE_CLIENT_ID;
+    delete process.env.GOOGLE_CLIENT_SECRET;
+
+    assert.equal(resolveDemoAuthEnabled(), true);
+
+    const authOptions = createAuthOptions();
+    assert.equal(authOptions.providers.some((provider) => provider.type === 'credentials'), true);
+  } finally {
+    if (originalDemoAuthEnabled === undefined) {
+      delete process.env.WEB_DEMO_AUTH_ENABLED;
+    } else {
+      process.env.WEB_DEMO_AUTH_ENABLED = originalDemoAuthEnabled;
+    }
+
+    if (originalGoogleClientId === undefined) {
+      delete process.env.GOOGLE_CLIENT_ID;
+    } else {
+      process.env.GOOGLE_CLIENT_ID = originalGoogleClientId;
+    }
+
+    if (originalGoogleClientSecret === undefined) {
+      delete process.env.GOOGLE_CLIENT_SECRET;
+    } else {
+      process.env.GOOGLE_CLIENT_SECRET = originalGoogleClientSecret;
+    }
+  }
+});
+
+test('web hides demo auth and auto-selects Google when Google OAuth is configured', () => {
+  const originalDemoAuthEnabled = process.env.WEB_DEMO_AUTH_ENABLED;
+  const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+  const originalGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  try {
+    process.env.WEB_DEMO_AUTH_ENABLED = 'true';
+    process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+    process.env.GOOGLE_CLIENT_SECRET = 'google-client-secret';
+
+    const authOptions = createAuthOptions();
+    assert.equal(authOptions.providers.some((provider) => provider.id === 'google'), true);
+    assert.equal(authOptions.providers.some((provider) => provider.type === 'credentials'), false);
+    assert.equal(resolveAutoSignInProviderId(authOptions.providers), 'google');
+  } finally {
+    if (originalDemoAuthEnabled === undefined) {
+      delete process.env.WEB_DEMO_AUTH_ENABLED;
+    } else {
+      process.env.WEB_DEMO_AUTH_ENABLED = originalDemoAuthEnabled;
+    }
+
     if (originalGoogleClientId === undefined) {
       delete process.env.GOOGLE_CLIENT_ID;
     } else {

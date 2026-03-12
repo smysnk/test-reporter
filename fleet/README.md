@@ -52,6 +52,8 @@ Optional web OAuth providers are configured through the same runtime secret:
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
 - `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`
 
+The demo credentials login is controlled separately through config with `WEB_DEMO_AUTH_ENABLED=false` by default. If Google OAuth is configured, the web sign-in page redirects straight into Google and does not show the demo login form.
+
 ## Optional External ConfigMap
 
 If you want runtime config outside Git instead of the generated chart ConfigMaps:

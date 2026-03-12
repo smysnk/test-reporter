@@ -464,6 +464,8 @@ See [`./fleet/README.md`](./fleet/README.md) for the current workflow and script
 
 Google, GitHub, and Discord OAuth can be enabled for the web app by setting the corresponding `*_CLIENT_ID` and `*_CLIENT_SECRET` values alongside `NEXTAUTH_SECRET`.
 
+`WEB_DEMO_AUTH_ENABLED` controls the local demo credentials provider for the web app. It now defaults to `false`, and if Google OAuth is configured the sign-in page skips the demo form and immediately starts Google sign-in.
+
 ## Versioning
 
 All publishable `@test-station/*` packages currently move in lockstep at `0.2.0`.

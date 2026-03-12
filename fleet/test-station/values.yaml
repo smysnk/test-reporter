@@ -56,6 +56,7 @@ web:
     WEB_GRAPHQL_PATH: /graphql
     SERVER_URL: ""
     NEXTAUTH_URL: ""
+    WEB_DEMO_AUTH_ENABLED: "false"
     WEB_DEFAULT_PROJECT_KEYS: "*"
     WEB_ADMIN_EMAILS: ""
   secret:

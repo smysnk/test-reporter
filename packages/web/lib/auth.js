@@ -113,6 +113,12 @@ export function describeAuthProviders(options = {}) {
   }));
 }
 
+export function resolveAutoSignInProviderId(providers = []) {
+  return Array.isArray(providers) && providers.some((provider) => provider?.id === 'google')
+    ? 'google'
+    : null;
+}
+
 export function resolveAuthSecret(options = {}) {
   if (typeof options.secret === 'string' && options.secret.trim()) {
     return options.secret.trim();
@@ -135,6 +141,18 @@ export function resolveAdminEmails(options = {}) {
   }
 
   return normalizeEmailList(splitConfiguredValues(env.get('WEB_ADMIN_EMAILS').default('').asString()));
+}
+
+export function resolveDemoAuthEnabled(options = {}) {
+  if (typeof options.demoAuthEnabled === 'boolean') {
+    return options.demoAuthEnabled;
+  }
+
+  if (typeof options.demoAuthEnabled === 'string') {
+    return parseBooleanFlag(options.demoAuthEnabled, false);
+  }
+
+  return parseBooleanFlag(env.get('WEB_DEMO_AUTH_ENABLED').default('false').asString(), false);
 }
 
 function resolveAuthProviders(options = {}) {
@@ -176,7 +194,7 @@ function resolveAuthProviders(options = {}) {
     }));
   }
 
-  const demoAuthEnabled = options.demoAuthEnabled !== false;
+  const demoAuthEnabled = resolveDemoAuthEnabled(options) && !(googleClientId && googleClientSecret);
   if (demoAuthEnabled) {
     providers.push(credentialsProviderFactory({
       id: 'demo-access',
@@ -268,4 +286,29 @@ function splitConfiguredValues(value) {
     return [];
   }
   return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function parseBooleanFlag(value, fallback) {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return fallback;
+  }
+
+  if (['1', 'true', 'yes', 'on', 'enabled'].includes(normalized)) {
+    return true;
+  }
+
+  if (['0', 'false', 'no', 'off', 'disabled'].includes(normalized)) {
+    return false;
+  }
+
+  return fallback;
 }
