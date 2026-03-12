@@ -42,6 +42,12 @@ cp .env.fleet.example .env.fleet
 
 The shared secret is consumed by both the `server` and `web` deployments.
 
+Optional web OAuth providers are configured through the same runtime secret:
+
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
+- `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`
+
 ## Optional External ConfigMap
 
 If you want runtime config outside Git instead of the generated chart ConfigMaps:

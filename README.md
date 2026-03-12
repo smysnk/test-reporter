@@ -462,6 +462,8 @@ The repo includes a Rancher Fleet bundle and repo-specific deployment lifecycle 
 
 See [`./fleet/README.md`](./fleet/README.md) for the current workflow and script usage.
 
+Google, GitHub, and Discord OAuth can be enabled for the web app by setting the corresponding `*_CLIENT_ID` and `*_CLIENT_SECRET` values alongside `NEXTAUTH_SECRET`.
+
 ## Versioning
 
 All publishable `@test-station/*` packages currently move in lockstep at `0.2.0`.

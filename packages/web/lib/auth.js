@@ -3,6 +3,7 @@ import './nextAuthEnv.js';
 import { getServerSession } from 'next-auth/next';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import DiscordProvider from 'next-auth/providers/discord';
+import GoogleProvider from 'next-auth/providers/google';
 import GithubProvider from 'next-auth/providers/github';
 import env from '../../../config/env.mjs';
 import { buildSignInRedirectUrl } from './routeProtection.js';
@@ -140,9 +141,12 @@ function resolveAuthProviders(options = {}) {
   const providers = [];
   const githubClientId = env.get('GITHUB_CLIENT_ID').default('').asString();
   const githubClientSecret = env.get('GITHUB_CLIENT_SECRET').default('').asString();
+  const googleClientId = env.get('GOOGLE_CLIENT_ID').default('').asString();
+  const googleClientSecret = env.get('GOOGLE_CLIENT_SECRET').default('').asString();
   const discordClientId = env.get('DISCORD_CLIENT_ID').default('').asString();
   const discordClientSecret = env.get('DISCORD_CLIENT_SECRET').default('').asString();
   const githubProviderFactory = unwrapProviderFactory(GithubProvider);
+  const googleProviderFactory = unwrapProviderFactory(GoogleProvider);
   const discordProviderFactory = unwrapProviderFactory(DiscordProvider);
   const credentialsProviderFactory = unwrapProviderFactory(CredentialsProvider);
 
@@ -155,6 +159,13 @@ function resolveAuthProviders(options = {}) {
           scope: 'read:user user:email',
         },
       },
+    }));
+  }
+
+  if (googleClientId && googleClientSecret) {
+    providers.push(googleProviderFactory({
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
     }));
   }
 

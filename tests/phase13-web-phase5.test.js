@@ -48,6 +48,34 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
   assert.equal(session.user.image, null);
 });
 
+test('web exposes Google as an OAuth provider when configured', () => {
+  const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+  const originalGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  try {
+    process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+    process.env.GOOGLE_CLIENT_SECRET = 'google-client-secret';
+
+    const authOptions = createAuthOptions({
+      demoAuthEnabled: false,
+    });
+
+    assert.equal(authOptions.providers.some((provider) => provider.id === 'google'), true);
+  } finally {
+    if (originalGoogleClientId === undefined) {
+      delete process.env.GOOGLE_CLIENT_ID;
+    } else {
+      process.env.GOOGLE_CLIENT_ID = originalGoogleClientId;
+    }
+
+    if (originalGoogleClientSecret === undefined) {
+      delete process.env.GOOGLE_CLIENT_SECRET;
+    } else {
+      process.env.GOOGLE_CLIENT_SECRET = originalGoogleClientSecret;
+    }
+  }
+});
+
 test('web defaults NEXTAUTH_URL to localhost using WEB_PORT when unset', () => {
   const originalNextAuthUrl = process.env.NEXTAUTH_URL;
   const originalWebPort = process.env.WEB_PORT;
