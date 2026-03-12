@@ -1,16 +1,14 @@
-import env from '../../../config/env.mjs';
-
 export function resolveNextAuthUrl(options = {}) {
   if (typeof options.nextAuthUrl === 'string' && options.nextAuthUrl.trim()) {
     return options.nextAuthUrl.trim();
   }
 
-  const configured = env.get('NEXTAUTH_URL').default('').asString().trim();
+  const configured = normalizeEnvValue(process.env.NEXTAUTH_URL);
   if (configured) {
     return configured;
   }
 
-  const webPort = env.get('WEB_PORT').default(3001).asPortNumber();
+  const webPort = resolveWebPort();
   return `http://localhost:${webPort}`;
 }
 
@@ -25,6 +23,21 @@ export function ensureNextAuthUrl(options = {}) {
   }
 
   return process.env.NEXTAUTH_URL;
+}
+
+function normalizeEnvValue(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function resolveWebPort() {
+  const configured = normalizeEnvValue(process.env.WEB_PORT);
+  const parsed = Number.parseInt(configured, 10);
+
+  if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
+    return parsed;
+  }
+
+  return 3001;
 }
 
 ensureNextAuthUrl();
