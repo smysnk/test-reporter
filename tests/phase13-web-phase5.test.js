@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildWebActorHeaders, createAuthOptions, resolveNextAuthUrl } from '../packages/web/lib/auth.js';
+import { ensureNextAuthUrl } from '../packages/web/lib/nextAuthEnv.js';
 import { formatCoveragePct, formatDuration } from '../packages/web/lib/format.js';
 import {
   executeWebGraphql,
@@ -59,6 +60,31 @@ test('web defaults NEXTAUTH_URL to localhost using WEB_PORT when unset', () => {
 
     createAuthOptions({ demoAuthEnabled: false });
     assert.equal(process.env.NEXTAUTH_URL, 'http://localhost:3017');
+  } finally {
+    if (originalNextAuthUrl === undefined) {
+      delete process.env.NEXTAUTH_URL;
+    } else {
+      process.env.NEXTAUTH_URL = originalNextAuthUrl;
+    }
+
+    if (originalWebPort === undefined) {
+      delete process.env.WEB_PORT;
+    } else {
+      process.env.WEB_PORT = originalWebPort;
+    }
+  }
+});
+
+test('web normalizes blank NEXTAUTH_URL before next-auth reads it', () => {
+  const originalNextAuthUrl = process.env.NEXTAUTH_URL;
+  const originalWebPort = process.env.WEB_PORT;
+
+  try {
+    process.env.NEXTAUTH_URL = '   ';
+    process.env.WEB_PORT = '3018';
+
+    assert.equal(ensureNextAuthUrl(), 'http://localhost:3018');
+    assert.equal(process.env.NEXTAUTH_URL, 'http://localhost:3018');
   } finally {
     if (originalNextAuthUrl === undefined) {
       delete process.env.NEXTAUTH_URL;

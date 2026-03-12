@@ -3,3 +3,12 @@ defaultNamespace: test-station
 helm:
   releaseName: test-station
   chart: ./fleet/test-station
+  values:
+    global:
+      publicDomain: test-station.smysnk.com
+    server:
+      existingSecret: test-station-runtime-secret
+    web:
+      existingSecret: test-station-runtime-secret
+      ingress:
+        enabled: true

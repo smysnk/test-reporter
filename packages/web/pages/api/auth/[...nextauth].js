@@ -1,3 +1,4 @@
+import '../../../lib/nextAuthEnv.js';
 import NextAuth from 'next-auth';
 import { createAuthOptions } from '../../../lib/auth.js';
 

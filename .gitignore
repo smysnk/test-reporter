@@ -9,6 +9,8 @@ node_modules/
 .next/
 .env
 .env.local
+.env.fleet
+.env.fleet.config
 packages/server/.env
 packages/server/.env.local
 packages/portal/.env
@@ -22,4 +24,3 @@ docs-internal/
 .DS_Store
 .test-results
 references/
-fleet/gitrepo.yml

@@ -1,4 +1,5 @@
 import React from 'react';
+import '../../lib/nextAuthEnv.js';
 import { getServerSession } from 'next-auth/next';
 import { signIn } from 'next-auth/react';
 import { createAuthOptions, describeAuthProviders } from '../../lib/auth.js';

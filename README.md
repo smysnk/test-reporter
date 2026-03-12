@@ -450,6 +450,18 @@ The current external-consumer smoke path is:
 node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs --coverage
 ```
 
+## Fleet Deployment
+
+The repo includes a Rancher Fleet bundle and repo-specific deployment lifecycle helpers for:
+
+- applying the Fleet GitRepo SSH secret
+- applying the shared runtime secret
+- optionally applying an external runtime ConfigMap
+- applying and verifying the GitRepo rollout
+- monitoring and recycling the web/server deployments
+
+See [`./fleet/README.md`](./fleet/README.md) for the current workflow and script usage.
+
 ## Versioning
 
 All publishable `@test-station/*` packages currently move in lockstep at `0.2.0`.

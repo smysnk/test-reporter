@@ -1,17 +1,19 @@
 import crypto from 'node:crypto';
+import './nextAuthEnv.js';
 import { getServerSession } from 'next-auth/next';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import DiscordProvider from 'next-auth/providers/discord';
 import GithubProvider from 'next-auth/providers/github';
 import env from '../../../config/env.mjs';
 import { buildSignInRedirectUrl } from './routeProtection.js';
+import { ensureNextAuthUrl, resolveNextAuthUrl } from './nextAuthEnv.js';
+
+export { ensureNextAuthUrl, resolveNextAuthUrl } from './nextAuthEnv.js';
 
 const DEVELOPMENT_AUTH_SECRET = 'test-station-web-development-secret';
 
 export function createAuthOptions(options = {}) {
-  if (!process.env.NEXTAUTH_URL || !process.env.NEXTAUTH_URL.trim()) {
-    process.env.NEXTAUTH_URL = resolveNextAuthUrl(options);
-  }
+  ensureNextAuthUrl(options);
 
   const adminEmails = resolveAdminEmails(options);
   const defaultProjectKeys = resolveDefaultProjectKeys(options);
@@ -116,20 +118,6 @@ export function resolveAuthSecret(options = {}) {
   }
 
   return env.get('NEXTAUTH_SECRET').default(DEVELOPMENT_AUTH_SECRET).asString();
-}
-
-export function resolveNextAuthUrl(options = {}) {
-  if (typeof options.nextAuthUrl === 'string' && options.nextAuthUrl.trim()) {
-    return options.nextAuthUrl.trim();
-  }
-
-  const configured = env.get('NEXTAUTH_URL').default('').asString().trim();
-  if (configured) {
-    return configured;
-  }
-
-  const webPort = env.get('WEB_PORT').default(3001).asPortNumber();
-  return `http://localhost:${webPort}`;
 }
 
 export function resolveDefaultProjectKeys(options = {}) {
