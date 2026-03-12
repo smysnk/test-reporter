@@ -4,7 +4,7 @@ metadata:
   name: test-station
   namespace: fleet-local
 spec:
-  repo: git@github.com:smysnk/test-station-private.git
+  repo: git@github.com:smysnk/test-station.git
   clientSecretName: smysnk-com-github-ssh
   branch: staging
   paths:
