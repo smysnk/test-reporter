@@ -13,11 +13,15 @@ This directory is the Rancher Fleet bundle for deploying `test-station` with:
 - Fleet namespace: `fleet-local`
 - Public domain: `test-station.smysnk.com`
 - Shared runtime secret: `test-station-runtime-secret`
+- Ingress class: `traefik`
+- TLS secret: `tls-test-station-smysnk-com`
 
 By default:
 
 - `web.ingress.enabled` is `true` via `fleet.yaml`
 - `server.existingSecret` and `web.existingSecret` both point at `test-station-runtime-secret` via `fleet.yaml`
+- `web.ingress.annotations.cert-manager.io/cluster-issuer` is `letsencrypt-prod`
+- `web.ingress.tls.enabled` is `true`
 - generated ConfigMaps stay enabled unless you explicitly switch to `existingConfigMap`
 
 This Fleet cluster rejects `GitRepo.spec.helm`, so repo-specific Helm overrides live in `fleet.yaml` instead of `fleet/gitrepo.yml`.
@@ -74,6 +78,7 @@ kubectl -n fleet-local get bundledeployment -o wide
 
 ```bash
 kubectl -n test-station get deploy,svc,ingress,configmap,secret
+kubectl -n test-station get certificate || true
 kubectl -n test-station rollout status deploy/test-station-web
 kubectl -n test-station rollout status deploy/test-station-server
 ```

@@ -116,3 +116,4 @@ kubectl -n "$APP_NAMESPACE" rollout status deployment "$SERVER_DEPLOYMENT" --tim
 
 echo "Deployment complete. Current resources:"
 kubectl -n "$APP_NAMESPACE" get deploy,svc,ingress,configmap,secret
+kubectl -n "$APP_NAMESPACE" get certificate >/dev/null 2>&1 && kubectl -n "$APP_NAMESPACE" get certificate || true

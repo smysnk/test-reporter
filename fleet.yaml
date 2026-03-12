@@ -12,3 +12,9 @@ helm:
       existingSecret: test-station-runtime-secret
       ingress:
         enabled: true
+        className: traefik
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+        tls:
+          enabled: true
+          secretName: tls-test-station-smysnk-com

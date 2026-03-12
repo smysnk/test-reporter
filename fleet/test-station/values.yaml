@@ -87,4 +87,7 @@ web:
     path: /
     pathType: Prefix
     hosts: []
-    tls: []
+    tls:
+      enabled: false
+      secretName: ""
+      hosts: []

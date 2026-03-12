@@ -92,3 +92,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s://%s" (include "test-station.publicScheme" .) $domain -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "test-station.defaultTlsSecretName" -}}
+{{- $domain := include "test-station.publicDomain" . | trim -}}
+{{- if $domain -}}
+{{- printf "tls-%s" ($domain | replace "." "-") -}}
+{{- end -}}
+{{- end -}}

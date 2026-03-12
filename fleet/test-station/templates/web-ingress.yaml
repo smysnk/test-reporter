@@ -1,6 +1,7 @@
 {{- if .Values.web.ingress.enabled }}
 {{- $hosts := default (list) .Values.web.ingress.hosts -}}
 {{- $host := .Values.web.ingress.host | default (include "test-station.publicDomain" . | trim) -}}
+{{- $tls := default (dict) .Values.web.ingress.tls -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -44,8 +45,23 @@ spec:
                 port:
                   number: {{ $.Values.web.service.port }}
     {{- end }}
-  {{- with .Values.web.ingress.tls }}
+  {{- if kindIs "slice" $tls }}
   tls:
-    {{- toYaml . | nindent 4 }}
+    {{- toYaml $tls | nindent 4 }}
+  {{- else if and (kindIs "map" $tls) $tls.enabled }}
+  tls:
+    - hosts:
+        {{- if gt (len (default (list) $tls.hosts)) 0 }}
+        {{- range $tls.hosts }}
+        - {{ . | quote }}
+        {{- end }}
+        {{- else if gt (len $hosts) 0 }}
+        {{- range $hosts }}
+        - {{ .host | quote }}
+        {{- end }}
+        {{- else if $host }}
+        - {{ $host | quote }}
+        {{- end }}
+      secretName: {{ default (include "test-station.defaultTlsSecretName" . | trim) $tls.secretName | quote }}
   {{- end }}
 {{- end }}

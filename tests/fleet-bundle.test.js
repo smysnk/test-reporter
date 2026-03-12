@@ -48,14 +48,22 @@ test('fleet values and workflow use the unified image contract without stray ref
 
   assert.match(fleetYaml, /publicDomain:\s*test-station\.smysnk\.com/);
   assert.match(fleetYaml, /existingSecret:\s*test-station-runtime-secret/);
+  assert.match(fleetYaml, /className:\s*traefik/);
+  assert.match(fleetYaml, /cert-manager\.io\/cluster-issuer:\s*letsencrypt-prod/);
+  assert.match(fleetYaml, /tls:\s*\n\s*enabled:\s*true/);
   assert.match(fleetYaml, /enabled:\s*true/);
   assert.match(gitRepoYaml, /paths:\s*\n\s*-\s*\./);
   assert.doesNotMatch(gitRepoYaml, /helm:\s*\n\s*values:/);
   assert.match(valuesYaml, /publicDomain:\s*""/);
+  assert.match(valuesYaml, /secretName:\s*""/);
   assert.match(valuesYaml, /repository:\s*ghcr\.io\/smysnk\/test-station/);
   assert.match(webIngressYaml, /test-station\.publicDomain/);
+  assert.match(webIngressYaml, /test-station\.defaultTlsSecretName/);
+  assert.match(webIngressYaml, /kindIs "map"/);
   assert.match(webConfigMapYaml, /NEXTAUTH_URL/);
   assert.match(serverConfigMapYaml, /WEB_URL/);
+  assert.match(fleetReadme, /TLS secret/);
+  assert.match(fleetReadme, /certificate \|\| true/);
   assert.match(fleetReadme, /apply-fleet-gitrepo-ssh-secret\.sh/);
   assert.match(fleetReadme, /apply-fleet-env-secret\.sh/);
   assert.match(fleetReadme, /deploy-fleet\.sh/);
