@@ -9,3 +9,10 @@ spec:
   branch: main
   paths:
     - .
+  helm:
+    values:
+      global:
+        publicDomain: test-station.example.com
+      web:
+        ingress:
+          enabled: true

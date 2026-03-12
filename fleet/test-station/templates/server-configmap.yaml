@@ -13,7 +13,12 @@
 {{- $_ := set $config "SERVER_PORT" (printf "%v" .Values.server.service.port) -}}
 {{- end }}
 {{- if or (not (hasKey $config "WEB_URL")) (eq (printf "%v" (index $config "WEB_URL")) "") }}
+{{- $publicWebUrl := include "test-station.publicWebUrl" . | trim -}}
+{{- if $publicWebUrl }}
+{{- $_ := set $config "WEB_URL" $publicWebUrl -}}
+{{- else }}
 {{- $_ := set $config "WEB_URL" (printf "http://%s:%v" (include "test-station.webName" .) .Values.web.service.port) -}}
+{{- end }}
 {{- end }}
 apiVersion: v1
 kind: ConfigMap

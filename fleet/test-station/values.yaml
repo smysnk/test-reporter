@@ -1,3 +1,7 @@
+global:
+  publicScheme: https
+  publicDomain: ""
+
 image:
   repository: ghcr.io/smysnk/test-station
   tag: main
@@ -51,7 +55,7 @@ web:
     WEB_PORT: "3001"
     WEB_GRAPHQL_PATH: /graphql
     SERVER_URL: ""
-    NEXTAUTH_URL: https://test-station.example.com
+    NEXTAUTH_URL: ""
     WEB_DEFAULT_PROJECT_KEYS: "*"
     WEB_ADMIN_EMAILS: ""
   secret:
@@ -77,9 +81,8 @@ web:
     enabled: false
     className: ""
     annotations: {}
-    hosts:
-      - host: test-station.example.com
-        paths:
-          - path: /
-            pathType: Prefix
+    host: ""
+    path: /
+    pathType: Prefix
+    hosts: []
     tls: []

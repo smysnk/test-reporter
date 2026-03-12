@@ -70,3 +70,25 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "test-station.image" -}}
 {{- printf "%s:%s" .Values.image.repository .Values.image.tag -}}
 {{- end -}}
+
+{{- define "test-station.publicScheme" -}}
+{{- default "https" .Values.global.publicScheme -}}
+{{- end -}}
+
+{{- define "test-station.publicDomain" -}}
+{{- $domain := default "" .Values.global.publicDomain -}}
+{{- if $domain -}}
+{{- $domain -}}
+{{- else if .Values.web.ingress.host -}}
+{{- .Values.web.ingress.host -}}
+{{- else if gt (len (default (list) .Values.web.ingress.hosts)) 0 -}}
+{{- (index .Values.web.ingress.hosts 0).host -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "test-station.publicWebUrl" -}}
+{{- $domain := include "test-station.publicDomain" . | trim -}}
+{{- if $domain -}}
+{{- printf "%s://%s" (include "test-station.publicScheme" .) $domain -}}
+{{- end -}}
+{{- end -}}

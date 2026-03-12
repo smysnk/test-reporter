@@ -18,8 +18,8 @@
 {{- if or (not (hasKey $config "SERVER_URL")) (eq (printf "%v" (index $config "SERVER_URL")) "") }}
 {{- $_ := set $config "SERVER_URL" (printf "http://%s:%v" (include "test-station.serverName" .) .Values.server.service.port) -}}
 {{- end }}
-{{- if not (hasKey $config "NEXTAUTH_URL") }}
-{{- $_ := set $config "NEXTAUTH_URL" "" -}}
+{{- if or (not (hasKey $config "NEXTAUTH_URL")) (eq (printf "%v" (index $config "NEXTAUTH_URL")) "") }}
+{{- $_ := set $config "NEXTAUTH_URL" (include "test-station.publicWebUrl" . | trim) -}}
 {{- end }}
 {{- if not (hasKey $config "WEB_DEFAULT_PROJECT_KEYS") }}
 {{- $_ := set $config "WEB_DEFAULT_PROJECT_KEYS" "*" -}}
