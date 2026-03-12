@@ -1,4 +1,3 @@
-import env from '../../../config/env.mjs';
 import { buildWebActorHeaders } from './auth.js';
 import {
   WEB_HOME_QUERY,
@@ -9,12 +8,21 @@ import {
   SCOPED_COVERAGE_TREND_QUERY,
 } from './queries.js';
 
+function normalizeEnvValue(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 function resolveDefaultServerUrl() {
-  return `http://localhost:${env.get('SERVER_PORT').default(4400).asPortNumber()}`;
+  const configuredPort = Number.parseInt(normalizeEnvValue(process.env.SERVER_PORT), 10);
+  const serverPort = Number.isInteger(configuredPort) && configuredPort >= 1 && configuredPort <= 65535
+    ? configuredPort
+    : 4400;
+  return `http://localhost:${serverPort}`;
 }
 
 export function resolveWebServerUrl() {
-  return env.get('SERVER_URL').default(resolveDefaultServerUrl()).asString();
+  const configuredServerUrl = normalizeEnvValue(process.env.SERVER_URL);
+  return configuredServerUrl || resolveDefaultServerUrl();
 }
 
 export function resolveWebGraphqlUrl() {
