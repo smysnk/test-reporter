@@ -20,6 +20,7 @@ By default:
 
 - `web.ingress.enabled` is `true` via `fleet.yaml`
 - `server.existingSecret` and `web.existingSecret` both point at `test-station-runtime-secret` via `fleet.yaml`
+- `https://test-station.smysnk.com/api/ingest` is routed through the shared ingress to the `server` service
 - `web.ingress.annotations.cert-manager.io/cluster-issuer` is `letsencrypt-prod`
 - `web.ingress.tls.enabled` is `true`
 - generated ConfigMaps stay enabled unless you explicitly switch to `existingConfigMap`
@@ -46,6 +47,8 @@ cp .env.fleet.example .env.fleet
 
 The shared secret is consumed by both the `server` and `web` deployments.
 
+For CI ingest publishing, set `INGEST_SHARED_KEY` in this secret and use the same value for the GitHub Actions secret `TEST_STATION_INGEST_SHARED_KEY`.
+
 Optional web OAuth providers are configured through the same runtime secret:
 
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`
@@ -53,6 +56,8 @@ Optional web OAuth providers are configured through the same runtime secret:
 - `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET`
 
 The demo credentials login is controlled separately through config with `WEB_DEMO_AUTH_ENABLED=false` by default. If Google OAuth is configured, the web sign-in page redirects straight into Google and does not show the demo login form.
+
+Optional CI artifact archiving can upload the generated report directory to S3 before ingest publishing. The server stores the resulting `storageKey` and `sourceUrl` metadata, but it does not upload artifact binaries itself.
 
 ## Optional External ConfigMap
 

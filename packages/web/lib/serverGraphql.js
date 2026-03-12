@@ -14,9 +14,7 @@ function resolveDefaultServerUrl() {
 }
 
 export function resolveWebServerUrl() {
-  return process.env.NEXT_PUBLIC_SERVER_URL
-    || process.env.SERVER_URL
-    || resolveDefaultServerUrl();
+  return env.get('SERVER_URL').default(resolveDefaultServerUrl()).asString();
 }
 
 export function resolveWebGraphqlUrl() {

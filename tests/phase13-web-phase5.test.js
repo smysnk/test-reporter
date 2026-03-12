@@ -247,19 +247,45 @@ test('web actor headers and route protection helpers produce the expected auth w
   assert.equal(isProtectedWebPath('/runs/run-1'), true);
   assert.equal(isProtectedWebPath('/auth/signin'), false);
   assert.equal(buildSignInRedirectUrl('/runs/run-1'), '/auth/signin?callbackUrl=%2Fruns%2Frun-1');
+  assert.equal(
+    buildSignInRedirectUrl('https://0.0.0.0:3001/?foo=bar#frag'),
+    '/auth/signin?callbackUrl=%2F%3Ffoo%3Dbar%23frag',
+  );
 });
 
 test('web defaults SERVER_URL to localhost using SERVER_PORT when unset', () => {
   const originalServerUrl = process.env.SERVER_URL;
-  const originalNextPublicServerUrl = process.env.NEXT_PUBLIC_SERVER_URL;
   const originalServerPort = process.env.SERVER_PORT;
 
   try {
     delete process.env.SERVER_URL;
-    delete process.env.NEXT_PUBLIC_SERVER_URL;
     process.env.SERVER_PORT = '4411';
 
     assert.equal(resolveWebServerUrl(), 'http://localhost:4411');
+  } finally {
+    if (originalServerUrl === undefined) {
+      delete process.env.SERVER_URL;
+    } else {
+      process.env.SERVER_URL = originalServerUrl;
+    }
+
+    if (originalServerPort === undefined) {
+      delete process.env.SERVER_PORT;
+    } else {
+      process.env.SERVER_PORT = originalServerPort;
+    }
+  }
+});
+
+test('web server URL ignores NEXT_PUBLIC_SERVER_URL and uses runtime SERVER_URL', () => {
+  const originalServerUrl = process.env.SERVER_URL;
+  const originalNextPublicServerUrl = process.env.NEXT_PUBLIC_SERVER_URL;
+
+  try {
+    process.env.SERVER_URL = 'http://test-station-server:4400';
+    process.env.NEXT_PUBLIC_SERVER_URL = 'http://localhost:4400';
+
+    assert.equal(resolveWebServerUrl(), 'http://test-station-server:4400');
   } finally {
     if (originalServerUrl === undefined) {
       delete process.env.SERVER_URL;
@@ -271,12 +297,6 @@ test('web defaults SERVER_URL to localhost using SERVER_PORT when unset', () => 
       delete process.env.NEXT_PUBLIC_SERVER_URL;
     } else {
       process.env.NEXT_PUBLIC_SERVER_URL = originalNextPublicServerUrl;
-    }
-
-    if (originalServerPort === undefined) {
-      delete process.env.SERVER_PORT;
-    } else {
-      process.env.SERVER_PORT = originalServerPort;
     }
   }
 });

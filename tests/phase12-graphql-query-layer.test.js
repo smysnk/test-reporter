@@ -228,7 +228,7 @@ test('GraphQL ingest mutation accepts shared-key service auth', async () => {
   const server = await createServer({
     port: 0,
     corsOrigin: 'http://localhost:3001',
-    ingestApiKeys: ['phase4-secret'],
+    ingestSharedKeys: ['phase4-secret'],
     models: createGraphqlModels(),
     ingestionService: {
       async ingest(payload) {

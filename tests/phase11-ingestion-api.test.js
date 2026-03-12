@@ -163,7 +163,7 @@ test('server ingest route enforces auth and returns actionable validation errors
   const server = await createServer({
     port: 0,
     corsOrigin: 'http://localhost:3001',
-    ingestApiKeys: ['top-secret'],
+    ingestSharedKeys: ['top-secret'],
     ingestionService,
   });
 

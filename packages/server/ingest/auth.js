@@ -17,14 +17,14 @@ export function createSharedKeyAuth(options = {}) {
 }
 
 export function authenticateSharedKeyRequest(req, options = {}, behavior = {}) {
-  const apiKeys = resolveIngestApiKeys(options);
+  const sharedKeys = resolveIngestSharedKeys(options);
   const candidate = readSharedKeyFromRequest(req);
 
-  if (apiKeys.length === 0) {
+  if (sharedKeys.length === 0) {
     if (behavior.ignoreMissingConfig !== false) {
       return null;
     }
-    throw new ConfigurationError('Shared-key ingest auth is not configured. Set INGEST_SHARED_KEY or INGEST_API_KEYS.');
+    throw new ConfigurationError('Shared-key ingest auth is not configured. Set INGEST_SHARED_KEY.');
   }
 
   if (!candidate) {
@@ -34,7 +34,7 @@ export function authenticateSharedKeyRequest(req, options = {}, behavior = {}) {
     throw new AuthenticationError('Missing shared key. Use Authorization: Bearer <key> or x-api-key.');
   }
 
-  if (!apiKeys.some((apiKey) => timingSafeEqual(apiKey, candidate))) {
+  if (!sharedKeys.some((sharedKey) => timingSafeEqual(sharedKey, candidate))) {
     if (behavior.allowInvalid === true) {
       return null;
     }
@@ -47,15 +47,14 @@ export function authenticateSharedKeyRequest(req, options = {}, behavior = {}) {
   };
 }
 
-export function resolveIngestApiKeys(options = {}) {
-  if (Array.isArray(options.ingestApiKeys)) {
-    return normalizeKeys(options.ingestApiKeys);
+export function resolveIngestSharedKeys(options = {}) {
+  if (Array.isArray(options.ingestSharedKeys)) {
+    return normalizeKeys(options.ingestSharedKeys);
   }
 
-  const configuredKeys = env.get('INGEST_API_KEYS').default('').asString();
-  const singleKey = env.get('INGEST_SHARED_KEY').default('').asString();
-
-  return normalizeKeys([singleKey, ...configuredKeys.split(',')]);
+  return normalizeKeys([
+    env.get('INGEST_SHARED_KEY').default('').asString(),
+  ]);
 }
 
 export function readSharedKeyFromRequest(req) {

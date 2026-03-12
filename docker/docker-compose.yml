@@ -23,8 +23,7 @@ services:
       SERVER_PORT: ${SERVER_PORT:-4400}
       WEB_URL: ${WEB_URL:-http://localhost:3001}
       DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/test_station}
-      INGEST_API_KEYS: ${INGEST_API_KEYS:-local-dev-shared-key}
-      INGEST_SHARED_KEY: ${INGEST_SHARED_KEY:-}
+      INGEST_SHARED_KEY: ${INGEST_SHARED_KEY:-change-me}
     ports:
       - "${SERVER_PORT:-4400}:${SERVER_PORT:-4400}"
     depends_on:

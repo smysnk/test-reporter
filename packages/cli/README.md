@@ -269,6 +269,35 @@ Typical prerequisite:
 yarn playwright install --with-deps
 ```
 
+### Publishing CI Runs To `/api/ingest`
+
+The deployed server accepts machine reports at `POST /api/ingest` with shared-key auth. The checked-in GitHub Actions workflow publishes the self-test report to `https://test-station.smysnk.com/api/ingest`.
+
+What is sent:
+
+- `report.json` as the canonical run payload
+- run metadata from GitHub Actions such as repository, branch, tag, commit SHA, actor, run URL, workflow, run number, attempt, and build start/end timestamps
+- artifact metadata for every file under the report output directory, including `report.json`, `modules.json`, `ownership.json`, `index.html`, and everything under `raw/`
+
+Shared-key auth:
+
+- the server reads `INGEST_SHARED_KEY`
+- the CI workflow reads the GitHub Actions secret `TEST_STATION_INGEST_SHARED_KEY`
+- set them to the same value
+
+Optional S3-backed artifact storage:
+
+- set `vars.TEST_STATION_ARTIFACT_S3_BUCKET` to enable `aws s3 sync` of the report directory
+- optionally set `vars.TEST_STATION_ARTIFACT_STORAGE_PREFIX` to control the object prefix
+- optionally set `vars.TEST_STATION_ARTIFACT_BASE_URL` when the uploaded artifacts are browser-accessible through S3 static hosting, CloudFront, or another CDN
+- set `secrets.TEST_STATION_ARTIFACT_AWS_ACCESS_KEY_ID` and `secrets.TEST_STATION_ARTIFACT_AWS_SECRET_ACCESS_KEY` for the sync credentials
+
+Current storage model:
+
+- the ingest endpoint stores artifact metadata, storage keys, and source URLs in Postgres
+- it does not upload binary artifacts itself
+- without S3 or another external artifact host, the server still records artifact inventory but not downloadable remote URLs
+
 ### Raw Artifact Contract
 
 Suites can attach raw artifacts that will be written under `raw/` and linked from the HTML report.

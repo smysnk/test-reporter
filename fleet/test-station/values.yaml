@@ -18,14 +18,16 @@ server:
     type: NodePort
     port: 4400
     nodePort: null
+  ingressPaths:
+    - path: /api/ingest
+      pathType: Prefix
   config:
     NODE_ENV: production
     SERVER_PORT: "4400"
     WEB_URL: ""
   secret:
     DATABASE_URL: postgres://test-station:change-me@postgresql.default.svc.cluster.local:5432/test_station
-    INGEST_API_KEYS: change-me
-    INGEST_SHARED_KEY: ""
+    INGEST_SHARED_KEY: change-me
   podAnnotations: {}
   resources: {}
   nodeSelector: {}

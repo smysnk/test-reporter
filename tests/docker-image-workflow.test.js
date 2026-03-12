@@ -39,6 +39,11 @@ test('ci workflow validates the smoke artifacts and Dockerfile build path', () =
   assert.match(workflow, /yarn install --immutable/);
   assert.match(workflow, /yarn test:node/);
   assert.match(workflow, /yarn test:coverage/);
+  assert.match(workflow, /https:\/\/test-station\.smysnk\.com\/api\/ingest/);
+  assert.match(workflow, /TEST_STATION_INGEST_SHARED_KEY/);
+  assert.match(workflow, /TEST_STATION_ARTIFACT_S3_BUCKET/);
+  assert.match(workflow, /aws s3 sync \.\/\.test-results\/self-test-report/);
+  assert.match(workflow, /publish-ingest-report\.mjs/);
   assert.match(workflow, /test -f \.\/examples\/generic-node-library\/artifacts\/test-report\/modules\.json/);
   assert.match(workflow, /test -f \.\/examples\/generic-node-library\/artifacts\/test-report\/ownership\.json/);
   assert.match(workflow, /docker build --file docker\/Dockerfile --tag test-station-ci \./);

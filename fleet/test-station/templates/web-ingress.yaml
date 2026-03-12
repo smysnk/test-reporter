@@ -1,6 +1,7 @@
 {{- if .Values.web.ingress.enabled }}
 {{- $hosts := default (list) .Values.web.ingress.hosts -}}
 {{- $host := .Values.web.ingress.host | default (include "test-station.publicDomain" . | trim) -}}
+{{- $serverPaths := default (list) .Values.server.ingressPaths -}}
 {{- $tls := default (dict) .Values.web.ingress.tls -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -23,6 +24,15 @@ spec:
     - host: {{ .host | quote }}
       http:
         paths:
+          {{- range $serverPaths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "test-station.serverName" $ }}
+                port:
+                  number: {{ $.Values.server.service.port }}
+          {{- end }}
           {{- range .paths }}
           - path: {{ .path }}
             pathType: {{ .pathType }}
@@ -37,6 +47,15 @@ spec:
     - host: {{ $host | quote }}
       http:
         paths:
+          {{- range $serverPaths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "test-station.serverName" $ }}
+                port:
+                  number: {{ $.Values.server.service.port }}
+          {{- end }}
           - path: {{ $.Values.web.ingress.path }}
             pathType: {{ $.Values.web.ingress.pathType }}
             backend:
