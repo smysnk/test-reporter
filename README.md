@@ -276,7 +276,7 @@ The deployed server accepts machine reports at `POST /api/ingest` with shared-ke
 What is sent:
 
 - `report.json` as the canonical run payload
-- run metadata from GitHub Actions such as repository, branch, tag, commit SHA, actor, run URL, workflow, run number, attempt, and build start/end timestamps
+- run metadata from GitHub Actions such as repository, branch, tag, commit SHA, actor, run URL, workflow, run number, attempt, build start/end timestamps, and the default non-secret GitHub Actions environment variables
 - artifact metadata for every file under the report output directory, including `report.json`, `modules.json`, `ownership.json`, `index.html`, and everything under `raw/`
 
 Shared-key auth:

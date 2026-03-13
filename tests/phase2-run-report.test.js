@@ -78,3 +78,35 @@ test('cli render re-renders html from an existing report file', () => {
   assert.equal(result.status, 0, result.stderr || result.stdout);
   assert.equal(fs.existsSync(path.join(resultDir, 'index.html')), true);
 });
+
+test('runReport captures GitHub Actions default environment in report metadata', async () => {
+  const outputDir = createTempOutputDir('phase2-run-report-github-env');
+  const originalEnv = process.env;
+  process.env = {
+    ...originalEnv,
+    GITHUB_SHA: 'abc123',
+    GITHUB_REF_NAME: 'main',
+    GITHUB_WORKFLOW: 'CI',
+    GITHUB_ACTIONS: 'true',
+    RUNNER_OS: 'Linux',
+    CI: 'true',
+    GITHUB_TOKEN: 'should-not-be-captured',
+  };
+
+  try {
+    const execution = await runReport({
+      configPath: fixtureConfigPath,
+      outputDir,
+      writeArtifacts: false,
+    });
+
+    assert.equal(execution.report.meta.ci.provider, 'github-actions');
+    assert.equal(execution.report.meta.ci.environment.CI, 'true');
+    assert.equal(execution.report.meta.ci.environment.GITHUB_SHA, 'abc123');
+    assert.equal(execution.report.meta.ci.environment.GITHUB_WORKFLOW, 'CI');
+    assert.equal(execution.report.meta.ci.environment.RUNNER_OS, 'Linux');
+    assert.equal('GITHUB_TOKEN' in execution.report.meta.ci.environment, false);
+  } finally {
+    process.env = originalEnv;
+  }
+});

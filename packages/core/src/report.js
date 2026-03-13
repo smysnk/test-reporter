@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { mergeCoverageSummaries, normalizeCoverageSummary } from './coverage.js';
+import { captureGitHubDefaultEnvironment } from './github-actions-env.js';
 import { collectCoverageAttribution, lookupOwner, evaluateCoverageThresholds } from './policy.js';
 
 export function createSummary(values = {}) {
@@ -91,6 +92,7 @@ export function normalizeSuiteResult(rawResult, suite, packageName) {
 }
 
 export function buildReportFromSuiteResults(context, suiteResults, durationMs) {
+  const ciMetadata = buildCiMetadata();
   const packageMap = new Map();
   const packageCatalog = Array.isArray(context?.packageCatalog) ? context.packageCatalog : [];
 
@@ -197,11 +199,24 @@ export function buildReportFromSuiteResults(context, suiteResults, durationMs) {
       projectName: context.project.name,
       projectRootDir: context.project.rootDir,
       outputDir: context.project.outputDir,
+      ...(ciMetadata ? { ci: ciMetadata } : {}),
       render: {
         defaultView: context.config?.render?.defaultView || 'module',
         includeDetailedAnalysisToggle: context.config?.render?.includeDetailedAnalysisToggle !== false,
       },
     },
+  };
+}
+
+function buildCiMetadata(env = process.env) {
+  const environment = captureGitHubDefaultEnvironment(env);
+  if (Object.keys(environment).length === 0) {
+    return null;
+  }
+
+  return {
+    provider: 'github-actions',
+    environment,
   };
 }
 

@@ -43,6 +43,11 @@ test('createIngestPayload includes GitHub metadata and S3-backed artifact pointe
   assert.equal(payload.source.ci.status, 'passed');
   assert.equal(payload.source.ci.buildDurationMs, 240000);
   assert.equal(payload.source.ci.artifactCount, 5);
+  assert.equal(payload.source.ci.environment.CI, 'true');
+  assert.equal(payload.source.ci.environment.GITHUB_SHA, 'abc123');
+  assert.equal(payload.source.ci.environment.GITHUB_WORKFLOW, 'CI');
+  assert.equal(payload.source.ci.environment.RUNNER_OS, 'Linux');
+  assert.equal('GITHUB_TOKEN' in payload.source.ci.environment, false);
   assert.equal(payload.artifacts.some((artifact) => artifact.relativePath === 'report.json'), true);
   assert.equal(payload.artifacts.some((artifact) => artifact.relativePath === 'modules.json'), true);
   assert.equal(payload.artifacts.some((artifact) => artifact.relativePath === 'ownership.json'), true);
@@ -107,6 +112,7 @@ test('publish-ingest-report CLI posts bearer-authenticated payloads', async () =
   assert.equal(capturedRequest.authorization, 'Bearer phase14-secret');
   assert.equal(capturedRequest.body.projectKey, 'test-station');
   assert.equal(capturedRequest.body.source.ci.status, 'failed');
+  assert.equal(capturedRequest.body.source.ci.environment.GITHUB_RUN_ID, '100');
   assert.equal(capturedRequest.body.artifacts.some((artifact) => artifact.relativePath === 'raw/workspace/unit.log'), true);
 });
 
@@ -225,6 +231,11 @@ function createIngestFixture() {
       GITHUB_WORKFLOW_SHA: 'abc123',
       GITHUB_JOB: 'test',
       GITHUB_REPOSITORY_OWNER: 'smysnk',
+      GITHUB_ACTIONS: 'true',
+      GITHUB_TOKEN: 'should-not-be-captured',
+      RUNNER_OS: 'Linux',
+      RUNNER_ARCH: 'X64',
+      CI: 'true',
     },
     report,
     reportPath,

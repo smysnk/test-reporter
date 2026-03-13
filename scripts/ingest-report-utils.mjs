@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { captureGitHubDefaultEnvironment } from '../packages/core/src/github-actions-env.js';
 
 export function readJson(filePath) {
   return JSON.parse(fs.readFileSync(path.resolve(filePath), 'utf8'));
@@ -104,6 +105,7 @@ export function attachArtifactLocations(report, storage = {}) {
 
 export function buildGitHubSourceContext(options = {}, env = process.env) {
   const event = readGitHubEvent(env.GITHUB_EVENT_PATH);
+  const environment = captureGitHubDefaultEnvironment(env);
   const serverUrl = trimToNull(env.GITHUB_SERVER_URL) || 'https://github.com';
   const repositoryFullName = trimToNull(event?.repository?.full_name)
     || trimToNull(env.GITHUB_REPOSITORY);
@@ -158,6 +160,7 @@ export function buildGitHubSourceContext(options = {}, env = process.env) {
       status: jobStatus,
       buildDurationMs,
       artifactCount: Number.isFinite(options.artifactCount) ? options.artifactCount : null,
+      environment,
       storage: {
         bucket: storage.bucket,
         prefix: storage.prefix,
