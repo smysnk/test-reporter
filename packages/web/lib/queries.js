@@ -20,12 +20,14 @@ export const WEB_HOME_QUERY = `
       externalKey
       status
       branch
+      commitSha
       completedAt
       durationMs
       project {
         key
         slug
         name
+        repositoryUrl
       }
       projectVersion {
         versionKey
@@ -58,6 +60,7 @@ export const PROJECT_ACTIVITY_QUERY = `
       externalKey
       status
       branch
+      commitSha
       completedAt
       durationMs
       projectVersion {
@@ -159,6 +162,7 @@ export const RUN_DETAIL_QUERY = `
         key
         slug
         name
+        repositoryUrl
       }
       projectVersion {
         versionKey

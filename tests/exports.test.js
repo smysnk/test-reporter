@@ -326,6 +326,43 @@ test('renderer returns baseline html', () => {
   assert.match(html, /data-view=\"package\"/);
   assert.match(html, /Raw Artifacts/);
   assert.match(html, /href="raw\/core\/core-node\.log"/);
+  assert.match(html, /coverage-table__metricBar/);
+  assert.match(html, /coverage-table__statementIcon/);
+  assert.match(html, /80\.0%/);
+});
+
+test('renderer shows statement tooltip state and fixed-width file coverage metrics', () => {
+  const report = createSampleReport();
+  const files = [
+    {
+      path: path.join(repoRoot, 'packages', 'core', 'src', 'missing-statements.js'),
+      lines: { covered: 10, total: 27, pct: 37.04 },
+      branches: { covered: 3, total: 8, pct: 37.5 },
+      functions: { covered: 2, total: 5, pct: 40 },
+      statements: null,
+    },
+    {
+      path: path.join(repoRoot, 'packages', 'core', 'src', 'with-statements.js'),
+      lines: { covered: 32, total: 40, pct: 80.2 },
+      branches: { covered: 8, total: 10, pct: 80 },
+      functions: { covered: 4, total: 5, pct: 80 },
+      statements: { covered: 8, total: 10, pct: 80 },
+    },
+  ];
+
+  report.summary.coverage.files = files;
+  report.packages[0].coverage.files = files;
+  report.packages[0].suites[0].coverage.files = files;
+  report.modules[0].coverage.files = files;
+  report.modules[0].themes[0].coverage.files = files;
+
+  const html = renderHtmlReport(report, { title: 'example' });
+  assert.match(html, /coverage-table__metricCol/);
+  assert.match(html, /coverage-table__statementIcon--disabled/);
+  assert.match(html, /coverage-table__statementIcon--active/);
+  assert.match(html, /title="Statements: 80\.0% \(8\/10\)"/);
+  assert.match(html, /37\.0%/);
+  assert.match(html, /80\.2%/);
 });
 
 test('adapter and plugin scaffolds expose stable ids', () => {

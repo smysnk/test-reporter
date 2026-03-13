@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { EmptyState, InlineList, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
-import { formatCoveragePct, formatDateTime, formatDuration, formatSignedDelta } from '../../lib/format.js';
+import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatSignedDelta } from '../../lib/format.js';
 import { requireWebSession } from '../../lib/auth.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../../lib/runReportTemplate.js';
 import { buildRunTemplateHref, resolveRunTemplateMode } from '../../lib/runTemplateRouting.js';
@@ -51,6 +51,7 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
         items: [
           { label: 'Completed', value: formatDateTime(run.completedAt), copy: run.branch || 'no branch' },
           { label: 'Duration', value: formatDuration(run.durationMs), copy: run.projectVersion?.versionKey || 'version unavailable' },
+          { label: 'Commit', value: formatCommitSha(run.commitSha), copy: formatRepositoryName(run.project?.repositoryUrl) },
           { label: 'Line Coverage', value: formatCoveragePct(run.coverageSnapshot?.linesPct), copy: `branch ${formatCoveragePct(run.coverageSnapshot?.branchesPct)}` },
         ],
       }),
@@ -405,7 +406,7 @@ function RunnerReportFrame({ runId, title }) {
 
       const nextHeight = Number.parseInt(event.data.height, 10);
       if (Number.isFinite(nextHeight) && nextHeight > 0) {
-        setFrameHeight(Math.max(960, nextHeight + 24));
+        setFrameHeight(Math.max(960, nextHeight));
       }
     };
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/WebBits.js';
-import { formatCoveragePct, formatDateTime, formatDuration } from '../lib/format.js';
+import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../lib/format.js';
 import { requireWebSession } from '../lib/auth.js';
 import { loadWebHomePage } from '../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../store/index.js';
@@ -97,7 +97,7 @@ export default function WebIndexPage({ data }) {
               React.createElement(
                 'div',
                 { className: 'web-list__meta' },
-                `${run.externalKey} • ${formatDateTime(run.completedAt)}`,
+                `${formatRepositoryName(run.project?.repositoryUrl)} • ${formatCommitSha(run.commitSha)} • ${formatDateTime(run.completedAt)}`,
               ),
               React.createElement(
                 'div',

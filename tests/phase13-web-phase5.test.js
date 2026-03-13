@@ -8,7 +8,7 @@ import {
   resolveNextAuthUrl,
 } from '../packages/web/lib/auth.js';
 import { ensureNextAuthUrl } from '../packages/web/lib/nextAuthEnv.js';
-import { formatCoveragePct, formatDuration } from '../packages/web/lib/format.js';
+import { formatCommitSha, formatCoveragePct, formatDuration, formatRepositoryName } from '../packages/web/lib/format.js';
 import {
   executeWebGraphql,
   loadWebHomePage,
@@ -20,6 +20,7 @@ import {
 import { buildRunTemplateHref, resolveRunTemplateMode } from '../packages/web/lib/runTemplateRouting.js';
 import { buildSignInRedirectUrl, isProtectedWebPath } from '../packages/web/lib/routeProtection.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
+import { decorateEmbeddedRunnerReportHtml } from '../packages/web/lib/runReportTemplate.js';
 import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nextauth].js';
 
 test('web auth options expose the sign-in page and session actor metadata', async () => {
@@ -565,6 +566,8 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
 
   assert.equal(formatDuration(1250), '1.3 s');
   assert.equal(formatCoveragePct(80), '80%');
+  assert.equal(formatCommitSha('abcdef1234567890'), 'abcdef1');
+  assert.equal(formatRepositoryName('https://github.com/smysnk/test-station.git'), 'smysnk/test-station');
 });
 
 test('web can render the runner report template from stored raw report data', async () => {
@@ -613,6 +616,14 @@ test('web can render the runner report template from stored raw report data', as
   assert.match(html, /<base target="_blank" \/>/);
   assert.match(html, new RegExp(RUNNER_REPORT_HEIGHT_MESSAGE_TYPE));
   assert.match(html, /href="https:\/\/artifacts\.example\.com\/workspace\/unit\.log"/);
+});
+
+test('web runner report embed script measures the report content instead of the full iframe viewport', () => {
+  const html = decorateEmbeddedRunnerReportHtml('<!DOCTYPE html><html><head></head><body><main>report</main></body></html>');
+
+  assert.match(html, /document\.querySelector\('main'\)/);
+  assert.match(html, /content\?\.scrollHeight/);
+  assert.doesNotMatch(html, /body\?\.scrollHeight/);
 });
 
 test('web run template routing defaults to the runner report and keeps the operations view addressable', () => {

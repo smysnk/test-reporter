@@ -630,6 +630,15 @@ export function renderHtmlReport(report, options = {}) {
       border-collapse: collapse;
       margin-top: 12px;
       font-size: 0.84rem;
+      table-layout: fixed;
+    }
+    .coverage-table col.coverage-table__fileCol { width: auto; }
+    .coverage-table col.coverage-table__metricCol { width: 170px; }
+    .coverage-table col.coverage-table__statementCol { width: 110px; }
+    .coverage-table col.coverage-table__attributionCol { width: 220px; }
+    .coverage-table td:first-child,
+    .coverage-table th:first-child {
+      width: auto;
     }
     .coverage-table th,
     .coverage-table td {
@@ -644,7 +653,64 @@ export function renderHtmlReport(report, options = {}) {
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }
-    .coverage-table code { font-size: 0.8rem; color: #d7e5ff; }
+    .coverage-table code {
+      display: block;
+      font-size: 0.8rem;
+      color: #d7e5ff;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .coverage-table__metric {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+    .coverage-table__metricValue {
+      font-size: 0.92rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    .coverage-table__metricBar {
+      height: 10px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 111, 143, 0.14);
+      border: 1px solid rgba(124, 160, 224, 0.12);
+    }
+    .coverage-table__metricFill {
+      height: 100%;
+      border-radius: inherit;
+      transition: width 180ms ease-out;
+    }
+    .coverage-table__statementCell {
+      text-align: center;
+      vertical-align: middle;
+    }
+    .coverage-table__statementIcon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(124, 160, 224, 0.16);
+      background: rgba(11, 20, 36, 0.78);
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      cursor: help;
+      user-select: none;
+    }
+    .coverage-table__statementIcon--active {
+      color: var(--text);
+      border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+      background: color-mix(in srgb, var(--accent) 12%, rgba(11, 20, 36, 0.82));
+    }
+    .coverage-table__statementIcon--disabled {
+      opacity: 0.45;
+    }
     .policy-block {
       margin: 0 0 16px;
       padding: 14px;
@@ -1402,10 +1468,10 @@ function renderCoverageBlock(coverage, rootDir) {
       return `
       <tr>
         <td><code>${escapeHtml(displayPath)}</code></td>
-        <td>${escapeHtml(file.lines ? `${file.lines.pct.toFixed(2)}%` : 'n/a')}</td>
-        <td>${escapeHtml(file.branches ? `${file.branches.pct.toFixed(2)}%` : 'n/a')}</td>
-        <td>${escapeHtml(file.functions ? `${file.functions.pct.toFixed(2)}%` : 'n/a')}</td>
-        <td>${escapeHtml(file.statements ? `${file.statements.pct.toFixed(2)}%` : 'n/a')}</td>
+        <td>${renderCoverageTableMetric(file.lines, 'Lines')}</td>
+        <td>${renderCoverageTableMetric(file.branches, 'Branches')}</td>
+        <td>${renderCoverageTableMetric(file.functions, 'Functions')}</td>
+        <td class="coverage-table__statementCell">${renderStatementsIcon(file.statements)}</td>
         ${showAttribution ? `<td>${escapeHtml(formatCoverageAttribution(file))}</td>` : ''}
       </tr>`;
     })
@@ -1421,6 +1487,14 @@ function renderCoverageBlock(coverage, rootDir) {
       <details>
         <summary>Coverage by file (${files.length} files, lowest line coverage first)</summary>
         <table class="coverage-table">
+          <colgroup>
+            <col class="coverage-table__fileCol" />
+            <col class="coverage-table__metricCol" />
+            <col class="coverage-table__metricCol" />
+            <col class="coverage-table__metricCol" />
+            <col class="coverage-table__statementCol" />
+            ${showAttribution ? '<col class="coverage-table__attributionCol" />' : ''}
+          </colgroup>
           <thead>
             <tr>
               <th>File</th>
@@ -1439,7 +1513,7 @@ function renderCoverageBlock(coverage, rootDir) {
 }
 
 function renderCoverageMetric(label, metric) {
-  const pct = metric ? metric.pct.toFixed(2) : '0.00';
+  const pct = metric ? formatCoveragePercent(metric.pct) : '0.0';
   const counts = metric ? `${formatCoverageCount(metric.covered)}/${formatCoverageCount(metric.total)}` : 'n/a';
   const fillStyle = metric
     ? `width:${metric.pct.toFixed(2)}%;background:hsl(${coverageHue(metric.pct)} 68% 48%);`
@@ -1456,6 +1530,42 @@ function renderCoverageMetric(label, metric) {
       </div>
     </div>
   `;
+}
+
+function renderCoverageTableMetric(metric, label) {
+  if (!hasCoverageMetric(metric)) {
+    return `<div class="coverage-table__metric" title="${escapeHtml(`No ${label.toLowerCase()} coverage recorded`)}"><strong class="coverage-table__metricValue">n/a</strong><div class="coverage-table__metricBar" aria-hidden="true"><div class="coverage-table__metricFill" style="width:0%;background:hsl(0 68% 48%);"></div></div></div>`;
+  }
+
+  const fillStyle = `width:${metric.pct.toFixed(2)}%;background:hsl(${coverageHue(metric.pct)} 68% 48%);`;
+  return `
+    <div class="coverage-table__metric" title="${escapeHtml(formatCoverageMetricTooltip(label, metric))}">
+      <strong class="coverage-table__metricValue">${escapeHtml(formatCoveragePercent(metric.pct))}%</strong>
+      <div class="coverage-table__metricBar" aria-hidden="true">
+        <div class="coverage-table__metricFill" style="${fillStyle}"></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderStatementsIcon(metric) {
+  const active = hasCoverageMetric(metric);
+  const title = active
+    ? formatCoverageMetricTooltip('Statements', metric)
+    : 'No statement coverage recorded';
+  return `<span class="coverage-table__statementIcon coverage-table__statementIcon--${active ? 'active' : 'disabled'}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">ST</span>`;
+}
+
+function hasCoverageMetric(metric) {
+  return Boolean(metric) && (
+    Number.isFinite(metric.pct)
+    || Number.isFinite(metric.total) && metric.total > 0
+    || Number.isFinite(metric.covered) && metric.covered > 0
+  );
+}
+
+function formatCoverageMetricTooltip(label, metric) {
+  return `${label}: ${formatCoveragePercent(metric?.pct)}% (${formatCoverageCount(metric?.covered)}/${formatCoverageCount(metric?.total)})`;
 }
 
 function formatCoverageAttribution(file) {
@@ -1507,6 +1617,10 @@ function formatDuration(value) {
 function coverageHue(pct) {
   const normalized = Math.max(0, Math.min(100, pct));
   return `${Math.round((normalized / 100) * 120)}deg`;
+}
+
+function formatCoveragePercent(value) {
+  return Number.isFinite(value) ? Number(value).toFixed(1) : '0.0';
 }
 
 function formatCoverageCount(value) {

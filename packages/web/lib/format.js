@@ -37,6 +37,43 @@ export function formatCoveragePct(value) {
   return Number.isFinite(value) ? `${Number(value).toFixed(value % 1 === 0 ? 0 : 1)}%` : 'N/A';
 }
 
+export function formatCommitSha(value, length = 7) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return 'Unknown';
+  }
+
+  const normalized = value.trim();
+  return normalized.slice(0, Math.max(1, length));
+}
+
+export function formatRepositoryName(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return 'Repository unavailable';
+  }
+
+  const normalized = value.trim().replace(/\/+$/, '').replace(/\.git$/i, '');
+
+  try {
+    const parsed = new URL(normalized);
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    if (segments.length >= 2) {
+      return `${segments.at(-2)}/${segments.at(-1)}`;
+    }
+    if (segments.length === 1) {
+      return segments[0];
+    }
+  } catch {
+    // fall through to looser path parsing for SCP-like git remotes
+  }
+
+  const segments = normalized.split(/[/:]/).filter(Boolean);
+  if (segments.length >= 2) {
+    return `${segments.at(-2)}/${segments.at(-1)}`;
+  }
+
+  return normalized;
+}
+
 export function formatStatusLabel(value) {
   if (typeof value !== 'string' || value.trim() === '') {
     return 'unknown';

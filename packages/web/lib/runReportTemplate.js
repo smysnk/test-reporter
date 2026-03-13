@@ -6,13 +6,12 @@ const EMBED_RESIZE_SCRIPT = `<script>
   const messageType = '${RUNNER_REPORT_HEIGHT_MESSAGE_TYPE}';
 
   const postHeight = () => {
+    const content = document.querySelector('main');
     const root = document.documentElement;
-    const body = document.body;
     const height = Math.max(
-      root?.scrollHeight || 0,
-      body?.scrollHeight || 0,
-      root?.offsetHeight || 0,
-      body?.offsetHeight || 0,
+      Math.ceil(content?.getBoundingClientRect().height || 0),
+      content?.scrollHeight || 0,
+      root?.clientHeight || 0,
     );
 
     if (height > 0) {
@@ -37,7 +36,9 @@ const EMBED_RESIZE_SCRIPT = `<script>
   if (typeof ResizeObserver === 'function') {
     const observer = new ResizeObserver(queueHeight);
     window.addEventListener('load', () => {
-      if (document.body) {
+      if (content) {
+        observer.observe(content);
+      } else if (document.body) {
         observer.observe(document.body);
       }
     }, { once: true });

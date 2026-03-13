@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
-import { formatCoveragePct, formatDateTime, formatDuration } from '../../lib/format.js';
+import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../../lib/format.js';
 import { requireWebSession } from '../../lib/auth.js';
 import { loadProjectExplorerPage } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
@@ -72,7 +72,7 @@ export default function ProjectExplorerPage({ data }) {
               React.createElement(
                 'div',
                 { className: 'web-list__meta' },
-                `${formatDateTime(run.completedAt)} • ${run.projectVersion?.versionKey || 'version unavailable'}`,
+                `${formatRepositoryName(project.repositoryUrl)} • ${formatCommitSha(run.commitSha)} • ${formatDateTime(run.completedAt)}`,
               ),
               React.createElement(
                 'div',
