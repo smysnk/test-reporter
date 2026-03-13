@@ -47,6 +47,7 @@ test('fleet values and workflow use the unified image contract without stray ref
   const dockerfile = fs.readFileSync(path.join(repoRoot, 'docker/Dockerfile'), 'utf8');
 
   assert.match(fleetYaml, /publicDomain:\s*test-station\.smysnk\.com/);
+  assert.match(fleetYaml, /image:\s*\n\s*tag:\s*staging/);
   assert.match(fleetYaml, /existingSecret:\s*test-station-runtime-secret/);
   assert.match(fleetYaml, /className:\s*traefik/);
   assert.match(fleetYaml, /cert-manager\.io\/cluster-issuer:\s*letsencrypt-prod/);
@@ -71,6 +72,7 @@ test('fleet values and workflow use the unified image contract without stray ref
   assert.match(fleetReadme, /apply-fleet-gitrepo-ssh-secret\.sh/);
   assert.match(fleetReadme, /apply-fleet-env-secret\.sh/);
   assert.match(fleetReadme, /deploy-fleet\.sh/);
+  assert.match(fleetReadme, /FLEET_KUBECONFIG/);
   assert.match(envFleetExample, /DATABASE_URL=/);
   assert.match(envFleetExample, /NEXTAUTH_SECRET=/);
   assert.match(gitIgnore, /^\.env\.fleet$/m);
@@ -78,6 +80,6 @@ test('fleet values and workflow use the unified image contract without stray ref
   assert.match(workflowYaml, /vars\.CONTAINER_REGISTRY/);
   assert.match(workflowYaml, /vars\.CONTAINER_IMAGE_REPOSITORY/);
   assert.match(workflowYaml, /secrets\.CONTAINER_REGISTRY_PASSWORD/);
-  assert.match(workflowYaml, /push:\s*true/);
+  assert.match(workflowYaml, /push:\s*\$\{\{ inputs\.push_image \}\}/);
   assert.match(dockerfile, /COPY scripts \.\/scripts/);
 });

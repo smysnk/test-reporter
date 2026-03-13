@@ -69,4 +69,4 @@ The smoke example now explicitly verifies `report.json`, `modules.json`, `owners
 
 - checked-in publishable package manifests should stay on the `0.2.0` baseline
 - the publish workflow will convert that baseline to `0.2.<build_number>` unless overridden
-- publishing still happens from the `release` branch, or via manual workflow dispatch with `publish_npm=true`
+- publishing now happens from the `staging` branch, or via manual workflow dispatch with `publish_npm=true`

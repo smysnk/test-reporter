@@ -1,10 +1,30 @@
 name: Build Unified Image
 
 on:
-  push:
-    branches:
-      - main
+  workflow_call:
+    inputs:
+      image_tag:
+        description: "Branch or release tag to publish alongside the sha tag"
+        required: false
+        default: staging
+        type: string
+      push_image:
+        description: "Push the built image to the target registry"
+        required: false
+        default: true
+        type: boolean
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Branch or release tag to publish alongside the sha tag"
+        required: false
+        default: manual
+        type: string
+      push_image:
+        description: "Push the built image to the target registry"
+        required: false
+        default: true
+        type: boolean
 
 env:
   # To publish to public Docker Hub instead of GHCR, set:
@@ -63,7 +83,7 @@ jobs:
         with:
           images: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_IMAGE_REPOSITORY }}
           tags: |
-            type=raw,value=main,enable={{is_default_branch}}
+            type=raw,value=${{ inputs.image_tag }}
             type=sha,format=long
 
       - name: Build and publish unified web/server image
@@ -72,7 +92,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           platforms: linux/amd64
-          push: true
+          push: ${{ inputs.push_image }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

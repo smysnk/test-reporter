@@ -15,6 +15,7 @@ This directory is the Rancher Fleet bundle for deploying `test-station` with:
 - Shared runtime secret: `test-station-runtime-secret`
 - Ingress class: `traefik`
 - TLS secret: `tls-test-station-smysnk-com`
+- Image tag: `staging`
 
 By default:
 
@@ -48,6 +49,8 @@ cp .env.fleet.example .env.fleet
 The shared secret is consumed by both the `server` and `web` deployments.
 
 For CI ingest publishing, set `INGEST_SHARED_KEY` in this secret and use the same value for the GitHub Actions secret `TEST_STATION_INGEST_SHARED_KEY`.
+
+The staging release workflow also needs a GitHub Actions secret named `FLEET_KUBECONFIG` that contains the kubeconfig used for `kubectl apply` and rollout restarts.
 
 Optional web OAuth providers are configured through the same runtime secret:
 

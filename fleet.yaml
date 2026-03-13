@@ -4,6 +4,8 @@ helm:
   releaseName: test-station
   chart: ./fleet/test-station
   values:
+    image:
+      tag: staging
     global:
       publicDomain: test-station.smysnk.com
     server:

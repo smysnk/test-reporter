@@ -271,7 +271,7 @@ yarn playwright install --with-deps
 
 ### Publishing CI Runs To `/api/ingest`
 
-The deployed server accepts machine reports at `POST /api/ingest` with shared-key auth. The checked-in GitHub Actions workflow publishes the self-test report to `https://test-station.smysnk.com/api/ingest`.
+The deployed server accepts machine reports at `POST /api/ingest` with shared-key auth. The checked-in staging release workflow publishes the self-test report to `https://test-station.smysnk.com/api/ingest`.
 
 What is sent:
 
@@ -282,7 +282,7 @@ What is sent:
 Shared-key auth:
 
 - the server reads `INGEST_SHARED_KEY`
-- the CI workflow reads the GitHub Actions secret `TEST_STATION_INGEST_SHARED_KEY`
+- the staging release workflow reads the GitHub Actions secret `TEST_STATION_INGEST_SHARED_KEY`
 - set them to the same value
 
 Optional S3-backed artifact storage:

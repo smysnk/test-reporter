@@ -3,6 +3,8 @@ name: CI
 on:
   pull_request:
   push:
+    branches:
+      - main
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -58,74 +60,6 @@ jobs:
           path: ./.test-results/self-test-report
           if-no-files-found: warn
 
-      - name: Derive report publishing status
-        if: always()
-        shell: bash
-        run: |
-          if [ "${{ steps.self_test.outputs.exit_code }}" = "0" ]; then
-            echo "TEST_STATION_CI_STATUS=passed" >> "$GITHUB_ENV"
-          else
-            echo "TEST_STATION_CI_STATUS=failed" >> "$GITHUB_ENV"
-          fi
-
-      - name: Configure AWS credentials for report archive sync
-        if: ${{ always() && github.event_name == 'push' && vars.S3_BUCKET != '' }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.S3_AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.S3_AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.S3_AWS_REGION != '' && vars.S3_AWS_REGION || 'us-east-1' }}
-
-      - name: Sync self-test report to S3
-        if: ${{ always() && github.event_name == 'push' && vars.S3_BUCKET != '' }}
-        shell: bash
-        env:
-          S3_BUCKET: ${{ vars.S3_BUCKET }}
-          S3_STORAGE_PREFIX: ${{ vars.S3_STORAGE_PREFIX }}
-        run: |
-          storage_prefix="${S3_STORAGE_PREFIX:-ci/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}}"
-          echo "S3_STORAGE_PREFIX=$storage_prefix" >> "$GITHUB_ENV"
-          aws s3 sync ./.test-results/self-test-report "s3://${S3_BUCKET}/${storage_prefix}" --no-progress
-
-      - name: Publish self-test report to ingest endpoint
-        if: ${{ always() && github.event_name == 'push' }}
-        shell: bash
-        env:
-          TEST_STATION_INGEST_ENDPOINT: https://test-station.smysnk.com/api/ingest
-          TEST_STATION_INGEST_PROJECT_KEY: test-station
-          TEST_STATION_INGEST_SHARED_KEY: ${{ secrets.TEST_STATION_INGEST_SHARED_KEY }}
-          S3_PUBLIC_URL: ${{ vars.S3_PUBLIC_URL }}
-          S3_BUCKET: ${{ vars.S3_BUCKET }}
-        run: |
-          test -n "$TEST_STATION_INGEST_SHARED_KEY" || { echo "Missing TEST_STATION_INGEST_SHARED_KEY secret"; exit 1; }
-          export TEST_STATION_BUILD_COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          export S3_STORAGE_PREFIX="${S3_STORAGE_PREFIX:-ci/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}}"
-          node ./scripts/publish-ingest-report.mjs --input ./.test-results/self-test-report/report.json
-
       - name: Assert self-test pass
         if: always()
         run: test "${{ steps.self_test.outputs.exit_code }}" = "0"
-
-      - name: Build
-        run: yarn build
-
-      - name: Run smoke example
-        run: |
-          rm -rf ./examples/generic-node-library/artifacts/test-report
-          node ./bin/test-station.mjs run --config ./examples/generic-node-library/test-station.config.mjs --coverage
-          test -f ./examples/generic-node-library/artifacts/test-report/report.json
-          test -f ./examples/generic-node-library/artifacts/test-report/modules.json
-          test -f ./examples/generic-node-library/artifacts/test-report/ownership.json
-          test -f ./examples/generic-node-library/artifacts/test-report/index.html
-          test -d ./examples/generic-node-library/artifacts/test-report/raw
-
-      - name: Validate unified image build
-        run: docker build --file docker/Dockerfile --tag test-station-ci .
-
-      - name: Upload smoke artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: generic-node-library-report
-          path: ./examples/generic-node-library/artifacts/test-report
-          if-no-files-found: warn

@@ -17,6 +17,8 @@ Options:
   --app-namespace <name>     Application namespace to check (default: fleet.yaml defaultNamespace)
   --web <deployment>         Web deployment to check (default: <releaseName>-web)
   --server <deployment>      Server deployment to check (default: <releaseName>-server)
+  --kubeconfig <path>        Optional KUBECONFIG path
+  --restart                  Restart workloads after syncing Fleet so mutable tags repull
   --wait-seconds <seconds>   Wait timeout for rollout status (default: 600)
   --help                     Show this help
 USAGE
@@ -28,6 +30,8 @@ NAME="$(gitrepo_name)"
 APP_NAMESPACE="$(fleet_default_namespace)"
 WEB_DEPLOYMENT="$(deployment_name web)"
 SERVER_DEPLOYMENT="$(deployment_name server)"
+KUBECONFIG_PATH=""
+RESTART_AFTER_SYNC="0"
 WAIT_SECONDS="600"
 
 while [[ $# -gt 0 ]]; do
@@ -56,6 +60,14 @@ while [[ $# -gt 0 ]]; do
       SERVER_DEPLOYMENT="${2:-}"
       shift 2
       ;;
+    --kubeconfig)
+      KUBECONFIG_PATH="${2:-}"
+      shift 2
+      ;;
+    --restart)
+      RESTART_AFTER_SYNC="1"
+      shift
+      ;;
     --wait-seconds)
       WAIT_SECONDS="${2:-600}"
       shift 2
@@ -75,6 +87,10 @@ done
 if ! command -v kubectl >/dev/null 2>&1; then
   echo "Error: kubectl is required" >&2
   exit 1
+fi
+
+if [[ -n "$KUBECONFIG_PATH" ]]; then
+  export KUBECONFIG="$KUBECONFIG_PATH"
 fi
 
 if [[ ! -f "$GITREPO_FILE" ]]; then
@@ -107,6 +123,13 @@ kubectl -n "$FLEET_NAMESPACE" get gitrepo "$NAME" -o wide || true
 echo "Current bundles in ${FLEET_NAMESPACE}:"
 kubectl -n "$FLEET_NAMESPACE" get bundle || true
 kubectl -n "$FLEET_NAMESPACE" get bundledeployment -o wide || true
+
+if [[ "$RESTART_AFTER_SYNC" == "1" ]]; then
+  echo "Restarting deployment/${WEB_DEPLOYMENT} in namespace/${APP_NAMESPACE}"
+  kubectl -n "$APP_NAMESPACE" rollout restart deployment "$WEB_DEPLOYMENT"
+  echo "Restarting deployment/${SERVER_DEPLOYMENT} in namespace/${APP_NAMESPACE}"
+  kubectl -n "$APP_NAMESPACE" rollout restart deployment "$SERVER_DEPLOYMENT"
+fi
 
 echo "Waiting for rollout of deployment/${WEB_DEPLOYMENT} in namespace/${APP_NAMESPACE}"
 kubectl -n "$APP_NAMESPACE" rollout status deployment "$WEB_DEPLOYMENT" --timeout="${WAIT_SECONDS}s"
