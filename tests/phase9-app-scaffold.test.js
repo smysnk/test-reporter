@@ -24,48 +24,50 @@ test('loadRepoEnv loads .env and lets .env.local override values', () => {
 test('server scaffold exposes health and GraphQL endpoints', async () => {
   const server = await createServer({ port: 0, corsOrigin: 'http://localhost:3001' });
 
-  await new Promise((resolve) => {
-    server.httpServer.listen(0, resolve);
-  });
-
-  const address = server.httpServer.address();
-  assert.equal(typeof address?.port, 'number');
-
-  const baseUrl = `http://127.0.0.1:${address.port}`;
-
-  const healthResponse = await fetch(`${baseUrl}/healthz`);
-  assert.equal(healthResponse.status, 200);
-  const healthPayload = await healthResponse.json();
-  assert.equal(healthPayload.status, 'ok');
-  assert.equal(healthPayload.service, 'test-station-server');
-
-  const graphqlResponse = await fetch(`${baseUrl}/graphql`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      query: '{ schemaVersion serviceStatus }',
-    }),
-  });
-  assert.equal(graphqlResponse.status, 200);
-  const graphqlPayload = await graphqlResponse.json();
-  assert.deepEqual(graphqlPayload.data, {
-    schemaVersion: '1',
-    serviceStatus: 'phase-4-query-layer',
-  });
-
-  await server.graphqlServer.stop();
-  if (server.httpServer.listening) {
-    await new Promise((resolve, reject) => {
-      server.httpServer.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve();
-      });
+  try {
+    await new Promise((resolve) => {
+      server.httpServer.listen(0, resolve);
     });
+
+    const address = server.httpServer.address();
+    assert.equal(typeof address?.port, 'number');
+
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+
+    const healthResponse = await fetch(`${baseUrl}/healthz`);
+    assert.equal(healthResponse.status, 200);
+    const healthPayload = await healthResponse.json();
+    assert.equal(healthPayload.status, 'ok');
+    assert.equal(healthPayload.service, 'test-station-server');
+
+    const graphqlResponse = await fetch(`${baseUrl}/graphql`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: '{ schemaVersion serviceStatus }',
+      }),
+    });
+    assert.equal(graphqlResponse.status, 200);
+    const graphqlPayload = await graphqlResponse.json();
+    assert.deepEqual(graphqlPayload.data, {
+      schemaVersion: '1',
+      serviceStatus: 'phase-8-access-control',
+    });
+  } finally {
+    await server.graphqlServer.stop();
+    if (server.httpServer.listening) {
+      await new Promise((resolve, reject) => {
+        server.httpServer.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+          resolve();
+        });
+      });
+    }
   }
 });
 

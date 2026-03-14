@@ -35,35 +35,55 @@ import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/repo
 import { RunBuildChip } from '../packages/web/components/WebBits.js';
 
 test('web auth options expose the sign-in page and session actor metadata', async () => {
-  const authOptions = createAuthOptions({
-    secret: 'test-secret',
-    adminEmails: ['admin@example.com'],
-    demoAuthEnabled: true,
-  });
+  const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+  const originalGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
-  assert.equal(authOptions.pages.signIn, '/auth/signin');
-  assert.equal(authOptions.providers.some((provider) => provider.type === 'credentials'), true);
+  try {
+    delete process.env.GOOGLE_CLIENT_ID;
+    delete process.env.GOOGLE_CLIENT_SECRET;
 
-  const token = await authOptions.callbacks.jwt({
-    token: {},
-    user: {
-      id: 'user-1',
-      email: 'admin@example.com',
-      name: 'Admin Operator',
-    },
-  });
+    const authOptions = createAuthOptions({
+      secret: 'test-secret',
+      adminEmails: ['admin@example.com'],
+      demoAuthEnabled: true,
+    });
 
-  assert.equal(token.userId, 'user-1');
-  assert.equal(token.role, 'admin');
+    assert.equal(authOptions.pages.signIn, '/auth/signin');
+    assert.equal(authOptions.providers.some((provider) => provider.type === 'credentials'), true);
 
-  const session = await authOptions.callbacks.session({
-    session: { user: {} },
-    token,
-  });
+    const token = await authOptions.callbacks.jwt({
+      token: {},
+      user: {
+        id: 'user-1',
+        email: 'admin@example.com',
+        name: 'Admin Operator',
+      },
+    });
 
-  assert.equal(session.userId, 'user-1');
-  assert.equal(session.role, 'admin');
-  assert.equal(session.user.image, null);
+    assert.equal(token.userId, 'user-1');
+    assert.equal(token.role, 'admin');
+
+    const session = await authOptions.callbacks.session({
+      session: { user: {} },
+      token,
+    });
+
+    assert.equal(session.userId, 'user-1');
+    assert.equal(session.role, 'admin');
+    assert.equal(session.user.image, null);
+  } finally {
+    if (originalGoogleClientId === undefined) {
+      delete process.env.GOOGLE_CLIENT_ID;
+    } else {
+      process.env.GOOGLE_CLIENT_ID = originalGoogleClientId;
+    }
+
+    if (originalGoogleClientSecret === undefined) {
+      delete process.env.GOOGLE_CLIENT_SECRET;
+    } else {
+      process.env.GOOGLE_CLIENT_SECRET = originalGoogleClientSecret;
+    }
+  }
 });
 
 test('web exposes Google as an OAuth provider when configured', () => {
