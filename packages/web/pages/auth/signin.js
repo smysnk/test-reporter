@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth/next';
 import { signIn } from 'next-auth/react';
 import { createAuthOptions, describeAuthProviders, resolveAutoSignInProviderId } from '../../lib/auth.js';
 
-export default function WebSignInPage({ callbackUrl, providers, autoSignInProviderId, error }) {
+export default function WebSignInPage({ callbackUrl, providers, autoSignInProviderId, error, signedOut }) {
   const credentialProvider = providers.find((provider) => provider.type === 'credentials') || null;
   const oauthProviders = providers.filter((provider) => provider.type !== 'credentials');
 
@@ -45,7 +45,9 @@ export default function WebSignInPage({ callbackUrl, providers, autoSignInProvid
       { className: 'web-card__copy' },
       autoSignInProviderId
         ? `Redirecting to ${formatProviderName(autoSignInProviderId)} sign-in...`
-        : error
+        : signedOut
+          ? 'You have signed out. Choose a provider below when you are ready to sign in again.'
+          : error
           ? `Authentication failed (${error}). Try the configured provider again or adjust the web auth environment.`
           : credentialProvider && oauthProviders.length > 0
             ? 'Use one of the configured SSO providers below, or use demo access if you have enabled it for this deployment.'
@@ -135,6 +137,7 @@ export async function getServerSideProps(context) {
   const callbackUrl = typeof context.query.callbackUrl === 'string' && context.query.callbackUrl.trim()
     ? context.query.callbackUrl
     : '/';
+  const signedOut = context.query.signedOut === '1' || context.query.signedOut === 'true';
   const error = typeof context.query.error === 'string' && context.query.error.trim()
     ? context.query.error.trim()
     : null;
@@ -153,8 +156,9 @@ export async function getServerSideProps(context) {
     props: {
       callbackUrl,
       providers,
-      autoSignInProviderId: error ? null : resolveAutoSignInProviderId(providers),
+      autoSignInProviderId: resolveAutoSignInProviderId(providers, { error, signedOut }),
       error,
+      signedOut,
     },
   };
 }

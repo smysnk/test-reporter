@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
-import { EmptyState, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
+import { EmptyState, MetricGrid, SectionCard, StatusPill, RunBuildChip } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../../lib/format.js';
 import { requireWebSession } from '../../lib/auth.js';
 import { loadProjectExplorerPage } from '../../lib/serverGraphql.js';
@@ -78,6 +78,7 @@ export default function ProjectExplorerPage({ data }) {
                 'div',
                 { className: 'web-list__row' },
                 React.createElement('span', { className: 'web-chip' }, run.branch || 'no-branch'),
+                React.createElement(RunBuildChip, { run }),
                 React.createElement('span', { className: 'web-chip' }, formatDuration(run.durationMs)),
                 React.createElement('span', { className: 'web-chip' }, `lines ${formatCoveragePct(run.coverageSnapshot?.linesPct)}`),
               ),

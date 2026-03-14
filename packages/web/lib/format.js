@@ -46,6 +46,22 @@ export function formatCommitSha(value, length = 7) {
   return normalized.slice(0, Math.max(1, length));
 }
 
+export function formatBuildNumber(value) {
+  return Number.isFinite(value) ? `build #${Math.trunc(Number(value))}` : 'Build unavailable';
+}
+
+export function formatRunBuildLabel(run) {
+  if (Number.isFinite(run?.projectVersion?.buildNumber)) {
+    return formatBuildNumber(run.projectVersion.buildNumber);
+  }
+
+  if (typeof run?.sourceRunId === 'string' && run.sourceRunId.trim() !== '') {
+    return `run ${run.sourceRunId.trim()}`;
+  }
+
+  return null;
+}
+
 export function formatRepositoryName(value) {
   if (typeof value !== 'string' || value.trim() === '') {
     return 'Repository unavailable';

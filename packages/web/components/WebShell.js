@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import { signOut, useSession } from 'next-auth/react';
 import { useSelector } from 'react-redux';
+import { buildSignedOutRedirectUrl } from '../lib/authRoutes.js';
 
 export function WebShell({ children }) {
   const { data: session } = useSession();
@@ -46,7 +47,7 @@ export function WebShell({ children }) {
               {
                 type: 'button',
                 className: 'web-button web-button--ghost',
-                onClick: () => signOut({ callbackUrl: '/auth/signin' }),
+                onClick: () => signOut({ callbackUrl: buildSignedOutRedirectUrl() }),
               },
               'Sign out',
             ),

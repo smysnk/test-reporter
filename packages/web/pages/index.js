@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/WebBits.js';
+import { MetricGrid, SectionCard, StatusPill, EmptyState, RunBuildChip } from '../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../lib/format.js';
 import { requireWebSession } from '../lib/auth.js';
 import { loadWebHomePage } from '../lib/serverGraphql.js';
@@ -103,6 +103,7 @@ export default function WebIndexPage({ data }) {
                 'div',
                 { className: 'web-list__row' },
                 React.createElement('span', { className: 'web-chip' }, run.branch || 'no-branch'),
+                React.createElement(RunBuildChip, { run }),
                 React.createElement('span', { className: 'web-chip' }, formatDuration(run.durationMs)),
                 React.createElement('span', { className: 'web-chip' }, `lines ${formatCoveragePct(run.coverageSnapshot?.linesPct)}`),
               ),

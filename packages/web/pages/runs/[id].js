@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { EmptyState, InlineList, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
-import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatSignedDelta } from '../../lib/format.js';
+import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, formatSignedDelta } from '../../lib/format.js';
 import { requireWebSession } from '../../lib/auth.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../../lib/runReportTemplate.js';
 import { buildRunTemplateHref, resolveRunTemplateMode } from '../../lib/runTemplateRouting.js';
@@ -20,6 +20,19 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
       },
     );
   }
+
+  const runBuildLabel = formatRunBuildLabel(run);
+  const runBuildCopy = run.sourceUrl
+    ? React.createElement(
+      'a',
+      {
+        href: run.sourceUrl,
+        target: '_blank',
+        rel: 'noreferrer',
+      },
+      'Open GitHub Actions run',
+    )
+    : (run.sourceRunId || 'run link unavailable');
 
   return React.createElement(
     React.Fragment,
@@ -52,6 +65,7 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
           { label: 'Completed', value: formatDateTime(run.completedAt), copy: run.branch || 'no branch' },
           { label: 'Duration', value: formatDuration(run.durationMs), copy: run.projectVersion?.versionKey || 'version unavailable' },
           { label: 'Commit', value: formatCommitSha(run.commitSha), copy: formatRepositoryName(run.project?.repositoryUrl) },
+          { label: 'Build', value: runBuildLabel || 'Unavailable', copy: runBuildCopy },
           { label: 'Line Coverage', value: formatCoveragePct(run.coverageSnapshot?.linesPct), copy: `branch ${formatCoveragePct(run.coverageSnapshot?.branchesPct)}` },
         ],
       }),

@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatRunBuildLabel } from '../lib/format.js';
 
 export function SectionCard({ eyebrow, title, copy, children, compact = false }) {
   return React.createElement(
@@ -53,4 +54,28 @@ export function InlineList({ items }) {
       item,
     )),
   );
+}
+
+export function RunBuildChip({ run }) {
+  const label = formatRunBuildLabel(run);
+  const href = typeof run?.sourceUrl === 'string' && run.sourceUrl.trim() ? run.sourceUrl.trim() : null;
+
+  if (!label) {
+    return null;
+  }
+
+  if (href) {
+    return React.createElement(
+      'a',
+      {
+        href,
+        target: '_blank',
+        rel: 'noreferrer',
+        className: 'web-chip',
+      },
+      label,
+    );
+  }
+
+  return React.createElement('span', { className: 'web-chip' }, label);
 }

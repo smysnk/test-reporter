@@ -21,6 +21,8 @@ export const WEB_HOME_QUERY = `
       status
       branch
       commitSha
+      sourceRunId
+      sourceUrl
       completedAt
       durationMs
       project {
@@ -31,6 +33,7 @@ export const WEB_HOME_QUERY = `
       }
       projectVersion {
         versionKey
+        buildNumber
       }
       coverageSnapshot {
         linesPct
@@ -61,10 +64,13 @@ export const PROJECT_ACTIVITY_QUERY = `
       status
       branch
       commitSha
+      sourceRunId
+      sourceUrl
       completedAt
       durationMs
       projectVersion {
         versionKey
+        buildNumber
       }
       coverageSnapshot {
         linesPct
@@ -88,6 +94,7 @@ export const PROJECT_ACTIVITY_QUERY = `
       body
       projectVersion {
         versionKey
+        buildNumber
       }
     }
   }
@@ -166,6 +173,7 @@ export const RUN_DETAIL_QUERY = `
       }
       projectVersion {
         versionKey
+        buildNumber
       }
       coverageSnapshot {
         linesPct

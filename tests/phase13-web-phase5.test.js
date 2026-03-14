@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildWebActorHeaders,
   createAuthOptions,
@@ -7,8 +9,10 @@ import {
   resolveDemoAuthEnabled,
   resolveNextAuthUrl,
 } from '../packages/web/lib/auth.js';
+import { buildSignedOutRedirectUrl } from '../packages/web/lib/authRoutes.js';
 import { ensureNextAuthUrl } from '../packages/web/lib/nextAuthEnv.js';
-import { formatCommitSha, formatCoveragePct, formatDuration, formatRepositoryName } from '../packages/web/lib/format.js';
+import { formatBuildNumber, formatCommitSha, formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../packages/web/lib/format.js';
+import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, RUN_DETAIL_QUERY } from '../packages/web/lib/queries.js';
 import {
   executeWebGraphql,
   loadWebHomePage,
@@ -22,6 +26,7 @@ import { buildSignInRedirectUrl, isProtectedWebPath } from '../packages/web/lib/
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
 import { decorateEmbeddedRunnerReportHtml } from '../packages/web/lib/runReportTemplate.js';
 import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nextauth].js';
+import { RunBuildChip } from '../packages/web/components/WebBits.js';
 
 test('web auth options expose the sign-in page and session actor metadata', async () => {
   const authOptions = createAuthOptions({
@@ -154,6 +159,8 @@ test('web hides demo auth and auto-selects Google when Google OAuth is configure
     assert.equal(authOptions.providers.some((provider) => provider.id === 'google'), true);
     assert.equal(authOptions.providers.some((provider) => provider.type === 'credentials'), false);
     assert.equal(resolveAutoSignInProviderId(authOptions.providers), 'google');
+    assert.equal(resolveAutoSignInProviderId(authOptions.providers, { signedOut: true }), null);
+    assert.equal(resolveAutoSignInProviderId(authOptions.providers, { error: 'OAuthSignin' }), null);
   } finally {
     if (originalDemoAuthEnabled === undefined) {
       delete process.env.WEB_DEMO_AUTH_ENABLED;
@@ -173,6 +180,10 @@ test('web hides demo auth and auto-selects Google when Google OAuth is configure
       process.env.GOOGLE_CLIENT_SECRET = originalGoogleClientSecret;
     }
   }
+});
+
+test('web sign-out redirects to a signed-out sign-in page without auto re-authenticating', () => {
+  assert.equal(buildSignedOutRedirectUrl(), '/auth/signin?signedOut=1');
 });
 
 test('web defaults NEXTAUTH_URL to localhost using WEB_PORT when unset', () => {
@@ -333,7 +344,15 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
         data: {
           me: { id: 'user-1', name: 'Web User', email: 'user@example.com', role: 'member', projectKeys: ['workspace'] },
           projects: [{ id: 'project-1', key: 'workspace', slug: 'workspace', name: 'Workspace' }],
-          runs: [{ id: 'run-1', externalKey: 'workspace:github-actions:1001', status: 'failed', coverageSnapshot: { linesPct: 80 } }],
+          runs: [{
+            id: 'run-1',
+            externalKey: 'workspace:github-actions:1001',
+            status: 'failed',
+            sourceRunId: '1001',
+            sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
+            projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
+            coverageSnapshot: { linesPct: 80 },
+          }],
         },
       }), {
         status: 200,
@@ -367,9 +386,11 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
             id: 'run-1',
             externalKey: 'workspace:github-actions:1001',
             status: 'failed',
+            sourceRunId: '1001',
+            sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
             completedAt: '2026-03-09T15:00:00.000Z',
             durationMs: 3000,
-            projectVersion: { versionKey: 'commit:abc123' },
+            projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
             coverageSnapshot: { linesPct: 80 },
           }],
           coverageTrend: [
@@ -512,7 +533,10 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
         run: {
           id: 'run-1',
           externalKey: 'workspace:github-actions:1001',
+          sourceRunId: '1001',
+          sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
           project: { slug: 'workspace', name: 'Workspace' },
+          projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
           artifacts: [],
           suites: [],
           coverageSnapshot: { linesPct: 80 },
@@ -566,8 +590,35 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
 
   assert.equal(formatDuration(1250), '1.3 s');
   assert.equal(formatCoveragePct(80), '80%');
+  assert.equal(formatBuildNumber(88), 'build #88');
   assert.equal(formatCommitSha('abcdef1234567890'), 'abcdef1');
   assert.equal(formatRepositoryName('https://github.com/smysnk/test-station.git'), 'smysnk/test-station');
+  assert.equal(formatRunBuildLabel({ projectVersion: { buildNumber: 88 } }), 'build #88');
+  assert.equal(formatRunBuildLabel({ sourceRunId: '1001' }), 'run 1001');
+});
+
+test('web run build chip and GraphQL queries include build metadata and source links', () => {
+  const html = renderToStaticMarkup(React.createElement(RunBuildChip, {
+    run: {
+      sourceRunId: '1001',
+      sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
+      projectVersion: {
+        buildNumber: 88,
+      },
+    },
+  }));
+
+  assert.match(html, /build #88/);
+  assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
+  assert.match(WEB_HOME_QUERY, /sourceRunId/);
+  assert.match(WEB_HOME_QUERY, /sourceUrl/);
+  assert.match(WEB_HOME_QUERY, /buildNumber/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /sourceRunId/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /sourceUrl/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /buildNumber/);
+  assert.match(RUN_DETAIL_QUERY, /sourceRunId/);
+  assert.match(RUN_DETAIL_QUERY, /sourceUrl/);
+  assert.match(RUN_DETAIL_QUERY, /buildNumber/);
 });
 
 test('web can render the runner report template from stored raw report data', async () => {
