@@ -45,6 +45,8 @@ test('ci workflow only runs test validation for main and pull requests', () => {
   assert.match(workflow, /yarn install --immutable/);
   assert.match(workflow, /yarn test:node/);
   assert.match(workflow, /yarn test:coverage/);
+  assert.match(workflow, /tee "\$log_path"/);
+  assert.match(workflow, /Captured log:/);
   assert.doesNotMatch(workflow, /publish-ingest-report\.mjs/);
   assert.doesNotMatch(workflow, /docker build --file docker\/Dockerfile --tag test-station-ci \./);
 });
@@ -60,6 +62,8 @@ test('staging release workflow gates npm publish, image build, and fleet deploym
   assert.match(workflow, /NPM_PUBLISH:\s*\$\{\{ \(\(github\.event_name == 'push' && github\.ref_name == 'staging'\) \|\| inputs\.publish_npm\) && '1' \|\| '0' \}\}/);
   assert.match(workflow, /TEST_STATION_INGEST_SHARED_KEY/);
   assert.match(workflow, /S3_BUCKET/);
+  assert.match(workflow, /tee "\$log_path"/);
+  assert.match(workflow, /Captured log:/);
   assert.match(workflow, /azure\/setup-kubectl@v4/);
   assert.match(workflow, /FLEET_KUBECONFIG/);
   assert.match(workflow, /deploy-fleet\.sh --kubeconfig "\$KUBECONFIG_PATH" --restart/);
