@@ -87,6 +87,9 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
 });
 
 test('server model registry wires the expected reporting associations', () => {
+  assert.equal(ProjectRoleAccess.getTableName(), 'project_role_access');
+  assert.equal(ProjectGroupAccess.getTableName(), 'project_group_access');
+
   assert.equal(User.associations.userRoles.target, UserRole);
   assert.equal(User.associations.userGroups.target, UserGroup);
   assert.equal(User.associations.roles.target, Role);

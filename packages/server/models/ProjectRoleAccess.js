@@ -22,6 +22,7 @@ const ProjectRoleAccess = sequelize.define('ProjectRoleAccess', {
     defaultValue: {},
   },
 }, {
+  tableName: 'project_role_access',
   indexes: [
     { unique: true, fields: ['project_id', 'role_id'] },
     { fields: ['role_id'] },

@@ -22,6 +22,7 @@ const ProjectGroupAccess = sequelize.define('ProjectGroupAccess', {
     defaultValue: {},
   },
 }, {
+  tableName: 'project_group_access',
   indexes: [
     { unique: true, fields: ['project_id', 'group_id'] },
     { fields: ['group_id'] },
