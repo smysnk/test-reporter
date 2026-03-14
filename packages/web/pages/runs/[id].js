@@ -2,7 +2,8 @@ import React from 'react';
 import Link from 'next/link';
 import { EmptyState, InlineList, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, formatSignedDelta } from '../../lib/format.js';
-import { requireWebSession } from '../../lib/auth.js';
+import { getWebSession } from '../../lib/auth.js';
+import { buildRunPageResult } from '../../lib/pageProps.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../../lib/runReportTemplate.js';
 import { buildRunTemplateHref, resolveRunTemplateMode } from '../../lib/runTemplateRouting.js';
 import { loadRunExplorerPage } from '../../lib/serverGraphql.js';
@@ -475,37 +476,26 @@ function ChangeListCard({ title, changes }) {
 }
 
 export const getServerSideProps = wrapper.getServerSideProps((store) => async (context) => {
-  const auth = await requireWebSession(context);
-  if (auth.redirect) {
-    return {
-      redirect: auth.redirect,
-    };
-  }
-
+  const session = await getWebSession(context.req, context.res);
   const runId = typeof context.params?.id === 'string' ? context.params.id : '';
   const templateMode = resolveRunTemplateMode(context.query?.template);
   const data = await loadRunExplorerPage({
-    session: auth.session,
+    session,
     runId,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
   });
 
-  if (!data) {
-    return {
-      notFound: true,
-    };
-  }
-
-  store.dispatch(setViewMode('run'));
-  store.dispatch(setRuntimeConfig({ graphqlPath: '/graphql' }));
-  store.dispatch(setSelectedProjectSlug(data.run?.project?.slug || null));
-  store.dispatch(setSelectedRunId(runId));
-
-  return {
-    props: {
-      session: auth.session,
-      data,
-      templateMode,
+  return buildRunPageResult({
+    store,
+    session,
+    runId,
+    templateMode,
+    data,
+    dispatchers: {
+      setViewMode,
+      setRuntimeConfig,
+      setSelectedProjectSlug,
+      setSelectedRunId,
     },
-  };
+  });
 });

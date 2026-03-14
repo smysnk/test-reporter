@@ -3,11 +3,8 @@ export function isProtectedWebPath(pathname) {
     return false;
   }
 
-  return pathname === '/'
-    || pathname.startsWith('/projects/')
-    || pathname === '/projects'
-    || pathname.startsWith('/runs/')
-    || pathname === '/runs';
+  return pathname === '/admin'
+    || pathname.startsWith('/admin/');
 }
 
 export function buildSignInRedirectUrl(callbackUrl) {

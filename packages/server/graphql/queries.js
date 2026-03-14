@@ -1,12 +1,16 @@
-import { requireActor } from './guards.js';
+import { requireAdminActor } from './guards.js';
 
 export const queryTypeDefs = `#graphql
   type Actor {
     id: ID!
+    userId: ID
     email: String
     name: String
     role: String!
-    projectKeys: [String!]!
+    isAdmin: Boolean!
+    isGuest: Boolean!
+    roleKeys: [String!]!
+    groupKeys: [String!]!
   }
 
   type Project {
@@ -235,10 +239,49 @@ export const queryTypeDefs = `#graphql
     fileChanges: [CoverageChange!]!
   }
 
+  type AdminUser {
+    id: ID!
+    email: String!
+    normalizedEmail: String!
+    name: String
+    avatarUrl: String
+    isAdmin: Boolean!
+    roleKeys: [String!]!
+    groupKeys: [String!]!
+  }
+
+  type AdminRole {
+    id: ID!
+    key: String!
+    name: String!
+    description: String
+    userCount: Int!
+    projectCount: Int!
+  }
+
+  type AdminGroup {
+    id: ID!
+    key: String!
+    name: String!
+    description: String
+    userCount: Int!
+    projectCount: Int!
+  }
+
+  type AdminProjectAccess {
+    project: Project!
+    isPublic: Boolean!
+    roleKeys: [String!]!
+    groupKeys: [String!]!
+    roles: [AdminRole!]!
+    groups: [AdminGroup!]!
+  }
+
   type Query {
     schemaVersion: String!
     serviceStatus: String!
-    me: Actor!
+    viewer: Actor
+    me: Actor
     projects: [Project!]!
     project(id: ID, key: String, slug: String): Project
     runs(projectId: ID, projectKey: String, status: String, limit: Int): [Run!]!
@@ -251,61 +294,56 @@ export const queryTypeDefs = `#graphql
     runCoverageComparison(runId: ID!): RunCoverageComparison
     artifacts(runId: ID, suiteRunId: ID, testExecutionId: ID): [Artifact!]!
     releaseNotes(projectId: ID, projectKey: String, versionId: ID, versionKey: String): [ReleaseNote!]!
+    adminUsers: [AdminUser!]!
+    adminUser(id: ID, email: String): AdminUser
+    adminRoles: [AdminRole!]!
+    adminGroups: [AdminGroup!]!
+    adminProjects: [AdminProjectAccess!]!
+    adminProjectAccess(projectId: ID, key: String, slug: String): AdminProjectAccess
   }
 `;
 
 export const queryResolvers = {
   Query: {
     schemaVersion: () => '1',
-    serviceStatus: () => 'phase-4-query-layer',
-    me: (_root, _args, context) => requireActor(context),
-    projects: (_root, _args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.listProjects({ actor });
+    serviceStatus: () => 'phase-8-access-control',
+    viewer: (_root, _args, context) => resolveViewer(context),
+    me: (_root, _args, context) => resolveViewer(context),
+    projects: (_root, _args, context) => context.queryService.listProjects({ actor: context.actor }),
+    project: (_root, args, context) => context.queryService.findProject({ ...args, actor: context.actor }),
+    runs: (_root, args, context) => context.queryService.listRuns({ ...args, actor: context.actor }),
+    run: (_root, args, context) => context.queryService.findRun({ ...args, actor: context.actor }),
+    runPackages: (_root, args, context) => context.queryService.listRunPackages({ ...args, actor: context.actor }),
+    runModules: (_root, args, context) => context.queryService.listRunModules({ ...args, actor: context.actor }),
+    runFiles: (_root, args, context) => context.queryService.listRunFiles({ ...args, actor: context.actor }),
+    tests: (_root, args, context) => context.queryService.listTestsForRun({ ...args, actor: context.actor }),
+    coverageTrend: (_root, args, context) => context.queryService.listCoverageTrend({ ...args, actor: context.actor }),
+    runCoverageComparison: (_root, args, context) => context.queryService.getRunCoverageComparison({ ...args, actor: context.actor }),
+    artifacts: (_root, args, context) => context.queryService.listArtifacts({ ...args, actor: context.actor }),
+    releaseNotes: (_root, args, context) => context.queryService.listReleaseNotes({ ...args, actor: context.actor }),
+    adminUsers: (_root, _args, context) => {
+      requireAdminActor(context);
+      return context.adminService.listUsers();
     },
-    project: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.findProject({ ...args, actor });
+    adminUser: (_root, args, context) => {
+      requireAdminActor(context);
+      return context.adminService.findUser(args);
     },
-    runs: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.listRuns({ ...args, actor });
+    adminRoles: (_root, _args, context) => {
+      requireAdminActor(context);
+      return context.adminService.listRoles();
     },
-    run: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.findRun({ ...args, actor });
+    adminGroups: (_root, _args, context) => {
+      requireAdminActor(context);
+      return context.adminService.listGroups();
     },
-    runPackages: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.listRunPackages({ ...args, actor });
+    adminProjects: (_root, _args, context) => {
+      requireAdminActor(context);
+      return context.adminService.listProjectAccesses();
     },
-    runModules: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.listRunModules({ ...args, actor });
-    },
-    runFiles: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.listRunFiles({ ...args, actor });
-    },
-    tests: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.listTestsForRun({ ...args, actor });
-    },
-    coverageTrend: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.listCoverageTrend({ ...args, actor });
-    },
-    runCoverageComparison: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.getRunCoverageComparison({ ...args, actor });
-    },
-    artifacts: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.listArtifacts({ ...args, actor });
-    },
-    releaseNotes: (_root, args, context) => {
-      const actor = requireActor(context);
-      return context.queryService.listReleaseNotes({ ...args, actor });
+    adminProjectAccess: (_root, args, context) => {
+      requireAdminActor(context);
+      return context.adminService.getProjectAccess(args);
     },
   },
   Run: {
@@ -320,3 +358,9 @@ export const queryResolvers = {
     tests: (suite, _args, context) => context.queryService.listTestsForSuiteRun({ suiteRunId: suite.id, actor: context.actor }),
   },
 };
+
+function resolveViewer(context) {
+  return context?.actor && context.actor.isGuest !== true
+    ? context.actor
+    : null;
+}

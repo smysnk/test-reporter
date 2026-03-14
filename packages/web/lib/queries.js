@@ -1,11 +1,10 @@
 export const WEB_HOME_QUERY = `
   query WebHomePage {
-    me {
+    viewer {
       id
       name
       email
       role
-      projectKeys
     }
     projects {
       id
@@ -300,6 +299,369 @@ export const RUN_REPORT_QUERY = `
         name
       }
       rawReport
+    }
+  }
+`;
+
+export const VIEWER_ACCESS_QUERY = `
+  query WebViewerAccess {
+    viewer {
+      id
+      userId
+      email
+      name
+      role
+      isAdmin
+      isGuest
+      roleKeys
+      groupKeys
+    }
+  }
+`;
+
+export const ADMIN_OVERVIEW_QUERY = `
+  query AdminOverviewPage {
+    viewer {
+      id
+      email
+      name
+      role
+      isAdmin
+    }
+    adminUsers {
+      id
+      email
+      name
+      isAdmin
+      roleKeys
+      groupKeys
+    }
+    adminRoles {
+      id
+      key
+      name
+      description
+      userCount
+      projectCount
+    }
+    adminGroups {
+      id
+      key
+      name
+      description
+      userCount
+      projectCount
+    }
+    adminProjects {
+      project {
+        id
+        key
+        slug
+        name
+        repositoryUrl
+        defaultBranch
+      }
+      isPublic
+      roleKeys
+      groupKeys
+    }
+  }
+`;
+
+export const ADMIN_PROJECTS_QUERY = `
+  query AdminProjectsPage {
+    viewer {
+      id
+      email
+      name
+      role
+      isAdmin
+    }
+    adminProjects {
+      project {
+        id
+        key
+        slug
+        name
+        repositoryUrl
+        defaultBranch
+      }
+      isPublic
+      roleKeys
+      groupKeys
+    }
+  }
+`;
+
+export const ADMIN_PROJECT_ACCESS_QUERY = `
+  query AdminProjectAccessPage($slug: String!) {
+    viewer {
+      id
+      email
+      name
+      role
+      isAdmin
+    }
+    adminProjectAccess(slug: $slug) {
+      project {
+        id
+        key
+        slug
+        name
+        repositoryUrl
+        defaultBranch
+      }
+      isPublic
+      roleKeys
+      groupKeys
+      roles {
+        id
+        key
+        name
+        description
+        userCount
+        projectCount
+      }
+      groups {
+        id
+        key
+        name
+        description
+        userCount
+        projectCount
+      }
+    }
+    adminRoles {
+      id
+      key
+      name
+      description
+      userCount
+      projectCount
+    }
+    adminGroups {
+      id
+      key
+      name
+      description
+      userCount
+      projectCount
+    }
+  }
+`;
+
+export const ADMIN_ROLES_QUERY = `
+  query AdminRolesPage {
+    viewer {
+      id
+      email
+      name
+      role
+      isAdmin
+    }
+    adminRoles {
+      id
+      key
+      name
+      description
+      userCount
+      projectCount
+    }
+  }
+`;
+
+export const ADMIN_GROUPS_QUERY = `
+  query AdminGroupsPage {
+    viewer {
+      id
+      email
+      name
+      role
+      isAdmin
+    }
+    adminGroups {
+      id
+      key
+      name
+      description
+      userCount
+      projectCount
+    }
+  }
+`;
+
+export const ADMIN_USERS_QUERY = `
+  query AdminUsersPage {
+    viewer {
+      id
+      email
+      name
+      role
+      isAdmin
+    }
+    adminUsers {
+      id
+      email
+      normalizedEmail
+      name
+      avatarUrl
+      isAdmin
+      roleKeys
+      groupKeys
+    }
+    adminRoles {
+      id
+      key
+      name
+      description
+      userCount
+      projectCount
+    }
+    adminGroups {
+      id
+      key
+      name
+      description
+      userCount
+      projectCount
+    }
+  }
+`;
+
+export const ADMIN_CREATE_ROLE_MUTATION = `
+  mutation AdminCreateRole($input: AdminRoleCreateInput!) {
+    adminCreateRole(input: $input) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_UPDATE_ROLE_MUTATION = `
+  mutation AdminUpdateRole($id: ID!, $input: AdminRoleUpdateInput!) {
+    adminUpdateRole(id: $id, input: $input) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_DELETE_ROLE_MUTATION = `
+  mutation AdminDeleteRole($id: ID!) {
+    adminDeleteRole(id: $id) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_CREATE_GROUP_MUTATION = `
+  mutation AdminCreateGroup($input: AdminGroupCreateInput!) {
+    adminCreateGroup(input: $input) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_UPDATE_GROUP_MUTATION = `
+  mutation AdminUpdateGroup($id: ID!, $input: AdminGroupUpdateInput!) {
+    adminUpdateGroup(id: $id, input: $input) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_DELETE_GROUP_MUTATION = `
+  mutation AdminDeleteGroup($id: ID!) {
+    adminDeleteGroup(id: $id) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_SET_USER_ADMIN_MUTATION = `
+  mutation AdminSetUserAdmin($userId: ID!, $isAdmin: Boolean!) {
+    adminSetUserAdmin(userId: $userId, isAdmin: $isAdmin) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_ADD_USER_ROLE_MUTATION = `
+  mutation AdminAddUserRole($userId: ID!, $roleId: ID!) {
+    adminAddUserRole(userId: $userId, roleId: $roleId) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_REMOVE_USER_ROLE_MUTATION = `
+  mutation AdminRemoveUserRole($userId: ID!, $roleId: ID!) {
+    adminRemoveUserRole(userId: $userId, roleId: $roleId) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_ADD_USER_GROUP_MUTATION = `
+  mutation AdminAddUserGroup($userId: ID!, $groupId: ID!) {
+    adminAddUserGroup(userId: $userId, groupId: $groupId) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_REMOVE_USER_GROUP_MUTATION = `
+  mutation AdminRemoveUserGroup($userId: ID!, $groupId: ID!) {
+    adminRemoveUserGroup(userId: $userId, groupId: $groupId) {
+      id
+    }
+  }
+`;
+
+export const ADMIN_SET_PROJECT_PUBLIC_MUTATION = `
+  mutation AdminSetProjectPublic($projectId: ID!, $isPublic: Boolean!) {
+    adminSetProjectPublic(projectId: $projectId, isPublic: $isPublic) {
+      project {
+        id
+      }
+    }
+  }
+`;
+
+export const ADMIN_ADD_PROJECT_ROLE_ACCESS_MUTATION = `
+  mutation AdminAddProjectRoleAccess($projectId: ID!, $roleId: ID!) {
+    adminAddProjectRoleAccess(projectId: $projectId, roleId: $roleId) {
+      project {
+        id
+      }
+    }
+  }
+`;
+
+export const ADMIN_REMOVE_PROJECT_ROLE_ACCESS_MUTATION = `
+  mutation AdminRemoveProjectRoleAccess($projectId: ID!, $roleId: ID!) {
+    adminRemoveProjectRoleAccess(projectId: $projectId, roleId: $roleId) {
+      project {
+        id
+      }
+    }
+  }
+`;
+
+export const ADMIN_ADD_PROJECT_GROUP_ACCESS_MUTATION = `
+  mutation AdminAddProjectGroupAccess($projectId: ID!, $groupId: ID!) {
+    adminAddProjectGroupAccess(projectId: $projectId, groupId: $groupId) {
+      project {
+        id
+      }
+    }
+  }
+`;
+
+export const ADMIN_REMOVE_PROJECT_GROUP_ACCESS_MUTATION = `
+  mutation AdminRemoveProjectGroupAccess($projectId: ID!, $groupId: ID!) {
+    adminRemoveProjectGroupAccess(projectId: $projectId, groupId: $groupId) {
+      project {
+        id
+      }
     }
   }
 `;

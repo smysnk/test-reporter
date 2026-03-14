@@ -1,5 +1,11 @@
 import { buildWebActorHeaders } from './auth.js';
 import {
+  ADMIN_GROUPS_QUERY,
+  ADMIN_OVERVIEW_QUERY,
+  ADMIN_PROJECT_ACCESS_QUERY,
+  ADMIN_PROJECTS_QUERY,
+  ADMIN_ROLES_QUERY,
+  ADMIN_USERS_QUERY,
   WEB_HOME_QUERY,
   PROJECT_ACTIVITY_QUERY,
   PROJECT_BY_SLUG_QUERY,
@@ -7,11 +13,14 @@ import {
   RUN_DETAIL_QUERY,
   RUN_REPORT_QUERY,
   SCOPED_COVERAGE_TREND_QUERY,
+  VIEWER_ACCESS_QUERY,
 } from './queries.js';
 import {
   decorateEmbeddedRunnerReportHtml,
   prepareEmbeddedRunnerReport,
 } from './runReportTemplate.js';
+
+export const ADMIN_PAGE_UNAUTHORIZED = Symbol('test-station.admin-page-unauthorized');
 
 function normalizeEnvValue(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -71,7 +80,7 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
   });
 
   return {
-    me: data.me || null,
+    viewer: data.viewer || data.me || null,
     projects: Array.isArray(data.projects) ? data.projects : [],
     runs: Array.isArray(data.runs) ? data.runs : [],
   };
@@ -159,6 +168,132 @@ export async function loadRunReportHtml({ session, runId, fetchImpl = fetch, req
   });
 
   return decorateEmbeddedRunnerReportHtml(html);
+}
+
+export async function loadAdminOverviewPage({ session, fetchImpl = fetch, requestId = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+  if (!viewer) {
+    return ADMIN_PAGE_UNAUTHORIZED;
+  }
+
+  const data = await executeWebGraphql({
+    session,
+    query: ADMIN_OVERVIEW_QUERY,
+    fetchImpl,
+    requestId,
+  });
+
+  return {
+    viewer,
+    users: Array.isArray(data.adminUsers) ? data.adminUsers : [],
+    roles: Array.isArray(data.adminRoles) ? data.adminRoles : [],
+    groups: Array.isArray(data.adminGroups) ? data.adminGroups : [],
+    projects: Array.isArray(data.adminProjects) ? data.adminProjects : [],
+  };
+}
+
+export async function loadAdminProjectsPage({ session, fetchImpl = fetch, requestId = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+  if (!viewer) {
+    return ADMIN_PAGE_UNAUTHORIZED;
+  }
+
+  const data = await executeWebGraphql({
+    session,
+    query: ADMIN_PROJECTS_QUERY,
+    fetchImpl,
+    requestId,
+  });
+
+  return {
+    viewer,
+    projects: Array.isArray(data.adminProjects) ? data.adminProjects : [],
+  };
+}
+
+export async function loadAdminProjectAccessPage({ session, slug, fetchImpl = fetch, requestId = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+  if (!viewer) {
+    return ADMIN_PAGE_UNAUTHORIZED;
+  }
+
+  const data = await executeWebGraphql({
+    session,
+    query: ADMIN_PROJECT_ACCESS_QUERY,
+    variables: { slug },
+    fetchImpl,
+    requestId,
+  });
+
+  if (!data.adminProjectAccess) {
+    return null;
+  }
+
+  return {
+    viewer,
+    projectAccess: data.adminProjectAccess,
+    roles: Array.isArray(data.adminRoles) ? data.adminRoles : [],
+    groups: Array.isArray(data.adminGroups) ? data.adminGroups : [],
+  };
+}
+
+export async function loadAdminRolesPage({ session, fetchImpl = fetch, requestId = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+  if (!viewer) {
+    return ADMIN_PAGE_UNAUTHORIZED;
+  }
+
+  const data = await executeWebGraphql({
+    session,
+    query: ADMIN_ROLES_QUERY,
+    fetchImpl,
+    requestId,
+  });
+
+  return {
+    viewer,
+    roles: Array.isArray(data.adminRoles) ? data.adminRoles : [],
+  };
+}
+
+export async function loadAdminGroupsPage({ session, fetchImpl = fetch, requestId = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+  if (!viewer) {
+    return ADMIN_PAGE_UNAUTHORIZED;
+  }
+
+  const data = await executeWebGraphql({
+    session,
+    query: ADMIN_GROUPS_QUERY,
+    fetchImpl,
+    requestId,
+  });
+
+  return {
+    viewer,
+    groups: Array.isArray(data.adminGroups) ? data.adminGroups : [],
+  };
+}
+
+export async function loadAdminUsersPage({ session, fetchImpl = fetch, requestId = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+  if (!viewer) {
+    return ADMIN_PAGE_UNAUTHORIZED;
+  }
+
+  const data = await executeWebGraphql({
+    session,
+    query: ADMIN_USERS_QUERY,
+    fetchImpl,
+    requestId,
+  });
+
+  return {
+    viewer,
+    users: Array.isArray(data.adminUsers) ? data.adminUsers : [],
+    roles: Array.isArray(data.adminRoles) ? data.adminRoles : [],
+    groups: Array.isArray(data.adminGroups) ? data.adminGroups : [],
+  };
 }
 
 async function loadProjectTrendPanels({
@@ -256,6 +391,17 @@ async function loadScopedTrendPanels({ session, projectKey, selections, fetchImp
   }));
 
   return responses.filter((entry) => entry.points.length > 0);
+}
+
+async function loadAdminViewer({ session, fetchImpl, requestId }) {
+  const data = await executeWebGraphql({
+    session,
+    query: VIEWER_ACCESS_QUERY,
+    fetchImpl,
+    requestId,
+  });
+
+  return data.viewer?.isAdmin === true ? data.viewer : null;
 }
 
 function buildTrendOverlays(points, releaseNotes) {

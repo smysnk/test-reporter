@@ -3,17 +3,21 @@ import {
   CoverageFile,
   CoverageSnapshot,
   CoverageTrendPoint,
+  Group,
   Project,
   ProjectFile,
+  ProjectGroupAccess,
   ProjectModule,
   ProjectPackage,
+  ProjectRoleAccess,
   ProjectVersion,
   ReleaseNote,
+  Role,
   Run,
   SuiteRun,
   TestExecution,
 } from '../models/index.js';
-import { hasProjectAccess, isAdminActor } from './guards.js';
+import { createProjectAccessService } from './access-service.js';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -24,21 +28,26 @@ export function createGraphqlQueryService(options = {}) {
     CoverageFile,
     CoverageSnapshot,
     CoverageTrendPoint,
+    Group,
     Project,
     ProjectFile,
+    ProjectGroupAccess,
     ProjectModule,
     ProjectPackage,
+    ProjectRoleAccess,
     ProjectVersion,
     ReleaseNote,
+    Role,
     Run,
     SuiteRun,
     TestExecution,
   };
+  const accessService = options.accessService || createProjectAccessService({ models });
 
   return {
     async listProjects({ actor }) {
       const projects = await loadAll(models.Project);
-      return filterProjectsForActor(projects, actor).sort(compareByName);
+      return (await accessService.filterProjects({ actor, projects })).sort(compareByName);
     },
 
     async findProject({ id, key, slug, actor }) {
@@ -354,14 +363,6 @@ export function createGraphqlQueryService(options = {}) {
       };
     },
   };
-}
-
-function filterProjectsForActor(projects, actor) {
-  if (isAdminActor(actor)) {
-    return [...projects];
-  }
-
-  return projects.filter((project) => hasProjectAccess(actor, project.key));
 }
 
 function decorateRun(run, related) {

@@ -1,63 +1,52 @@
 import { getWebSession } from '../../../../lib/auth.js';
-import { buildSignInRedirectUrl } from '../../../../lib/routeProtection.js';
 import { loadRunReportHtml } from '../../../../lib/serverGraphql.js';
 
-export default async function webRunReportHandler(req, res) {
-  if (req.method !== 'GET') {
-    res.setHeader('allow', 'GET');
-    res.status(405).end('Method Not Allowed');
-    return;
-  }
+export function createRunReportHandler({ getSession = getWebSession, loadReportHtml = loadRunReportHtml } = {}) {
+  return async function webRunReportHandler(req, res) {
+    if (req.method !== 'GET') {
+      res.setHeader('allow', 'GET');
+      res.status(405).end('Method Not Allowed');
+      return;
+    }
 
-  const session = await getWebSession(req, res);
-  if (!session) {
-    res.redirect(307, buildSignInRedirectUrl(resolveRunReportPath(req)));
-    return;
-  }
-
-  const runId = typeof req.query.id === 'string' ? req.query.id : '';
-  if (!runId) {
-    renderHtmlResponse(res, 400, renderStatusHtml({
-      title: 'Run report unavailable',
-      copy: 'A run identifier is required before the runner template can be rendered.',
-    }));
-    return;
-  }
-
-  try {
-    const html = await loadRunReportHtml({
-      session,
-      runId,
-      requestId: typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : null,
-    });
-
-    if (!html) {
-      renderHtmlResponse(res, 404, renderStatusHtml({
-        title: 'Run report not found',
-        copy: 'The requested execution could not be resolved from the reporting backend.',
+    const session = await getSession(req, res);
+    const runId = typeof req.query.id === 'string' ? req.query.id : '';
+    if (!runId) {
+      renderHtmlResponse(res, 400, renderStatusHtml({
+        title: 'Run report unavailable',
+        copy: 'A run identifier is required before the runner template can be rendered.',
       }));
       return;
     }
 
-    renderHtmlResponse(res, 200, html);
-  } catch (error) {
-    renderHtmlResponse(res, 500, renderStatusHtml({
-      title: 'Runner report failed to load',
-      copy: error instanceof Error && error.message
-        ? error.message
-        : 'The runner template could not be rendered for this execution.',
-    }));
-  }
+    try {
+      const html = await loadReportHtml({
+        session,
+        runId,
+        requestId: typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : null,
+      });
+
+      if (!html) {
+        renderHtmlResponse(res, 404, renderStatusHtml({
+          title: 'Run report not found',
+          copy: 'The requested execution could not be resolved from the reporting backend.',
+        }));
+        return;
+      }
+
+      renderHtmlResponse(res, 200, html);
+    } catch (error) {
+      renderHtmlResponse(res, 500, renderStatusHtml({
+        title: 'Runner report failed to load',
+        copy: error instanceof Error && error.message
+          ? error.message
+          : 'The runner template could not be rendered for this execution.',
+      }));
+    }
+  };
 }
 
-function resolveRunReportPath(req) {
-  const runId = typeof req?.query?.id === 'string' && req.query.id.trim()
-    ? req.query.id.trim()
-    : '';
-  return runId
-    ? `/runs/${encodeURIComponent(runId)}?template=runner`
-    : '/';
-}
+export default createRunReportHandler();
 
 function renderHtmlResponse(res, statusCode, html) {
   res.setHeader('cache-control', 'private, no-store');

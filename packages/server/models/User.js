@@ -1,34 +1,30 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db.js';
 
-const Project = sequelize.define('Project', {
+const User = sequelize.define('User', {
   id: {
     type: DataTypes.UUID,
     allowNull: false,
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true,
   },
-  key: {
+  email: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  slug: {
+  normalizedEmail: {
     type: DataTypes.STRING,
     allowNull: false,
   },
   name: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
   },
-  repositoryUrl: {
+  avatarUrl: {
     type: DataTypes.TEXT,
     allowNull: true,
   },
-  defaultBranch: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  isPublic: {
+  isAdmin: {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false,
@@ -40,9 +36,8 @@ const Project = sequelize.define('Project', {
   },
 }, {
   indexes: [
-    { unique: true, fields: ['key'] },
-    { unique: true, fields: ['slug'] },
+    { unique: true, fields: ['normalized_email'] },
   ],
 });
 
-export default Project;
+export default User;

@@ -17,13 +17,11 @@ export function createAuthOptions(options = {}) {
   ensureNextAuthUrl(options);
 
   const adminEmails = resolveAdminEmails(options);
-  const defaultProjectKeys = resolveDefaultProjectKeys(options);
 
   return {
     providers: resolveAuthProviders({
       ...options,
       adminEmails,
-      defaultProjectKeys,
     }),
     secret: resolveAuthSecret(options),
     session: {
@@ -39,10 +37,8 @@ export function createAuthOptions(options = {}) {
           token.email = user.email || token.email || null;
           token.name = user.name || token.name || token.email || token.userId;
           token.role = user.role || resolveRole(user.email, adminEmails);
-          token.projectKeys = normalizeProjectKeys(user.projectKeys, defaultProjectKeys);
         } else {
           token.role = typeof token.role === 'string' && token.role.trim() ? token.role : resolveRole(token.email, adminEmails);
-          token.projectKeys = normalizeProjectKeys(token.projectKeys, defaultProjectKeys);
           token.userId = token.userId || token.sub || token.email || 'web-user';
         }
 
@@ -62,7 +58,6 @@ export function createAuthOptions(options = {}) {
           },
           userId: token.userId || token.sub || null,
           role: typeof token.role === 'string' ? token.role : 'member',
-          projectKeys: normalizeProjectKeys(token.projectKeys, defaultProjectKeys),
         };
       },
     },
@@ -101,7 +96,6 @@ export function buildWebActorHeaders(session) {
     'x-test-station-actor-email': session.user?.email || '',
     'x-test-station-actor-name': session.user?.name || session.user?.email || session.userId || 'Web User',
     'x-test-station-actor-role': session.role || 'member',
-    'x-test-station-actor-project-keys': normalizeProjectKeys(session.projectKeys, ['*']).join(','),
   };
 }
 
@@ -129,14 +123,6 @@ export function resolveAuthSecret(options = {}) {
   }
 
   return env.get('NEXTAUTH_SECRET').default(DEVELOPMENT_AUTH_SECRET).asString();
-}
-
-export function resolveDefaultProjectKeys(options = {}) {
-  const values = normalizeProjectKeys(
-    options.defaultProjectKeys,
-    splitConfiguredValues(env.get('WEB_DEFAULT_PROJECT_KEYS').default('*').asString()),
-  );
-  return values.length > 0 ? values : ['*'];
 }
 
 export function resolveAdminEmails(options = {}) {
@@ -206,7 +192,6 @@ function resolveAuthProviders(options = {}) {
       credentials: {
         email: { label: 'Email', type: 'email' },
         name: { label: 'Name', type: 'text' },
-        projectKeys: { label: 'Project Keys', type: 'text' },
       },
       async authorize(credentials) {
         const email = normalizeEmail(credentials?.email) || 'demo@test-station.local';
@@ -218,7 +203,6 @@ function resolveAuthProviders(options = {}) {
           email,
           name,
           role: resolveRole(email, options.adminEmails),
-          projectKeys: normalizeProjectKeys(credentials?.projectKeys, options.defaultProjectKeys),
         };
       },
     }));
@@ -247,28 +231,6 @@ function resolveRole(email, adminEmails) {
   return email && normalizeEmailList(adminEmails).includes(normalizeEmail(email))
     ? 'admin'
     : 'member';
-}
-
-function normalizeProjectKeys(value, fallback = []) {
-  const entries = Array.isArray(value)
-    ? value
-    : typeof value === 'string'
-      ? value.split(',')
-      : Array.isArray(fallback)
-        ? fallback
-        : [];
-
-  const normalized = Array.from(new Set(
-    entries
-      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-      .filter(Boolean),
-  ));
-
-  return normalized.length > 0 ? normalized : Array.from(new Set(
-    (Array.isArray(fallback) ? fallback : [])
-      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-      .filter(Boolean),
-  ));
 }
 
 function normalizeEmailList(values) {

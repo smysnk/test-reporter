@@ -1,8 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createGraphqlQueryService } from '../packages/server/graphql/query-service.js';
 import { createServer } from '../packages/server/index.js';
+import { resolveActorFromRequest } from '../packages/server/graphql/context.js';
 
-test('GraphQL rejects protected queries without an actor', async () => {
+test('GraphQL exposes guest-safe public reads and hides private resources', async () => {
   const server = await createServer({
     port: 0,
     corsOrigin: 'http://localhost:3001',
@@ -11,12 +13,197 @@ test('GraphQL rejects protected queries without an actor', async () => {
 
   await listen(server);
   const response = await graphqlRequest(server, {
-    query: '{ projects { key } }',
+    query: `
+      query GuestPublicRead {
+        viewer {
+          id
+        }
+        projects {
+          key
+          name
+        }
+        publicProject: project(key: "public-site") {
+          key
+          slug
+        }
+        privateProject: project(key: "workspace") {
+          key
+        }
+        runs(projectKey: "public-site") {
+          id
+          externalKey
+          status
+          project {
+            key
+          }
+          coverageSnapshot {
+            linesPct
+          }
+        }
+        publicRun: run(id: "run-public-1") {
+          id
+          externalKey
+          project {
+            key
+          }
+          coverageSnapshot {
+            linesPct
+          }
+          suites {
+            suiteIdentifier
+            tests {
+              fullName
+              status
+            }
+          }
+          artifacts {
+            label
+            href
+            kind
+          }
+        }
+        privateRun: run(id: "run-1") {
+          id
+        }
+        runPackages(runId: "run-public-1") {
+          name
+          status
+          suiteCount
+        }
+        runModules(runId: "run-public-1") {
+          module
+          owner
+          packageCount
+        }
+        runFiles(runId: "run-public-1") {
+          path
+          status
+          testCount
+          failedTestCount
+        }
+        tests(runId: "run-public-1") {
+          fullName
+          status
+          packageName
+        }
+        coverageTrend(projectKey: "public-site") {
+          runId
+          externalKey
+          scopeType
+          label
+          linesPct
+          versionKey
+        }
+        runCoverageComparison(runId: "run-public-1") {
+          runId
+          previousRunId
+          currentExternalKey
+          currentVersionKey
+          previousVersionKey
+          deltaLinesPct
+        }
+        artifacts(runId: "run-public-1") {
+          label
+          href
+          kind
+        }
+        privateArtifacts: artifacts(runId: "run-1") {
+          label
+        }
+        releaseNotes(projectKey: "public-site") {
+          title
+          projectVersion {
+            versionKey
+          }
+        }
+      }
+    `,
   });
 
-  assert.equal(response.status, 401);
-  assert.equal(response.payload.data, null);
-  assert.equal(response.payload.errors[0].extensions.code, 'UNAUTHORIZED');
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.errors, undefined);
+  assert.equal(response.payload.data.viewer, null);
+  assert.deepEqual(response.payload.data.projects, [
+    {
+      key: 'public-site',
+      name: 'Public Site',
+    },
+  ]);
+  assert.deepEqual(response.payload.data.publicProject, {
+    key: 'public-site',
+    slug: 'public-site',
+  });
+  assert.equal(response.payload.data.privateProject, null);
+  assert.equal(response.payload.data.runs.length, 1);
+  assert.equal(response.payload.data.runs[0].externalKey, 'public-site:github-actions:2001');
+  assert.equal(response.payload.data.runs[0].coverageSnapshot.linesPct, 91);
+  assert.equal(response.payload.data.publicRun.externalKey, 'public-site:github-actions:2001');
+  assert.equal(response.payload.data.publicRun.suites[0].tests[0].fullName, 'public site passes');
+  assert.equal(response.payload.data.publicRun.artifacts[0].href, 'raw/public-site/public-site.log');
+  assert.equal(response.payload.data.privateRun, null);
+  assert.deepEqual(response.payload.data.runPackages, [
+    {
+      name: 'public-site',
+      status: 'passed',
+      suiteCount: 1,
+    },
+  ]);
+  assert.deepEqual(response.payload.data.runModules, [
+    {
+      module: 'marketing',
+      owner: 'growth',
+      packageCount: 1,
+    },
+  ]);
+  assert.deepEqual(response.payload.data.runFiles, [
+    {
+      path: '/repo/apps/public-site/src/home.js',
+      status: 'passed',
+      testCount: 1,
+      failedTestCount: 0,
+    },
+  ]);
+  assert.deepEqual(response.payload.data.tests, [
+    {
+      fullName: 'public site passes',
+      status: 'passed',
+      packageName: 'public-site',
+    },
+  ]);
+  assert.deepEqual(response.payload.data.coverageTrend, [
+    {
+      runId: 'run-public-1',
+      externalKey: 'public-site:github-actions:2001',
+      scopeType: 'project',
+      label: 'Public Site',
+      linesPct: 91,
+      versionKey: 'commit:public111',
+    },
+  ]);
+  assert.deepEqual(response.payload.data.runCoverageComparison, {
+    runId: 'run-public-1',
+    previousRunId: null,
+    currentExternalKey: 'public-site:github-actions:2001',
+    currentVersionKey: 'commit:public111',
+    previousVersionKey: null,
+    deltaLinesPct: null,
+  });
+  assert.deepEqual(response.payload.data.artifacts, [
+    {
+      label: 'Public site log',
+      href: 'raw/public-site/public-site.log',
+      kind: 'file',
+    },
+  ]);
+  assert.deepEqual(response.payload.data.privateArtifacts, []);
+  assert.deepEqual(response.payload.data.releaseNotes, [
+    {
+      title: 'Public site launch',
+      projectVersion: {
+        versionKey: 'commit:public111',
+      },
+    },
+  ]);
 
   await closeServer(server);
 });
@@ -30,12 +217,18 @@ test('GraphQL exposes project, run, file, test, artifact, trend, and release-not
 
   await listen(server);
   const response = await graphqlRequest(server, {
-    query: `
+      query: `
       query Phase4ReadLayer {
-        me {
+        viewer {
           id
+          userId
+          email
+          name
           role
-          projectKeys
+          isAdmin
+          isGuest
+          roleKeys
+          groupKeys
         }
         projects {
           key
@@ -160,17 +353,30 @@ test('GraphQL exposes project, run, file, test, artifact, trend, and release-not
     'x-test-station-actor-id': 'user-1',
     'x-test-station-actor-email': 'user-1@example.com',
     'x-test-station-actor-role': 'member',
-    'x-test-station-actor-project-keys': 'workspace',
   });
 
   assert.equal(response.status, 200);
   assert.equal(response.payload.errors, undefined);
-  assert.deepEqual(response.payload.data.me, {
+  assert.deepEqual(response.payload.data.viewer, {
     id: 'user-1',
+    userId: 'user-1',
+    email: 'user-1@example.com',
+    name: 'User One',
     role: 'member',
-    projectKeys: ['workspace'],
+    isAdmin: false,
+    isGuest: false,
+    roleKeys: ['release-manager'],
+    groupKeys: ['qa'],
   });
   assert.deepEqual(response.payload.data.projects, [
+    {
+      key: 'group-only',
+      name: 'Group Only',
+    },
+    {
+      key: 'public-site',
+      name: 'Public Site',
+    },
     {
       key: 'workspace',
       name: 'Workspace',
@@ -223,6 +429,478 @@ test('GraphQL exposes project, run, file, test, artifact, trend, and release-not
   assert.equal(response.payload.data.releaseNotes[0].title, '0.1.0 release');
 
   await closeServer(server);
+});
+
+test('GraphQL rejects admin queries for non-admin actors', async () => {
+  const server = await createServer({
+    port: 0,
+    corsOrigin: 'http://localhost:3001',
+    models: createAdminGraphqlModels(),
+  });
+
+  await listen(server);
+  const response = await graphqlRequest(server, {
+    query: `
+      query AdminUsers {
+        adminUsers {
+          id
+        }
+      }
+    `,
+  }, {
+    'x-test-station-actor-id': 'user-1',
+    'x-test-station-actor-email': 'user-1@example.com',
+    'x-test-station-actor-role': 'member',
+  });
+
+  assert.equal(response.status, 403);
+  assert.equal(response.payload.data, null);
+  assert.equal(response.payload.errors[0].extensions.code, 'FORBIDDEN');
+
+  await closeServer(server);
+});
+
+test('GraphQL admin queries and mutations manage roles, groups, users, and project access', async () => {
+  const server = await createServer({
+    port: 0,
+    corsOrigin: 'http://localhost:3001',
+    models: createAdminGraphqlModels(),
+  });
+
+  await listen(server);
+
+  const initial = await graphqlRequest(server, {
+    query: `
+      query AdminBootstrap {
+        adminUsers {
+          id
+          email
+          isAdmin
+          roleKeys
+          groupKeys
+        }
+        adminRoles {
+          id
+          key
+          userCount
+          projectCount
+        }
+        adminGroups {
+          id
+          key
+          userCount
+          projectCount
+        }
+        workspaceAccess: adminProjectAccess(key: "workspace") {
+          isPublic
+          roleKeys
+          groupKeys
+        }
+      }
+    `,
+  }, buildAdminHeaders());
+
+  assert.equal(initial.status, 200);
+  assert.equal(initial.payload.errors, undefined);
+  assert.deepEqual(initial.payload.data.adminUsers, [
+    {
+      id: 'admin-1',
+      email: 'admin@example.com',
+      isAdmin: true,
+      roleKeys: [],
+      groupKeys: [],
+    },
+    {
+      id: 'user-1',
+      email: 'user-1@example.com',
+      isAdmin: false,
+      roleKeys: ['release-manager'],
+      groupKeys: ['qa'],
+    },
+  ]);
+  assert.deepEqual(initial.payload.data.adminRoles, [
+    {
+      id: 'role-1',
+      key: 'release-manager',
+      userCount: 1,
+      projectCount: 1,
+    },
+  ]);
+  assert.deepEqual(initial.payload.data.adminGroups, [
+    {
+      id: 'group-1',
+      key: 'qa',
+      userCount: 1,
+      projectCount: 1,
+    },
+  ]);
+  assert.deepEqual(initial.payload.data.workspaceAccess, {
+    isPublic: false,
+    roleKeys: ['release-manager'],
+    groupKeys: [],
+  });
+
+  const createResponse = await graphqlRequest(server, {
+    query: `
+      mutation CreateAdminEntities {
+        role: adminCreateRole(input: {
+          key: "ops"
+          name: "Operations"
+          description: "Operations access"
+        }) {
+          id
+          key
+          name
+          description
+          userCount
+          projectCount
+        }
+        group: adminCreateGroup(input: {
+          key: "partners"
+          name: "Partners"
+          description: "External partners"
+        }) {
+          id
+          key
+          name
+          description
+          userCount
+          projectCount
+        }
+      }
+    `,
+  }, buildAdminHeaders());
+
+  assert.equal(createResponse.status, 200);
+  assert.equal(createResponse.payload.errors, undefined);
+  assert.equal(createResponse.payload.data.role.key, 'ops');
+  assert.equal(createResponse.payload.data.group.key, 'partners');
+  const createdRoleId = createResponse.payload.data.role.id;
+  const createdGroupId = createResponse.payload.data.group.id;
+
+  const updateResponse = await graphqlRequest(server, {
+    query: `
+      mutation UpdateAdminEntities($roleId: ID!, $groupId: ID!) {
+        updatedRole: adminUpdateRole(id: $roleId, input: {
+          name: "Operations Prime"
+          description: "Primary operations access"
+        }) {
+          id
+          key
+          name
+          description
+        }
+        updatedGroup: adminUpdateGroup(id: $groupId, input: {
+          name: "Partners Prime"
+          description: "Primary partner access"
+        }) {
+          id
+          key
+          name
+          description
+        }
+        promotedUser: adminSetUserAdmin(userId: "user-1", isAdmin: true) {
+          id
+          isAdmin
+          roleKeys
+          groupKeys
+        }
+        userWithRole: adminAddUserRole(userId: "user-1", roleId: $roleId) {
+          id
+          isAdmin
+          roleKeys
+          groupKeys
+        }
+        userWithGroup: adminAddUserGroup(userId: "user-1", groupId: $groupId) {
+          id
+          isAdmin
+          roleKeys
+          groupKeys
+        }
+        publicWorkspace: adminSetProjectPublic(projectId: "project-1", isPublic: true) {
+          project {
+            key
+          }
+          isPublic
+          roleKeys
+          groupKeys
+        }
+        hiddenRoleAccess: adminAddProjectRoleAccess(projectId: "project-2", roleId: $roleId) {
+          project {
+            key
+          }
+          isPublic
+          roleKeys
+          groupKeys
+        }
+        hiddenGroupAccess: adminAddProjectGroupAccess(projectId: "project-2", groupId: $groupId) {
+          project {
+            key
+          }
+          isPublic
+          roleKeys
+          groupKeys
+        }
+      }
+    `,
+    variables: {
+      roleId: createdRoleId,
+      groupId: createdGroupId,
+    },
+  }, buildAdminHeaders());
+
+  assert.equal(updateResponse.status, 200);
+  assert.equal(updateResponse.payload.errors, undefined);
+  assert.deepEqual(updateResponse.payload.data.updatedRole, {
+    id: createdRoleId,
+    key: 'ops',
+    name: 'Operations Prime',
+    description: 'Primary operations access',
+  });
+  assert.deepEqual(updateResponse.payload.data.updatedGroup, {
+    id: createdGroupId,
+    key: 'partners',
+    name: 'Partners Prime',
+    description: 'Primary partner access',
+  });
+  assert.equal(updateResponse.payload.data.promotedUser.isAdmin, true);
+  assert.deepEqual(updateResponse.payload.data.userWithRole.roleKeys, ['ops', 'release-manager']);
+  assert.deepEqual(updateResponse.payload.data.userWithGroup.groupKeys, ['partners', 'qa']);
+  assert.deepEqual(updateResponse.payload.data.publicWorkspace, {
+    project: {
+      key: 'workspace',
+    },
+    isPublic: true,
+    roleKeys: ['release-manager'],
+    groupKeys: [],
+  });
+  assert.deepEqual(updateResponse.payload.data.hiddenRoleAccess, {
+    project: {
+      key: 'hidden',
+    },
+    isPublic: false,
+    roleKeys: ['ops'],
+    groupKeys: [],
+  });
+  assert.deepEqual(updateResponse.payload.data.hiddenGroupAccess, {
+    project: {
+      key: 'hidden',
+    },
+    isPublic: false,
+    roleKeys: ['ops'],
+    groupKeys: ['partners'],
+  });
+
+  const adminState = await graphqlRequest(server, {
+    query: `
+      query AdminState {
+        user: adminUser(email: "user-1@example.com") {
+          id
+          normalizedEmail
+          isAdmin
+          roleKeys
+          groupKeys
+        }
+        hiddenAccess: adminProjectAccess(projectId: "project-2") {
+          project {
+            key
+          }
+          isPublic
+          roleKeys
+          groupKeys
+          roles {
+            id
+            key
+            userCount
+            projectCount
+          }
+          groups {
+            id
+            key
+            userCount
+            projectCount
+          }
+        }
+        roles: adminRoles {
+          id
+          key
+          userCount
+          projectCount
+        }
+        groups: adminGroups {
+          id
+          key
+          userCount
+          projectCount
+        }
+      }
+    `,
+  }, buildAdminHeaders());
+
+  assert.equal(adminState.status, 200);
+  assert.equal(adminState.payload.errors, undefined);
+  assert.deepEqual(adminState.payload.data.user, {
+    id: 'user-1',
+    normalizedEmail: 'user-1@example.com',
+    isAdmin: true,
+    roleKeys: ['ops', 'release-manager'],
+    groupKeys: ['partners', 'qa'],
+  });
+  assert.deepEqual(adminState.payload.data.hiddenAccess, {
+    project: {
+      key: 'hidden',
+    },
+    isPublic: false,
+    roleKeys: ['ops'],
+    groupKeys: ['partners'],
+    roles: [
+      {
+        id: createdRoleId,
+        key: 'ops',
+        userCount: 1,
+        projectCount: 1,
+      },
+    ],
+    groups: [
+      {
+        id: createdGroupId,
+        key: 'partners',
+        userCount: 1,
+        projectCount: 1,
+      },
+    ],
+  });
+
+  const cleanupResponse = await graphqlRequest(server, {
+    query: `
+      mutation CleanupAdminEntities($roleId: ID!, $groupId: ID!) {
+        userWithoutRole: adminRemoveUserRole(userId: "user-1", roleId: $roleId) {
+          id
+          roleKeys
+          groupKeys
+        }
+        userWithoutGroup: adminRemoveUserGroup(userId: "user-1", groupId: $groupId) {
+          id
+          roleKeys
+          groupKeys
+        }
+        hiddenWithoutRole: adminRemoveProjectRoleAccess(projectId: "project-2", roleId: $roleId) {
+          project {
+            key
+          }
+          roleKeys
+          groupKeys
+        }
+        hiddenWithoutGroup: adminRemoveProjectGroupAccess(projectId: "project-2", groupId: $groupId) {
+          project {
+            key
+          }
+          roleKeys
+          groupKeys
+        }
+        deletedRole: adminDeleteRole(id: $roleId) {
+          id
+          key
+        }
+        deletedGroup: adminDeleteGroup(id: $groupId) {
+          id
+          key
+        }
+      }
+    `,
+    variables: {
+      roleId: createdRoleId,
+      groupId: createdGroupId,
+    },
+  }, buildAdminHeaders());
+
+  assert.equal(cleanupResponse.status, 200);
+  assert.equal(cleanupResponse.payload.errors, undefined);
+  assert.deepEqual(cleanupResponse.payload.data.userWithoutRole, {
+    id: 'user-1',
+    roleKeys: ['release-manager'],
+    groupKeys: ['partners', 'qa'],
+  });
+  assert.deepEqual(cleanupResponse.payload.data.userWithoutGroup, {
+    id: 'user-1',
+    roleKeys: ['release-manager'],
+    groupKeys: ['qa'],
+  });
+  assert.deepEqual(cleanupResponse.payload.data.hiddenWithoutRole, {
+    project: {
+      key: 'hidden',
+    },
+    roleKeys: [],
+    groupKeys: ['partners'],
+  });
+  assert.deepEqual(cleanupResponse.payload.data.hiddenWithoutGroup, {
+    project: {
+      key: 'hidden',
+    },
+    roleKeys: [],
+    groupKeys: [],
+  });
+  assert.deepEqual(cleanupResponse.payload.data.deletedRole, {
+    id: createdRoleId,
+    key: 'ops',
+  });
+  assert.deepEqual(cleanupResponse.payload.data.deletedGroup, {
+    id: createdGroupId,
+    key: 'partners',
+  });
+
+  await closeServer(server);
+});
+
+test('query service filters visible projects from public, role, and group grants', async () => {
+  const queryService = createGraphqlQueryService({
+    models: createGraphqlModels(),
+  });
+
+  const guestProjects = await queryService.listProjects({
+    actor: {
+      id: 'guest',
+      userId: null,
+      email: null,
+      name: 'Guest',
+      role: 'guest',
+      isAdmin: false,
+      isGuest: true,
+      roleKeys: [],
+      groupKeys: [],
+    },
+  });
+  assert.deepEqual(guestProjects.map((project) => project.key), ['public-site']);
+
+  const memberProjects = await queryService.listProjects({
+    actor: {
+      id: 'user-1',
+      userId: 'user-1',
+      email: 'user-1@example.com',
+      name: 'User One',
+      role: 'member',
+      isAdmin: false,
+      isGuest: false,
+      roleKeys: ['release-manager'],
+      groupKeys: ['qa'],
+    },
+  });
+  assert.deepEqual(memberProjects.map((project) => project.key), ['group-only', 'public-site', 'workspace']);
+
+  const adminProjects = await queryService.listProjects({
+    actor: {
+      id: 'admin-1',
+      userId: 'admin-1',
+      email: 'admin@example.com',
+      name: 'Admin',
+      role: 'admin',
+      isAdmin: true,
+      isGuest: false,
+      roleKeys: [],
+      groupKeys: [],
+    },
+  });
+  assert.deepEqual(adminProjects.map((project) => project.key), ['group-only', 'hidden', 'public-site', 'workspace']);
 });
 
 test('GraphQL ingest mutation accepts shared-key service auth', async () => {
@@ -300,16 +978,124 @@ test('GraphQL ingest mutation accepts shared-key service auth', async () => {
   await closeServer(server);
 });
 
+test('resolveActorFromRequest returns a guest actor when no identity headers are present', async () => {
+  const actor = await resolveActorFromRequest({
+    headers: {},
+  }, {
+    models: createGraphqlModels(),
+  });
+
+  assert.deepEqual(actor, {
+    id: 'guest',
+    userId: null,
+    email: null,
+    name: 'Guest',
+    role: 'guest',
+    isAdmin: false,
+    isGuest: true,
+    roleKeys: [],
+    groupKeys: [],
+  });
+});
+
+test('resolveActorFromRequest upserts persisted users, applies bootstrap admin emails, and ignores legacy project key headers', async () => {
+  const models = {
+    User: createMutableModel([], 'user'),
+    Role: createFindAllModel([]),
+    Group: createFindAllModel([]),
+    UserRole: createFindAllModel([]),
+    UserGroup: createFindAllModel([]),
+  };
+
+  const actor = await resolveActorFromRequest({
+    headers: {
+      'x-test-station-actor-id': 'session-user',
+      'x-test-station-actor-email': 'Bootstrap.Admin@example.com',
+      'x-test-station-actor-name': 'Bootstrap Admin',
+      'x-test-station-actor-project-keys': 'workspace',
+    },
+  }, {
+    models,
+    adminEmails: ['bootstrap.admin@example.com'],
+  });
+
+  assert.equal(actor.id, 'user-1');
+  assert.equal(actor.userId, 'user-1');
+  assert.equal(actor.email, 'Bootstrap.Admin@example.com');
+  assert.equal(actor.name, 'Bootstrap Admin');
+  assert.equal(actor.role, 'admin');
+  assert.equal(actor.isAdmin, true);
+  assert.equal(actor.isGuest, false);
+  assert.deepEqual(actor.roleKeys, []);
+  assert.deepEqual(actor.groupKeys, []);
+  assert.deepEqual(models.User.rows, [{
+    id: 'user-1',
+    email: 'Bootstrap.Admin@example.com',
+    normalizedEmail: 'bootstrap.admin@example.com',
+    name: 'Bootstrap Admin',
+    avatarUrl: null,
+    isAdmin: true,
+    metadata: {},
+  }]);
+});
+
 function createGraphqlModels() {
   const report = createRunReport();
+  const publicReport = createPublicRunReport();
 
   return {
+    User: createFindAllModel([
+      {
+        id: 'user-1',
+        email: 'user-1@example.com',
+        normalizedEmail: 'user-1@example.com',
+        name: 'User One',
+        avatarUrl: null,
+        isAdmin: false,
+        metadata: {},
+      },
+    ]),
+    Role: createFindAllModel([
+      {
+        id: 'role-1',
+        key: 'release-manager',
+        name: 'Release Manager',
+        description: null,
+        metadata: {},
+      },
+    ]),
+    Group: createFindAllModel([
+      {
+        id: 'group-1',
+        key: 'qa',
+        name: 'QA',
+        description: null,
+        metadata: {},
+      },
+    ]),
+    UserRole: createFindAllModel([
+      {
+        id: 'user-role-1',
+        userId: 'user-1',
+        roleId: 'role-1',
+        metadata: {},
+      },
+    ]),
+    UserGroup: createFindAllModel([
+      {
+        id: 'user-group-1',
+        userId: 'user-1',
+        groupId: 'group-1',
+        metadata: {},
+      },
+    ]),
     Project: createFindAllModel([
       {
         id: 'project-1',
         key: 'workspace',
         slug: 'workspace',
         name: 'Workspace',
+        isPublic: false,
         repositoryUrl: 'https://github.com/example/test-station',
         defaultBranch: 'main',
         metadata: {},
@@ -319,8 +1105,45 @@ function createGraphqlModels() {
         key: 'hidden',
         slug: 'hidden',
         name: 'Hidden',
+        isPublic: false,
         repositoryUrl: null,
         defaultBranch: 'main',
+        metadata: {},
+      },
+      {
+        id: 'project-3',
+        key: 'public-site',
+        slug: 'public-site',
+        name: 'Public Site',
+        isPublic: true,
+        repositoryUrl: 'https://github.com/example/public-site',
+        defaultBranch: 'main',
+        metadata: {},
+      },
+      {
+        id: 'project-4',
+        key: 'group-only',
+        slug: 'group-only',
+        name: 'Group Only',
+        isPublic: false,
+        repositoryUrl: null,
+        defaultBranch: 'main',
+        metadata: {},
+      },
+    ]),
+    ProjectRoleAccess: createFindAllModel([
+      {
+        id: 'project-role-access-1',
+        projectId: 'project-1',
+        roleId: 'role-1',
+        metadata: {},
+      },
+    ]),
+    ProjectGroupAccess: createFindAllModel([
+      {
+        id: 'project-group-access-1',
+        projectId: 'project-4',
+        groupId: 'group-1',
         metadata: {},
       },
     ]),
@@ -353,6 +1176,20 @@ function createGraphqlModels() {
         releasedAt: null,
         metadata: {},
       },
+      {
+        id: 'version-public-1',
+        projectId: 'project-3',
+        versionKey: 'commit:public111',
+        versionKind: 'commit',
+        branch: 'main',
+        tag: null,
+        commitSha: 'public111',
+        semanticVersion: null,
+        buildNumber: 2001,
+        releaseName: null,
+        releasedAt: null,
+        metadata: {},
+      },
     ]),
     ProjectPackage: createFindAllModel([
       {
@@ -361,6 +1198,14 @@ function createGraphqlModels() {
         name: 'workspace',
         slug: 'workspace',
         path: 'packages',
+        metadata: {},
+      },
+      {
+        id: 'package-public-1',
+        projectId: 'project-3',
+        name: 'public-site',
+        slug: 'public-site',
+        path: 'apps/public-site',
         metadata: {},
       },
     ]),
@@ -374,6 +1219,15 @@ function createGraphqlModels() {
         owner: 'platform',
         metadata: {},
       },
+      {
+        id: 'module-public-1',
+        projectId: 'project-3',
+        projectPackageId: 'package-public-1',
+        name: 'marketing',
+        slug: 'marketing',
+        owner: 'growth',
+        metadata: {},
+      },
     ]),
     ProjectFile: createFindAllModel([
       {
@@ -382,6 +1236,15 @@ function createGraphqlModels() {
         projectPackageId: 'package-1',
         projectModuleId: 'module-1',
         path: '/repo/packages/core/src/index.js',
+        language: 'js',
+        metadata: {},
+      },
+      {
+        id: 'file-public-1',
+        projectId: 'project-3',
+        projectPackageId: 'package-public-1',
+        projectModuleId: 'module-public-1',
+        path: '/repo/apps/public-site/src/home.js',
         language: 'js',
         metadata: {},
       },
@@ -427,6 +1290,26 @@ function createGraphqlModels() {
         summary: report.summary,
         metadata: {},
       },
+      {
+        id: 'run-public-1',
+        projectId: 'project-3',
+        projectVersionId: 'version-public-1',
+        externalKey: 'public-site:github-actions:2001',
+        sourceProvider: 'github-actions',
+        sourceRunId: '2001',
+        sourceUrl: 'https://github.com/example/public-site/actions/runs/2001',
+        triggeredBy: 'ci-bot',
+        branch: 'main',
+        commitSha: 'public111',
+        startedAt: '2026-03-10T14:59:00.000Z',
+        completedAt: '2026-03-10T15:00:00.000Z',
+        durationMs: 1800,
+        status: 'passed',
+        reportSchemaVersion: '1',
+        rawReport: publicReport,
+        summary: publicReport.summary,
+        metadata: {},
+      },
     ]),
     SuiteRun: createFindAllModel([
       {
@@ -446,6 +1329,27 @@ function createGraphqlModels() {
         rawArtifacts: report.packages[0].suites[0].rawArtifacts,
         output: {
           stdout: 'suite output',
+          stderr: '',
+        },
+        metadata: {},
+      },
+      {
+        id: 'suite-public-1',
+        runId: 'run-public-1',
+        projectPackageId: 'package-public-1',
+        packageName: 'public-site',
+        suiteIdentifier: 'public-site-node',
+        label: 'Public Site Tests',
+        runtime: 'node-test',
+        command: 'node --test ./tests/*.test.js',
+        cwd: '/repo/apps/public-site',
+        status: 'passed',
+        durationMs: 1800,
+        summary: { total: 1, passed: 1, failed: 0, skipped: 0 },
+        warnings: [],
+        rawArtifacts: publicReport.packages[0].suites[0].rawArtifacts,
+        output: {
+          stdout: 'public suite output',
           stderr: '',
         },
         metadata: {},
@@ -498,6 +1402,29 @@ function createGraphqlModels() {
         sourceSnippet: 'assert.equal(1, 2)',
         metadata: {},
       },
+      {
+        id: 'test-public-1',
+        suiteRunId: 'suite-public-1',
+        projectModuleId: 'module-public-1',
+        projectFileId: 'file-public-1',
+        name: 'passes',
+        fullName: 'public site passes',
+        status: 'passed',
+        durationMs: 8,
+        filePath: '/repo/apps/public-site/src/home.js',
+        line: 14,
+        column: 2,
+        classificationSource: 'fixture',
+        moduleName: 'marketing',
+        themeName: 'landing',
+        assertions: ['assert.equal(true, true)'],
+        setup: ['load landing fixture'],
+        mocks: [],
+        failureMessages: [],
+        rawDetails: { fixture: true },
+        sourceSnippet: 'assert.equal(true, true)',
+        metadata: {},
+      },
     ]),
     CoverageSnapshot: createFindAllModel([
       {
@@ -532,6 +1459,23 @@ function createGraphqlModels() {
         statementsCovered: 8,
         statementsTotal: 10,
         statementsPct: 80,
+        metadata: {},
+      },
+      {
+        id: 'coverage-public-1',
+        runId: 'run-public-1',
+        linesCovered: 10,
+        linesTotal: 11,
+        linesPct: 91,
+        branchesCovered: 9,
+        branchesTotal: 10,
+        branchesPct: 90,
+        functionsCovered: 3,
+        functionsTotal: 3,
+        functionsPct: 100,
+        statementsCovered: 10,
+        statementsTotal: 11,
+        statementsPct: 91,
         metadata: {},
       },
     ]),
@@ -580,6 +1524,31 @@ function createGraphqlModels() {
         statementsCovered: 8,
         statementsTotal: 10,
         statementsPct: 80,
+        shared: false,
+        attributionSource: 'manifest',
+        attributionReason: 'fixture',
+        attributionWeight: 1,
+        metadata: {},
+      },
+      {
+        id: 'coverage-file-public-1',
+        coverageSnapshotId: 'coverage-public-1',
+        projectFileId: 'file-public-1',
+        projectPackageId: 'package-public-1',
+        projectModuleId: 'module-public-1',
+        path: '/repo/apps/public-site/src/home.js',
+        linesCovered: 10,
+        linesTotal: 11,
+        linesPct: 91,
+        branchesCovered: 9,
+        branchesTotal: 10,
+        branchesPct: 90,
+        functionsCovered: 3,
+        functionsTotal: 3,
+        functionsPct: 100,
+        statementsCovered: 10,
+        statementsTotal: 11,
+        statementsPct: 91,
         shared: false,
         attributionSource: 'manifest',
         attributionReason: 'fixture',
@@ -764,6 +1733,28 @@ function createGraphqlModels() {
         statementsPct: 80,
         metadata: {},
       },
+      {
+        id: 'trend-project-public-1',
+        projectId: 'project-3',
+        projectVersionId: 'version-public-1',
+        runId: 'run-public-1',
+        projectPackageId: null,
+        projectModuleId: null,
+        projectFileId: null,
+        scopeType: 'project',
+        scopeHash: 'trend-project-public-1',
+        scopeKey: 'project:public-site',
+        label: 'Public Site',
+        packageName: null,
+        moduleName: null,
+        filePath: null,
+        recordedAt: '2026-03-10T15:00:00.000Z',
+        linesPct: 91,
+        branchesPct: 90,
+        functionsPct: 100,
+        statementsPct: 91,
+        metadata: {},
+      },
     ]),
     Artifact: createFindAllModel([
       {
@@ -774,6 +1765,20 @@ function createGraphqlModels() {
         label: 'Repo log',
         relativePath: 'workspace/repo-node.log',
         href: 'raw/workspace/repo-node.log',
+        kind: 'file',
+        mediaType: 'text/plain',
+        storageKey: null,
+        sourceUrl: null,
+        metadata: {},
+      },
+      {
+        id: 'artifact-public-1',
+        runId: 'run-public-1',
+        suiteRunId: 'suite-public-1',
+        testExecutionId: null,
+        label: 'Public site log',
+        relativePath: 'public-site/public-site.log',
+        href: 'raw/public-site/public-site.log',
         kind: 'file',
         mediaType: 'text/plain',
         storageKey: null,
@@ -792,7 +1797,141 @@ function createGraphqlModels() {
         publishedAt: '2026-03-09T16:00:00.000Z',
         metadata: {},
       },
+      {
+        id: 'note-public-1',
+        projectId: 'project-3',
+        projectVersionId: 'version-public-1',
+        title: 'Public site launch',
+        body: 'Initial public launch.',
+        sourceUrl: 'https://example.test/releases/public-site-launch',
+        publishedAt: '2026-03-10T16:00:00.000Z',
+        metadata: {},
+      },
     ]),
+  };
+}
+
+function createAdminGraphqlModels() {
+  const base = createGraphqlModels();
+
+  return {
+    ...base,
+    User: createMutableModel([
+      {
+        id: 'admin-1',
+        email: 'admin@example.com',
+        normalizedEmail: 'admin@example.com',
+        name: 'Admin User',
+        avatarUrl: null,
+        isAdmin: true,
+        metadata: {
+          providerAccessToken: 'should-not-leak',
+        },
+      },
+      {
+        id: 'user-1',
+        email: 'user-1@example.com',
+        normalizedEmail: 'user-1@example.com',
+        name: 'User One',
+        avatarUrl: null,
+        isAdmin: false,
+        metadata: {
+          providerAccessToken: 'should-not-leak',
+        },
+      },
+    ], 'user'),
+    Role: createMutableModel([
+      {
+        id: 'role-1',
+        key: 'release-manager',
+        name: 'Release Manager',
+        description: null,
+        metadata: {},
+      },
+    ], 'role'),
+    Group: createMutableModel([
+      {
+        id: 'group-1',
+        key: 'qa',
+        name: 'QA',
+        description: null,
+        metadata: {},
+      },
+    ], 'group'),
+    UserRole: createMutableModel([
+      {
+        id: 'user-role-1',
+        userId: 'user-1',
+        roleId: 'role-1',
+        metadata: {},
+      },
+    ], 'user-role'),
+    UserGroup: createMutableModel([
+      {
+        id: 'user-group-1',
+        userId: 'user-1',
+        groupId: 'group-1',
+        metadata: {},
+      },
+    ], 'user-group'),
+    Project: createMutableModel([
+      {
+        id: 'project-1',
+        key: 'workspace',
+        slug: 'workspace',
+        name: 'Workspace',
+        isPublic: false,
+        repositoryUrl: 'https://github.com/example/test-station',
+        defaultBranch: 'main',
+        metadata: {},
+      },
+      {
+        id: 'project-2',
+        key: 'hidden',
+        slug: 'hidden',
+        name: 'Hidden',
+        isPublic: false,
+        repositoryUrl: null,
+        defaultBranch: 'main',
+        metadata: {},
+      },
+      {
+        id: 'project-3',
+        key: 'public-site',
+        slug: 'public-site',
+        name: 'Public Site',
+        isPublic: true,
+        repositoryUrl: 'https://github.com/example/public-site',
+        defaultBranch: 'main',
+        metadata: {},
+      },
+      {
+        id: 'project-4',
+        key: 'group-only',
+        slug: 'group-only',
+        name: 'Group Only',
+        isPublic: false,
+        repositoryUrl: null,
+        defaultBranch: 'main',
+        metadata: {},
+      },
+    ], 'project'),
+    ProjectRoleAccess: createMutableModel([
+      {
+        id: 'project-role-access-1',
+        projectId: 'project-1',
+        roleId: 'role-1',
+        metadata: {},
+      },
+    ], 'project-role-access'),
+    ProjectGroupAccess: createMutableModel([
+      {
+        id: 'project-group-access-1',
+        projectId: 'project-4',
+        groupId: 'group-1',
+        metadata: {},
+      },
+    ], 'project-group-access'),
   };
 }
 
@@ -947,12 +2086,200 @@ function createRunReport() {
   };
 }
 
+function createPublicRunReport() {
+  return {
+    schemaVersion: '1',
+    generatedAt: '2026-03-10T15:00:00.000Z',
+    durationMs: 1800,
+    summary: {
+      totalPackages: 1,
+      totalModules: 1,
+      totalSuites: 1,
+      failedSuites: 0,
+      totalTests: 1,
+      passedTests: 1,
+      failedTests: 0,
+      skippedTests: 0,
+      coverage: {
+        lines: { covered: 10, total: 11, pct: 91 },
+        branches: { covered: 9, total: 10, pct: 90 },
+        functions: { covered: 3, total: 3, pct: 100 },
+        statements: { covered: 10, total: 11, pct: 91 },
+        files: [
+          {
+            path: '/repo/apps/public-site/src/home.js',
+            lines: { covered: 10, total: 11, pct: 91 },
+            branches: { covered: 9, total: 10, pct: 90 },
+            functions: { covered: 3, total: 3, pct: 100 },
+            statements: { covered: 10, total: 11, pct: 91 },
+            module: 'marketing',
+            theme: 'landing',
+            packageName: 'public-site',
+            shared: false,
+            attributionSource: 'manifest',
+            attributionReason: 'fixture',
+            attributionWeight: 1,
+          },
+        ],
+      },
+      coverageAttribution: {
+        totalFiles: 1,
+        attributedFiles: 1,
+        sharedFiles: 0,
+        unattributedFiles: 0,
+      },
+      filterOptions: {
+        modules: ['marketing'],
+        packages: ['public-site'],
+        frameworks: ['node-test'],
+      },
+    },
+    packages: [
+      {
+        name: 'public-site',
+        location: 'apps/public-site',
+        status: 'passed',
+        durationMs: 1800,
+        summary: { total: 1, passed: 1, failed: 0, skipped: 0 },
+        coverage: {
+          lines: { covered: 10, total: 11, pct: 91 },
+          branches: { covered: 9, total: 10, pct: 90 },
+          functions: { covered: 3, total: 3, pct: 100 },
+          statements: { covered: 10, total: 11, pct: 91 },
+        },
+        modules: ['marketing'],
+        frameworks: ['node-test'],
+        suites: [
+          {
+            id: 'public-site-node',
+            label: 'Public Site Tests',
+            runtime: 'node-test',
+            command: 'node --test ./tests/*.test.js',
+            cwd: '/repo/apps/public-site',
+            status: 'passed',
+            durationMs: 1800,
+            summary: { total: 1, passed: 1, failed: 0, skipped: 0 },
+            warnings: [],
+            output: {
+              stdout: 'public suite output',
+              stderr: '',
+            },
+            rawArtifacts: [
+              {
+                relativePath: 'public-site/public-site.log',
+                href: 'raw/public-site/public-site.log',
+                label: 'Public site log',
+                kind: 'file',
+                mediaType: 'text/plain',
+              },
+            ],
+            tests: [
+              {
+                name: 'passes',
+                fullName: 'public site passes',
+                status: 'passed',
+                durationMs: 8,
+                file: '/repo/apps/public-site/src/home.js',
+                line: 14,
+                column: 2,
+                assertions: ['assert.equal(true, true)'],
+                setup: ['load landing fixture'],
+                mocks: [],
+                failureMessages: [],
+                rawDetails: { fixture: true },
+                sourceSnippet: 'assert.equal(true, true)',
+                module: 'marketing',
+                theme: 'landing',
+                classificationSource: 'fixture',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    modules: [
+      {
+        module: 'marketing',
+        owner: 'growth',
+        summary: { total: 1, passed: 1, failed: 0, skipped: 0 },
+        durationMs: 8,
+        packageCount: 1,
+        packages: ['public-site'],
+        frameworks: ['node-test'],
+        dominantPackages: ['public-site'],
+        coverage: {
+          lines: { covered: 10, total: 11, pct: 91 },
+        },
+        themes: [],
+      },
+    ],
+    meta: {
+      projectName: 'Public Site',
+    },
+  };
+}
+
 function createFindAllModel(rows) {
   return {
     async findAll() {
       return rows.map((row) => structuredClone(row));
     },
   };
+}
+
+function createMutableModel(rows = [], idPrefix = 'row') {
+  const state = rows.map((row) => structuredClone(row));
+
+  return {
+    rows: state,
+    async findAll() {
+      return state.map((row) => createMutableRecord(row, state));
+    },
+    async findOne({ where } = {}) {
+      const row = state.find((entry) => matchesWhere(entry, where || {}));
+      return row ? createMutableRecord(row, state) : null;
+    },
+    async create(values) {
+      const row = {
+        ...structuredClone(values),
+        id: values.id || `${idPrefix}-${state.length + 1}`,
+      };
+      state.push(row);
+      return createMutableRecord(row, state);
+    },
+  };
+}
+
+function createMutableRecord(row, state) {
+  return {
+    ...row,
+    toJSON() {
+      return structuredClone(row);
+    },
+    async update(values) {
+      Object.assign(row, structuredClone(values));
+      Object.assign(this, row);
+      return this;
+    },
+    async destroy() {
+      const index = state.findIndex((entry) => entry.id === row.id);
+      if (index >= 0) {
+        state.splice(index, 1);
+      }
+    },
+  };
+}
+
+function buildAdminHeaders() {
+  return {
+    'x-test-station-actor-id': 'admin-1',
+    'x-test-station-actor-email': 'admin@example.com',
+    'x-test-station-actor-role': 'admin',
+  };
+}
+
+function matchesWhere(row, where) {
+  return Object.entries(where || {}).every(([key, value]) => row?.[key] === value);
 }
 
 async function listen(server) {

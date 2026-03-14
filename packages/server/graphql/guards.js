@@ -1,7 +1,7 @@
 import { GraphQLError } from 'graphql';
 
 export function requireActor(context) {
-  if (context?.actor) {
+  if (context?.actor && context.actor.isGuest !== true) {
     return context.actor;
   }
 
@@ -28,28 +28,41 @@ export function requireServiceOrAdminActor(context) {
   return requireAdminActor(context);
 }
 
-export function requireProjectAccess(context, projectKey) {
+export async function requireProjectAccess(context, projectOrKey) {
   const actor = requireActor(context);
-  if (hasProjectAccess(actor, projectKey)) {
+  if (await hasProjectAccess(actor, projectOrKey, context?.accessService)) {
     return actor;
   }
 
-  throw createGraphqlAuthError(403, 'FORBIDDEN', `Actor does not have access to project ${projectKey}.`);
+  throw createGraphqlAuthError(403, 'FORBIDDEN', `Actor does not have access to project ${String(projectOrKey)}.`);
 }
 
-export function hasProjectAccess(actor, projectKey) {
-  if (!actor || !projectKey) {
+export async function hasProjectAccess(actor, projectOrKey, accessService) {
+  if (!actor || !projectOrKey) {
     return false;
   }
+
+  if (accessService) {
+    if (typeof projectOrKey === 'string') {
+      return accessService.canViewProjectByKey({ actor, projectKey: projectOrKey });
+    }
+
+    return accessService.canViewProject({ actor, project: projectOrKey });
+  }
+
+  if (actor.isGuest === true) {
+    return Boolean(projectOrKey?.isPublic === true);
+  }
+
   if (isAdminActor(actor)) {
     return true;
   }
-  return Array.isArray(actor.projectKeys)
-    && (actor.projectKeys.includes('*') || actor.projectKeys.includes(projectKey));
+
+  return false;
 }
 
 export function isAdminActor(actor) {
-  return actor?.role === 'admin';
+  return actor?.isAdmin === true || actor?.role === 'admin';
 }
 
 export function createGraphqlAuthError(status, code, message) {

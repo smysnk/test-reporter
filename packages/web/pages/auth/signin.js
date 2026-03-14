@@ -25,7 +25,6 @@ export default function WebSignInPage({ callbackUrl, providers, autoSignInProvid
       callbackUrl,
       email: formData.get('email'),
       name: formData.get('name'),
-      projectKeys: formData.get('projectKeys'),
     });
   }
 
@@ -50,11 +49,11 @@ export default function WebSignInPage({ callbackUrl, providers, autoSignInProvid
           : error
           ? `Authentication failed (${error}). Try the configured provider again or adjust the web auth environment.`
           : credentialProvider && oauthProviders.length > 0
-            ? 'Use one of the configured SSO providers below, or use demo access if you have enabled it for this deployment.'
+            ? 'Use one of the configured SSO providers below, or use demo access if you have enabled it for this deployment. Project visibility still comes from server-side public, role, and group access rules.'
             : oauthProviders.length > 0
               ? 'Use one of the configured SSO providers below.'
               : credentialProvider
-                ? 'Demo access is enabled for this deployment.'
+                ? 'Demo access is enabled for this deployment. Project visibility still comes from server-side public, role, and group access rules.'
                 : 'No web auth providers are configured. Set Google OAuth or explicitly enable WEB_DEMO_AUTH_ENABLED=true.',
     ),
     error
@@ -107,17 +106,6 @@ export default function WebSignInPage({ callbackUrl, providers, autoSignInProvid
             type: 'text',
             name: 'name',
             defaultValue: 'Web Operator',
-          }),
-        ),
-        React.createElement(
-          'label',
-          { className: 'web-field' },
-          React.createElement('span', { className: 'web-field__label' }, 'Project Keys'),
-          React.createElement('input', {
-            className: 'web-field__input',
-            type: 'text',
-            name: 'projectKeys',
-            defaultValue: '*',
           }),
         ),
         React.createElement(

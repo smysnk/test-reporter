@@ -1,5 +1,6 @@
 import { Sequelize } from 'sequelize';
 import env from '../../config/env.mjs';
+import { formatBootstrapAdminSummary, synchronizeBootstrapAdminUsers } from './bootstrapAdminUsers.js';
 import { runMigrations } from './migrations/runMigrations.js';
 
 const databaseUrl = env
@@ -26,6 +27,18 @@ export async function dbReady(options = {}) {
     process.stdout.write('[db] authenticating connection\n');
     await sequelize.authenticate();
     process.stdout.write('[db] connection authenticated\n');
+  }
+
+  if (options.skipBootstrapAdminBackfill !== true) {
+    const { User } = await import('./models/index.js');
+    const summary = await synchronizeBootstrapAdminUsers({
+      userModel: options.userModel || User,
+      adminEmails: options.adminEmails,
+      allowMissingTable: options.skipMigrations === true,
+    });
+    if (summary.configured > 0 || summary.skipped > 0) {
+      process.stdout.write(`${formatBootstrapAdminSummary(summary)}\n`);
+    }
   }
 
   return sequelize;

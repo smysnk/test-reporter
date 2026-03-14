@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, MetricGrid, SectionCard, StatusPill, RunBuildChip } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../../lib/format.js';
-import { requireWebSession } from '../../lib/auth.js';
+import { getWebSession } from '../../lib/auth.js';
+import { buildProjectPageResult } from '../../lib/pageProps.js';
 import { loadProjectExplorerPage } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
 
@@ -230,35 +231,24 @@ export default function ProjectExplorerPage({ data }) {
 }
 
 export const getServerSideProps = wrapper.getServerSideProps((store) => async (context) => {
-  const auth = await requireWebSession(context);
-  if (auth.redirect) {
-    return {
-      redirect: auth.redirect,
-    };
-  }
-
+  const session = await getWebSession(context.req, context.res);
   const slug = typeof context.params?.slug === 'string' ? context.params.slug : '';
   const data = await loadProjectExplorerPage({
-    session: auth.session,
+    session,
     slug,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
   });
 
-  if (!data) {
-    return {
-      notFound: true,
-    };
-  }
-
-  store.dispatch(setViewMode('project'));
-  store.dispatch(setRuntimeConfig({ graphqlPath: '/graphql' }));
-  store.dispatch(setSelectedProjectSlug(slug));
-  store.dispatch(setSelectedRunId(null));
-
-  return {
-    props: {
-      session: auth.session,
-      data,
+  return buildProjectPageResult({
+    store,
+    session,
+    slug,
+    data,
+    dispatchers: {
+      setViewMode,
+      setRuntimeConfig,
+      setSelectedProjectSlug,
+      setSelectedRunId,
     },
-  };
+  });
 });

@@ -1,7 +1,7 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../db.js';
 
-const Project = sequelize.define('Project', {
+const Role = sequelize.define('Role', {
   id: {
     type: DataTypes.UUID,
     allowNull: false,
@@ -12,26 +12,13 @@ const Project = sequelize.define('Project', {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  slug: {
-    type: DataTypes.STRING,
-    allowNull: false,
-  },
   name: {
     type: DataTypes.STRING,
     allowNull: false,
   },
-  repositoryUrl: {
+  description: {
     type: DataTypes.TEXT,
     allowNull: true,
-  },
-  defaultBranch: {
-    type: DataTypes.STRING,
-    allowNull: true,
-  },
-  isPublic: {
-    type: DataTypes.BOOLEAN,
-    allowNull: false,
-    defaultValue: false,
   },
   metadata: {
     type: DataTypes.JSONB,
@@ -41,8 +28,7 @@ const Project = sequelize.define('Project', {
 }, {
   indexes: [
     { unique: true, fields: ['key'] },
-    { unique: true, fields: ['slug'] },
   ],
 });
 
-export default Project;
+export default Role;

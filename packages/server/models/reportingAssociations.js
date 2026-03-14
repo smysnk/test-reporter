@@ -3,16 +3,59 @@ import CoverageFile from './CoverageFile.js';
 import CoverageSnapshot from './CoverageSnapshot.js';
 import CoverageTrendPoint from './CoverageTrendPoint.js';
 import ErrorOccurrence from './ErrorOccurrence.js';
+import Group from './Group.js';
 import PerformanceStat from './PerformanceStat.js';
 import Project from './Project.js';
 import ProjectFile from './ProjectFile.js';
+import ProjectGroupAccess from './ProjectGroupAccess.js';
 import ProjectModule from './ProjectModule.js';
 import ProjectPackage from './ProjectPackage.js';
+import ProjectRoleAccess from './ProjectRoleAccess.js';
 import ProjectVersion from './ProjectVersion.js';
 import ReleaseNote from './ReleaseNote.js';
+import Role from './Role.js';
 import Run from './Run.js';
 import SuiteRun from './SuiteRun.js';
 import TestExecution from './TestExecution.js';
+import User from './User.js';
+import UserGroup from './UserGroup.js';
+import UserRole from './UserRole.js';
+
+User.hasMany(UserRole, { foreignKey: 'userId', as: 'userRoles' });
+UserRole.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+Role.hasMany(UserRole, { foreignKey: 'roleId', as: 'userRoles' });
+UserRole.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
+
+User.belongsToMany(Role, { through: UserRole, foreignKey: 'userId', otherKey: 'roleId', as: 'roles' });
+Role.belongsToMany(User, { through: UserRole, foreignKey: 'roleId', otherKey: 'userId', as: 'users' });
+
+User.hasMany(UserGroup, { foreignKey: 'userId', as: 'userGroups' });
+UserGroup.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+Group.hasMany(UserGroup, { foreignKey: 'groupId', as: 'userGroups' });
+UserGroup.belongsTo(Group, { foreignKey: 'groupId', as: 'group' });
+
+User.belongsToMany(Group, { through: UserGroup, foreignKey: 'userId', otherKey: 'groupId', as: 'groups' });
+Group.belongsToMany(User, { through: UserGroup, foreignKey: 'groupId', otherKey: 'userId', as: 'users' });
+
+Project.hasMany(ProjectRoleAccess, { foreignKey: 'projectId', as: 'projectRoleAccesses' });
+ProjectRoleAccess.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+
+Role.hasMany(ProjectRoleAccess, { foreignKey: 'roleId', as: 'projectRoleAccesses' });
+ProjectRoleAccess.belongsTo(Role, { foreignKey: 'roleId', as: 'role' });
+
+Project.belongsToMany(Role, { through: ProjectRoleAccess, foreignKey: 'projectId', otherKey: 'roleId', as: 'accessRoles' });
+Role.belongsToMany(Project, { through: ProjectRoleAccess, foreignKey: 'roleId', otherKey: 'projectId', as: 'accessibleProjects' });
+
+Project.hasMany(ProjectGroupAccess, { foreignKey: 'projectId', as: 'projectGroupAccesses' });
+ProjectGroupAccess.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+
+Group.hasMany(ProjectGroupAccess, { foreignKey: 'groupId', as: 'projectGroupAccesses' });
+ProjectGroupAccess.belongsTo(Group, { foreignKey: 'groupId', as: 'group' });
+
+Project.belongsToMany(Group, { through: ProjectGroupAccess, foreignKey: 'projectId', otherKey: 'groupId', as: 'accessGroups' });
+Group.belongsToMany(Project, { through: ProjectGroupAccess, foreignKey: 'groupId', otherKey: 'projectId', as: 'accessibleProjects' });
 
 Project.hasMany(ProjectVersion, { foreignKey: 'projectId', as: 'projectVersions' });
 ProjectVersion.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
@@ -128,14 +171,21 @@ export {
   CoverageSnapshot,
   CoverageTrendPoint,
   ErrorOccurrence,
+  Group,
   PerformanceStat,
   Project,
   ProjectFile,
+  ProjectGroupAccess,
   ProjectModule,
   ProjectPackage,
+  ProjectRoleAccess,
   ProjectVersion,
   ReleaseNote,
+  Role,
   Run,
   SuiteRun,
   TestExecution,
+  User,
+  UserGroup,
+  UserRole,
 };

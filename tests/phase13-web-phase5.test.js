@@ -12,9 +12,13 @@ import {
 import { buildSignedOutRedirectUrl } from '../packages/web/lib/authRoutes.js';
 import { ensureNextAuthUrl } from '../packages/web/lib/nextAuthEnv.js';
 import { formatBuildNumber, formatCommitSha, formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../packages/web/lib/format.js';
+import { buildAdminPageResult, buildOverviewPageResult, buildProjectPageResult, buildRunPageResult } from '../packages/web/lib/pageProps.js';
 import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, RUN_DETAIL_QUERY } from '../packages/web/lib/queries.js';
 import {
+  ADMIN_PAGE_UNAUTHORIZED,
   executeWebGraphql,
+  loadAdminOverviewPage,
+  loadAdminProjectAccessPage,
   loadWebHomePage,
   loadProjectExplorerPage,
   loadRunExplorerPage,
@@ -26,13 +30,14 @@ import { buildSignInRedirectUrl, isProtectedWebPath } from '../packages/web/lib/
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
 import { decorateEmbeddedRunnerReportHtml } from '../packages/web/lib/runReportTemplate.js';
 import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nextauth].js';
+import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
+import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
 import { RunBuildChip } from '../packages/web/components/WebBits.js';
 
 test('web auth options expose the sign-in page and session actor metadata', async () => {
   const authOptions = createAuthOptions({
     secret: 'test-secret',
     adminEmails: ['admin@example.com'],
-    defaultProjectKeys: ['workspace'],
     demoAuthEnabled: true,
   });
 
@@ -50,7 +55,6 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
 
   assert.equal(token.userId, 'user-1');
   assert.equal(token.role, 'admin');
-  assert.deepEqual(token.projectKeys, ['workspace']);
 
   const session = await authOptions.callbacks.session({
     session: { user: {} },
@@ -59,7 +63,6 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
 
   assert.equal(session.userId, 'user-1');
   assert.equal(session.role, 'admin');
-  assert.deepEqual(session.projectKeys, ['workspace']);
   assert.equal(session.user.image, null);
 });
 
@@ -246,7 +249,6 @@ test('web actor headers and route protection helpers produce the expected auth w
       name: 'Web User',
     },
     role: 'member',
-    projectKeys: ['workspace', 'api'],
   });
 
   assert.deepEqual(headers, {
@@ -254,12 +256,13 @@ test('web actor headers and route protection helpers produce the expected auth w
     'x-test-station-actor-email': 'user@example.com',
     'x-test-station-actor-name': 'Web User',
     'x-test-station-actor-role': 'member',
-    'x-test-station-actor-project-keys': 'workspace,api',
   });
 
-  assert.equal(isProtectedWebPath('/'), true);
-  assert.equal(isProtectedWebPath('/projects/workspace'), true);
-  assert.equal(isProtectedWebPath('/runs/run-1'), true);
+  assert.equal(isProtectedWebPath('/'), false);
+  assert.equal(isProtectedWebPath('/projects/workspace'), false);
+  assert.equal(isProtectedWebPath('/runs/run-1'), false);
+  assert.equal(isProtectedWebPath('/admin'), true);
+  assert.equal(isProtectedWebPath('/admin/access'), true);
   assert.equal(isProtectedWebPath('/auth/signin'), false);
   assert.equal(buildSignInRedirectUrl('/runs/run-1'), '/auth/signin?callbackUrl=%2Fruns%2Frun-1');
   assert.equal(
@@ -328,7 +331,6 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
       name: 'Web User',
     },
     role: 'member',
-    projectKeys: ['workspace'],
   };
   const requests = [];
   const fetchImpl = async (_url, options) => {
@@ -342,7 +344,7 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
     if (query.includes('WebHomePage')) {
       return new Response(JSON.stringify({
         data: {
-          me: { id: 'user-1', name: 'Web User', email: 'user@example.com', role: 'member', projectKeys: ['workspace'] },
+          viewer: { id: 'user-1', name: 'Web User', email: 'user@example.com', role: 'member' },
           projects: [{ id: 'project-1', key: 'workspace', slug: 'workspace', name: 'Workspace' }],
           runs: [{
             id: 'run-1',
@@ -495,8 +497,8 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
   };
 
   const home = await loadWebHomePage({ session, fetchImpl, requestId: 'req-home' });
+  assert.equal(home.viewer.id, 'user-1');
   assert.equal(home.projects.length, 1);
-  assert.equal(requests[0].headers['x-test-station-actor-project-keys'], 'workspace');
   assert.equal(requests[0].headers['x-request-id'], 'req-home');
 
   const project = await loadProjectExplorerPage({ session, slug: 'workspace', fetchImpl, requestId: 'req-project' });
@@ -517,6 +519,430 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
   assert.equal(requests[6].body.variables.filePath, '/repo/packages/core/src/index.js');
 });
 
+test('web GraphQL helpers and proxy allow anonymous public reads without actor headers', async () => {
+  const requests = [];
+  const fetchImpl = async (_url, options) => {
+    requests.push({
+      headers: options.headers,
+      body: JSON.parse(options.body),
+    });
+
+    return new Response(JSON.stringify({
+      data: {
+        viewer: null,
+        projects: [{ id: 'project-public', key: 'public-site', slug: 'public-site', name: 'Public Site' }],
+        runs: [],
+      },
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const home = await loadWebHomePage({ session: null, fetchImpl, requestId: 'req-guest' });
+  assert.equal(home.viewer, null);
+  assert.equal(home.projects[0].key, 'public-site');
+  assert.equal(requests[0].headers['x-test-station-actor-id'], undefined);
+  assert.equal(requests[0].headers['x-request-id'], 'req-guest');
+
+  const responseState = createResponseRecorder();
+  const handler = createGraphqlProxyHandler({
+    getSession: async () => null,
+    fetchImpl: async (_url, options) => {
+      requests.push({
+        headers: options.headers,
+        body: JSON.parse(options.body),
+      });
+
+      return new Response(JSON.stringify({
+        data: {
+          projects: [{ key: 'public-site' }],
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    },
+  });
+
+  await handler({
+    method: 'POST',
+    headers: {
+      'x-request-id': 'proxy-guest',
+    },
+    body: {
+      query: '{ projects { key } }',
+    },
+  }, responseState.res);
+
+  assert.equal(responseState.statusCode, 200);
+  assert.deepEqual(JSON.parse(responseState.bodyText), {
+    data: {
+      projects: [{ key: 'public-site' }],
+    },
+  });
+  assert.equal(requests[1].headers['x-test-station-actor-id'], undefined);
+  assert.equal(requests[1].headers['x-request-id'], 'proxy-guest');
+});
+
+test('web SSR page result builders allow guest public pages and return notFound for private resources', async () => {
+  const store = createStoreStub();
+  const session = null;
+  const overview = buildOverviewPageResult({
+    store,
+    session,
+    data: {
+      viewer: null,
+      projects: [{ id: 'project-public', key: 'public-site', slug: 'public-site', name: 'Public Site' }],
+      runs: [],
+    },
+  });
+  assert.equal(overview.props.session, null);
+  assert.equal(overview.props.data.projects[0].key, 'public-site');
+
+  const projectPage = buildProjectPageResult({
+    store,
+    session,
+    slug: 'public-site',
+    data: {
+      project: { id: 'project-public', key: 'public-site', slug: 'public-site', name: 'Public Site' },
+      runs: [],
+      coverageTrend: [],
+      releaseNotes: [],
+      trendPanels: {},
+    },
+  });
+  assert.equal(projectPage.props.session, null);
+  assert.equal(projectPage.props.data.project.slug, 'public-site');
+
+  const projectNotFound = buildProjectPageResult({
+    store,
+    session,
+    slug: 'workspace',
+    data: null,
+  });
+  assert.deepEqual(projectNotFound, { notFound: true });
+
+  const runPage = buildRunPageResult({
+    store,
+    session,
+    runId: 'run-public-1',
+    templateMode: 'runner',
+    data: {
+      run: {
+        id: 'run-public-1',
+        externalKey: 'public-site:github-actions:2001',
+        project: { slug: 'public-site' },
+      },
+      runPackages: [],
+      runModules: [],
+      runFiles: [],
+      failedTests: [],
+      coverageComparison: null,
+    },
+  });
+  assert.equal(runPage.props.session, null);
+  assert.equal(runPage.props.data.run.id, 'run-public-1');
+
+  const runNotFound = buildRunPageResult({
+    store,
+    session,
+    runId: 'run-1',
+    templateMode: 'runner',
+    data: null,
+  });
+  assert.deepEqual(runNotFound, { notFound: true });
+});
+
+test('web admin loaders short-circuit for authenticated non-admin viewers', async () => {
+  const requests = [];
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    requests.push(body);
+
+    return new Response(JSON.stringify({
+      data: {
+        viewer: {
+          id: 'viewer-1',
+          userId: 'user-1',
+          email: 'member@example.com',
+          name: 'Member User',
+          role: 'member',
+          isAdmin: false,
+          isGuest: false,
+          roleKeys: [],
+          groupKeys: [],
+        },
+      },
+    }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+
+  const data = await loadAdminOverviewPage({
+    session: {
+      userId: 'user-1',
+      user: {
+        email: 'member@example.com',
+      },
+      role: 'member',
+    },
+    fetchImpl,
+    requestId: 'admin-member',
+  });
+
+  assert.equal(data, ADMIN_PAGE_UNAUTHORIZED);
+  assert.equal(requests.length, 1);
+  assert.match(requests[0].query, /WebViewerAccess/);
+});
+
+test('web admin loaders normalize overview and project access data for admin pages', async () => {
+  const requests = [];
+  const session = {
+    userId: 'admin-1',
+    user: {
+      email: 'admin@example.com',
+      name: 'Admin User',
+    },
+    role: 'admin',
+  };
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    requests.push(body);
+    const query = body.query || '';
+
+    if (query.includes('WebViewerAccess')) {
+      return new Response(JSON.stringify({
+        data: {
+          viewer: {
+            id: 'viewer-1',
+            userId: 'admin-1',
+            email: 'admin@example.com',
+            name: 'Admin User',
+            role: 'admin',
+            isAdmin: true,
+            isGuest: false,
+            roleKeys: ['platform'],
+            groupKeys: ['staff'],
+          },
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    if (query.includes('AdminOverviewPage')) {
+      return new Response(JSON.stringify({
+        data: {
+          viewer: {
+            id: 'viewer-1',
+            email: 'admin@example.com',
+            name: 'Admin User',
+            role: 'admin',
+            isAdmin: true,
+          },
+          adminUsers: [{
+            id: 'user-1',
+            email: 'member@example.com',
+            name: 'Member User',
+            isAdmin: false,
+            roleKeys: ['platform'],
+            groupKeys: [],
+          }],
+          adminRoles: [{
+            id: 'role-1',
+            key: 'platform',
+            name: 'Platform',
+            description: 'Platform team',
+            userCount: 1,
+            projectCount: 1,
+          }],
+          adminGroups: [{
+            id: 'group-1',
+            key: 'staff',
+            name: 'Staff',
+            description: 'Internal team',
+            userCount: 1,
+            projectCount: 1,
+          }],
+          adminProjects: [{
+            project: {
+              id: 'project-1',
+              key: 'workspace',
+              slug: 'workspace',
+              name: 'Workspace',
+              repositoryUrl: 'https://example.test/workspace',
+              defaultBranch: 'main',
+            },
+            isPublic: false,
+            roleKeys: ['platform'],
+            groupKeys: ['staff'],
+          }],
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    if (query.includes('AdminProjectAccessPage')) {
+      return new Response(JSON.stringify({
+        data: {
+          viewer: {
+            id: 'viewer-1',
+            email: 'admin@example.com',
+            name: 'Admin User',
+            role: 'admin',
+            isAdmin: true,
+          },
+          adminProjectAccess: {
+            project: {
+              id: 'project-1',
+              key: 'workspace',
+              slug: 'workspace',
+              name: 'Workspace',
+              repositoryUrl: 'https://example.test/workspace',
+              defaultBranch: 'main',
+            },
+            isPublic: false,
+            roleKeys: ['platform'],
+            groupKeys: ['staff'],
+            roles: [{
+              id: 'role-1',
+              key: 'platform',
+              name: 'Platform',
+              description: 'Platform team',
+              userCount: 1,
+              projectCount: 1,
+            }],
+            groups: [{
+              id: 'group-1',
+              key: 'staff',
+              name: 'Staff',
+              description: 'Internal team',
+              userCount: 1,
+              projectCount: 1,
+            }],
+          },
+          adminRoles: [{
+            id: 'role-1',
+            key: 'platform',
+            name: 'Platform',
+            description: 'Platform team',
+            userCount: 1,
+            projectCount: 1,
+          }],
+          adminGroups: [{
+            id: 'group-1',
+            key: 'staff',
+            name: 'Staff',
+            description: 'Internal team',
+            userCount: 1,
+            projectCount: 1,
+          }],
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    throw new Error(`Unexpected admin GraphQL request: ${query}`);
+  };
+
+  const overview = await loadAdminOverviewPage({ session, fetchImpl, requestId: 'admin-overview' });
+  assert.equal(overview.viewer.isAdmin, true);
+  assert.equal(overview.users.length, 1);
+  assert.equal(overview.projects[0].project.slug, 'workspace');
+
+  const projectAccess = await loadAdminProjectAccessPage({
+    session,
+    slug: 'workspace',
+    fetchImpl,
+    requestId: 'admin-project',
+  });
+  assert.equal(projectAccess.projectAccess.project.slug, 'workspace');
+  assert.equal(projectAccess.projectAccess.roles.length, 1);
+  assert.equal(projectAccess.roles.length, 1);
+  assert.equal(projectAccess.groups.length, 1);
+  assert.match(requests[0].query, /WebViewerAccess/);
+  assert.match(requests[1].query, /AdminOverviewPage/);
+  assert.match(requests[2].query, /WebViewerAccess/);
+  assert.match(requests[3].query, /AdminProjectAccessPage/);
+  assert.deepEqual(requests[3].variables, { slug: 'workspace' });
+});
+
+test('web admin page result builder dispatches admin state and selected project context', () => {
+  const actions = [];
+  const store = {
+    dispatch(action) {
+      actions.push(action);
+    },
+  };
+
+  const result = buildAdminPageResult({
+    store,
+    session: { userId: 'admin-1' },
+    selectedProjectSlug: 'workspace',
+    data: {
+      viewer: {
+        isAdmin: true,
+      },
+      projects: [],
+    },
+    dispatchers: {
+      setViewMode: (value) => ({ type: 'view', payload: value }),
+      setRuntimeConfig: (value) => ({ type: 'runtime', payload: value }),
+      setSelectedProjectSlug: (value) => ({ type: 'project', payload: value }),
+      setSelectedRunId: (value) => ({ type: 'run', payload: value }),
+    },
+  });
+
+  assert.equal(result.props.session.userId, 'admin-1');
+  assert.equal(result.props.data.viewer.isAdmin, true);
+  assert.deepEqual(actions, [
+    { type: 'view', payload: 'admin' },
+    { type: 'runtime', payload: { graphqlPath: '/graphql' } },
+    { type: 'project', payload: 'workspace' },
+    { type: 'run', payload: null },
+  ]);
+
+  assert.deepEqual(buildAdminPageResult({
+    store,
+    session: null,
+    data: null,
+  }), { notFound: true });
+});
+
+test('web runner report handler allows anonymous public report rendering', async () => {
+  const responseState = createResponseRecorder();
+  const handler = createRunReportHandler({
+    getSession: async () => null,
+    loadReportHtml: async ({ session, runId, requestId }) => {
+      assert.equal(session, null);
+      assert.equal(runId, 'run-public-1');
+      assert.equal(requestId, 'runner-guest');
+      return '<!DOCTYPE html><html><body><main>public report</main></body></html>';
+    },
+  });
+
+  await handler({
+    method: 'GET',
+    query: {
+      id: 'run-public-1',
+    },
+    headers: {
+      'x-request-id': 'runner-guest',
+    },
+  }, responseState.res);
+
+  assert.equal(responseState.statusCode, 200);
+  assert.equal(responseState.headers['content-type'], 'text/html; charset=utf-8');
+  assert.match(responseState.bodyText, /public report/);
+});
+
 test('web run loader and raw GraphQL executor preserve response structure', async () => {
   const session = {
     userId: 'user-1',
@@ -525,7 +951,6 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
       name: 'Web User',
     },
     role: 'member',
-    projectKeys: ['workspace'],
   };
   const responses = [
     {
@@ -610,6 +1035,7 @@ test('web run build chip and GraphQL queries include build metadata and source l
 
   assert.match(html, /build #88/);
   assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
+  assert.match(WEB_HOME_QUERY, /viewer/);
   assert.match(WEB_HOME_QUERY, /sourceRunId/);
   assert.match(WEB_HOME_QUERY, /sourceUrl/);
   assert.match(WEB_HOME_QUERY, /buildNumber/);
@@ -629,7 +1055,6 @@ test('web can render the runner report template from stored raw report data', as
       name: 'Web User',
     },
     role: 'member',
-    projectKeys: ['workspace'],
   };
 
   const fetchImpl = async (_url, options) => {
@@ -791,5 +1216,53 @@ function createRunnerReportFixture() {
         themes: [],
       },
     ],
+  };
+}
+
+function createStoreStub() {
+  return {
+    dispatch() {},
+  };
+}
+
+function createResponseRecorder() {
+  const state = {
+    statusCode: 200,
+    headers: {},
+    bodyText: '',
+  };
+
+  return {
+    ...state,
+    res: {
+      setHeader(name, value) {
+        state.headers[String(name).toLowerCase()] = value;
+      },
+      status(code) {
+        state.statusCode = code;
+        return this;
+      },
+      json(payload) {
+        state.bodyText = JSON.stringify(payload);
+        return this;
+      },
+      send(payload) {
+        state.bodyText = typeof payload === 'string' ? payload : String(payload);
+        return this;
+      },
+      end(payload = '') {
+        state.bodyText = typeof payload === 'string' ? payload : String(payload);
+        return this;
+      },
+    },
+    get statusCode() {
+      return state.statusCode;
+    },
+    get headers() {
+      return state.headers;
+    },
+    get bodyText() {
+      return state.bodyText;
+    },
   };
 }

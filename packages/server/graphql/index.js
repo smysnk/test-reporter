@@ -1,4 +1,6 @@
+import { createGraphqlAdminService } from './admin-service.js';
 import { createIngestionService } from '../ingest/index.js';
+import { createProjectAccessService } from './access-service.js';
 import { createGraphqlContext } from './context.js';
 import { mutationResolvers, mutationTypeDefs } from './mutations.js';
 import { queryResolvers, queryTypeDefs } from './queries.js';
@@ -20,8 +22,15 @@ export const resolvers = mergeResolvers(
 );
 
 export function createGraphqlServices(options = {}) {
+  const accessService = options.accessService || createProjectAccessService(options);
+
   return {
-    queryService: options.queryService || createGraphqlQueryService(options),
+    accessService,
+    adminService: options.adminService || createGraphqlAdminService(options),
+    queryService: options.queryService || createGraphqlQueryService({
+      ...options,
+      accessService,
+    }),
     ingestionService: options.ingestionService || createIngestionService(options),
   };
 }

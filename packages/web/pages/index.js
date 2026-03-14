@@ -2,7 +2,8 @@ import React from 'react';
 import Link from 'next/link';
 import { MetricGrid, SectionCard, StatusPill, EmptyState, RunBuildChip } from '../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../lib/format.js';
-import { requireWebSession } from '../lib/auth.js';
+import { getWebSession } from '../lib/auth.js';
+import { buildOverviewPageResult } from '../lib/pageProps.js';
 import { loadWebHomePage } from '../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../store/index.js';
 
@@ -23,7 +24,7 @@ export default function WebIndexPage({ data }) {
       },
       React.createElement(MetricGrid, {
         items: [
-          { label: 'Projects', value: String(projects.length), copy: 'Accessible from this session' },
+          { label: 'Projects', value: String(projects.length), copy: 'Visible to this viewer' },
           { label: 'Recent Runs', value: String(runs.length), copy: 'Latest executions across visible projects' },
           { label: 'Latest Line Coverage', value: formatCoveragePct(latestCoverage), copy: 'Most recent run with coverage data' },
         ],
@@ -66,7 +67,7 @@ export default function WebIndexPage({ data }) {
           )
           : React.createElement(EmptyState, {
             title: 'No projects available',
-            copy: 'The current session does not have access to any projects yet.',
+            copy: 'No public projects are visible yet. Sign in to see private projects granted to your account.',
           }),
       ),
       React.createElement(
@@ -119,27 +120,21 @@ export default function WebIndexPage({ data }) {
 }
 
 export const getServerSideProps = wrapper.getServerSideProps((store) => async (context) => {
-  const auth = await requireWebSession(context);
-  if (auth.redirect) {
-    return {
-      redirect: auth.redirect,
-    };
-  }
-
-  store.dispatch(setViewMode('overview'));
-  store.dispatch(setRuntimeConfig({ graphqlPath: '/graphql' }));
-  store.dispatch(setSelectedProjectSlug(null));
-  store.dispatch(setSelectedRunId(null));
-
+  const session = await getWebSession(context.req, context.res);
   const data = await loadWebHomePage({
-    session: auth.session,
+    session,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
   });
 
-  return {
-    props: {
-      session: auth.session,
-      data,
+  return buildOverviewPageResult({
+    store,
+    session,
+    data,
+    dispatchers: {
+      setViewMode,
+      setRuntimeConfig,
+      setSelectedProjectSlug,
+      setSelectedRunId,
     },
-  };
+  });
 });

@@ -496,6 +496,10 @@ Google, GitHub, and Discord OAuth can be enabled for the web app by setting the 
 
 `WEB_DEMO_AUTH_ENABLED` controls the local demo credentials provider for the web app. It now defaults to `false`, and if Google OAuth is configured the sign-in page skips the demo form and immediately starts Google sign-in.
 
+`WEB_ADMIN_EMAILS` is the bootstrap escape hatch for the admin area. On server startup, matching existing users are elevated to admin and missing user rows are created so the first real admin can reach `/admin` without manual SQL changes.
+
+Projects default to private. Guests can browse only projects explicitly marked public in the admin area; authenticated members see public projects plus anything granted through persisted roles and groups.
+
 ## Versioning
 
 All publishable `@test-station/*` packages currently move in lockstep at `0.2.0`.

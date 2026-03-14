@@ -462,6 +462,9 @@ const GlobalStyle = createGlobalStyle`
     gap: 18px;
     min-width: 0;
   }
+  .web-stack--tight {
+    gap: 8px;
+  }
   .web-trend-card {
     display: grid;
     gap: 16px;
@@ -509,6 +512,112 @@ const GlobalStyle = createGlobalStyle`
   .web-chip--release {
     background: rgba(107, 178, 255, 0.12);
   }
+  .web-chip--muted {
+    color: ${(props) => props.theme.colors.muted};
+    background: rgba(107, 178, 255, 0.04);
+  }
+  .web-chip--admin-public {
+    color: ${(props) => props.theme.colors.success};
+    background: color-mix(in srgb, ${(props) => props.theme.colors.success} 16%, transparent);
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.success} 28%, transparent);
+  }
+  .web-chip--admin-private {
+    color: ${(props) => props.theme.colors.warning};
+    background: color-mix(in srgb, ${(props) => props.theme.colors.warning} 16%, transparent);
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.warning} 28%, transparent);
+  }
+  .web-admin-shortcuts {
+    display: grid;
+    gap: 16px;
+    margin-top: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .web-admin-shortcut {
+    display: grid;
+    gap: 10px;
+    padding: 18px;
+    border-radius: 18px;
+    background: ${(props) => props.theme.colors.panelSoft};
+    border: 1px solid ${(props) => props.theme.colors.border};
+  }
+  .web-admin-shortcut__title {
+    font-size: 1rem;
+  }
+  .web-admin-shortcut__copy {
+    color: ${(props) => props.theme.colors.muted};
+    line-height: 1.5;
+  }
+  .web-admin-notice {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+  }
+  .web-admin-notice--error {
+    color: ${(props) => props.theme.colors.danger};
+    background: color-mix(in srgb, ${(props) => props.theme.colors.danger} 10%, transparent);
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.danger} 28%, transparent);
+  }
+  .web-admin-form {
+    display: grid;
+    gap: 16px;
+    margin-top: 22px;
+  }
+  .web-admin-form__grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .web-admin-field {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+  .web-admin-field__label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: ${(props) => props.theme.colors.muted};
+  }
+  .web-admin-field__hint {
+    color: ${(props) => props.theme.colors.muted};
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+  .web-admin-input,
+  .web-admin-textarea,
+  .web-admin-select {
+    width: 100%;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    border-radius: 14px;
+    padding: 12px 14px;
+    font: inherit;
+    background: rgba(7, 17, 31, 0.88);
+    color: ${(props) => props.theme.colors.text};
+    min-width: 0;
+  }
+  .web-admin-textarea {
+    resize: vertical;
+  }
+  .web-admin-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 20px;
+  }
+  .web-admin-inline-form {
+    display: flex;
+    gap: 12px;
+    align-items: end;
+    flex-wrap: wrap;
+    margin-top: 18px;
+  }
+  .web-admin-inline-form > * {
+    min-width: 0;
+  }
+  .web-admin-help {
+    margin-top: 18px;
+  }
   @media (min-width: 900px) {
     .web-shell__header {
       grid-template-columns: minmax(0, 1fr) auto;
@@ -525,6 +634,7 @@ export default function WebApp({ Component, ...rest }) {
   const client = getApolloClient();
   const pageProps = props.pageProps || {};
   const session = pageProps.session || null;
+  const viewer = pageProps.data?.viewer || null;
 
   return React.createElement(
     SessionProvider,
@@ -544,7 +654,7 @@ export default function WebApp({ Component, ...rest }) {
             React.createElement(GlobalStyle, null),
             React.createElement(
               WebShell,
-              null,
+              { viewer },
               React.createElement(Component, pageProps),
             ),
           ),
