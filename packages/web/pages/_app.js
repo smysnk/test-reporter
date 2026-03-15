@@ -329,17 +329,16 @@ const GlobalStyle = createGlobalStyle`
     box-shadow: inset 0 0 0 1px rgba(107, 178, 255, 0.14);
   }
   .web-explorer__sidebar-row {
-    display: flex;
-    gap: 10px;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
+    display: block;
   }
   .web-explorer__sidebar-title {
-    flex: 1 1 180px;
-    min-width: 0;
+    display: block;
     font-size: 1rem;
     overflow-wrap: anywhere;
+  }
+  .web-explorer__sidebar-status {
+    display: flex;
+    justify-content: flex-start;
   }
   .web-explorer__sidebar-meta {
     color: ${(props) => props.theme.colors.muted};
@@ -786,8 +785,8 @@ const GlobalStyle = createGlobalStyle`
       grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
     }
     .web-explorer__sidebar {
-      position: sticky;
-      top: 32px;
+      position: static;
+      top: auto;
     }
   }
 `;

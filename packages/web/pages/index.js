@@ -15,7 +15,7 @@ function selectOverviewProject(dispatch, slug) {
   dispatch(setViewMode('overview'));
 }
 
-function SidebarButton({ active = false, title, meta, chips = [], onClick }) {
+function SidebarButton({ active = false, title, meta, status, onClick }) {
   return React.createElement(
     'button',
     {
@@ -28,8 +28,14 @@ function SidebarButton({ active = false, title, meta, chips = [], onClick }) {
       'div',
       { className: 'web-explorer__sidebar-row' },
       React.createElement('strong', { className: 'web-explorer__sidebar-title' }, title),
-      ...(Array.isArray(chips) ? chips : []).filter(Boolean),
     ),
+    status
+      ? React.createElement(
+        'div',
+        { className: 'web-explorer__sidebar-status' },
+        React.createElement(StatusPill, { status }),
+      )
+      : null,
     meta ? React.createElement('span', { className: 'web-explorer__sidebar-meta' }, meta) : null,
   );
 }
@@ -244,20 +250,14 @@ export default function WebIndexPage({ data }) {
             active: !model.selectedProject,
             title: 'All recent runs',
             meta: `${model.totalRuns} recent runs across ${model.totalProjects} visible project${model.totalProjects === 1 ? '' : 's'}`,
-            chips: [
-              React.createElement('span', { className: 'web-chip web-chip--muted', key: 'recent-all' }, 'live feed'),
-            ],
             onClick: () => selectOverviewProject(dispatch, null),
           }),
           ...model.projects.map((project) => React.createElement(SidebarButton, {
             key: project.id,
             active: model.selectedProject?.slug === project.slug,
             title: project.name,
-            meta: `${formatRepositoryName(project.repositoryUrl)} • ${project.recentRunCount} recent run${project.recentRunCount === 1 ? '' : 's'}`,
-            chips: [
-              React.createElement('span', { className: 'web-chip web-chip--muted', key: `${project.id}:key` }, project.key),
-              project.latestRun ? React.createElement(StatusPill, { key: `${project.id}:status`, status: project.latestRun.status }) : null,
-            ],
+            meta: `${project.recentRunCount} recent run${project.recentRunCount === 1 ? '' : 's'}`,
+            status: project.latestRun?.status || null,
             onClick: () => selectOverviewProject(dispatch, project.slug),
           })),
         )
