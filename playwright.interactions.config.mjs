@@ -2,12 +2,12 @@ import path from 'node:path';
 import { defineConfig } from '@playwright/test';
 
 const baseURL = process.env.TEST_STATION_E2E_BASE_URL || 'https://test-station.smysnk.com';
-const outputRoot = path.resolve(process.cwd(), process.env.TEST_STATION_E2E_OUTPUT_DIR || 'artifacts/e2e-performance');
+const outputRoot = path.resolve(process.cwd(), process.env.TEST_STATION_E2E_INTERACTIONS_OUTPUT_DIR || 'artifacts/e2e-interactions');
 const storageState = process.env.TEST_STATION_E2E_STORAGE_STATE || undefined;
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: ['**/*performance.spec.js'],
+  testMatch: ['**/*interaction.spec.js'],
   fullyParallel: false,
   workers: 1,
   timeout: 180_000,
@@ -20,8 +20,8 @@ export default defineConfig({
     ['json', { outputFile: path.join(outputRoot, 'playwright-results.json') }],
   ],
   metadata: {
-    benchmarkBaseURL: baseURL,
-    benchmarkOutputDir: outputRoot,
+    interactionsBaseURL: baseURL,
+    interactionsOutputDir: outputRoot,
   },
   use: {
     baseURL,

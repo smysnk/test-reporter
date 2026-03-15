@@ -6,6 +6,7 @@ import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/W
 import { formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../lib/format.js';
 import { buildHomeExplorerModel } from '../lib/homeExplorer.js';
 import { getWebSession } from '../lib/auth.js';
+import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../lib/pageProfiling.js';
 import { buildOverviewPageResult } from '../lib/pageProps.js';
 import { loadWebHomePage } from '../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../store/index.js';
@@ -237,6 +238,15 @@ export default function WebIndexPage({ data }) {
     }
   }, [dispatch, model.selectedProject, selectedProjectSlug]);
 
+  React.useEffect(() => {
+    recordClientPageMark('overview-page-ready', {
+      focusMode: model.selectedProject ? 'project' : 'all-runs',
+      selectedProjectSlug: model.selectedProject?.slug || null,
+      visibleProjectCount: model.totalProjects,
+      visibleRunCount: model.visibleRuns.length,
+    });
+  }, [model.selectedProject?.slug, model.totalProjects, model.visibleRuns.length]);
+
   const sectionTitle = model.selectedProject
     ? model.selectedProject.name
     : 'Recent test runs';
@@ -380,15 +390,29 @@ export default function WebIndexPage({ data }) {
 
 export const getServerSideProps = wrapper.getServerSideProps((store) => async (context) => {
   const session = await getWebSession(context.req, context.res);
+  const pageProfiler = createPageLoadProfiler({
+    pageType: 'overview',
+    route: '/',
+  });
   const data = await loadWebHomePage({
     session,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
+    profiler: pageProfiler,
   });
+  const pageProfile = pageProfiler.finalize({
+    visibleProjectCount: Array.isArray(data?.projects) ? data.projects.length : 0,
+    visibleRunCount: Array.isArray(data?.runs) ? data.runs.length : 0,
+  });
+  const serverTimingHeader = buildServerTimingHeader(pageProfile);
+  if (serverTimingHeader && context.res && typeof context.res.setHeader === 'function') {
+    context.res.setHeader('Server-Timing', serverTimingHeader);
+  }
 
   return buildOverviewPageResult({
     store,
     session,
     data,
+    pageProfile,
     dispatchers: {
       setViewMode,
       setRuntimeConfig,

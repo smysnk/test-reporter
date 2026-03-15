@@ -19,6 +19,8 @@
     "test:coverage": "node ./bin/test-station.mjs run --config ./test-station.config.mjs --coverage",
     "test:e2e:performance": "playwright test -c ./playwright.performance.config.mjs",
     "test:e2e:performance:list": "playwright test -c ./playwright.performance.config.mjs --list",
+    "test:e2e:interactions": "playwright test -c ./playwright.interactions.config.mjs",
+    "test:e2e:interactions:list": "playwright test -c ./playwright.interactions.config.mjs --list",
     "pages:build": "node ./scripts/pages/build-self-test-site.mjs",
     "server:dev": "yarn workspace server dev",
     "server:start": "yarn workspace server start",

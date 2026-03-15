@@ -13,6 +13,15 @@ import {
 import { buildSignedOutRedirectUrl } from '../packages/web/lib/authRoutes.js';
 import { ensureNextAuthUrl } from '../packages/web/lib/nextAuthEnv.js';
 import { formatBuildNumber, formatCommitSha, formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../packages/web/lib/format.js';
+import {
+  beginClientRouteProfile,
+  buildServerTimingHeader,
+  completeClientRouteProfile,
+  createPageLoadProfiler,
+  recordClientPageMark,
+  recordClientRouteStage,
+  setClientServerPageProfile,
+} from '../packages/web/lib/pageProfiling.js';
 import { buildAdminPageResult, buildOverviewPageResult, buildProjectPageResult, buildRunPageResult } from '../packages/web/lib/pageProps.js';
 import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, RUN_DETAIL_QUERY } from '../packages/web/lib/queries.js';
 import { resolvePublicRuntimeConfig } from '../packages/web/lib/runtimeConfig.js';
@@ -677,6 +686,12 @@ test('web GraphQL helpers and proxy allow anonymous public reads without actor h
 test('web SSR page result builders allow guest public pages and return notFound for private resources', async () => {
   const store = createStoreStub();
   const session = null;
+  const pageProfile = {
+    pageType: 'overview',
+    route: '/',
+    totalMs: 12.4,
+    steps: [{ name: 'home-feed-query', durationMs: 8.7 }],
+  };
   const overview = buildOverviewPageResult({
     store,
     session,
@@ -685,9 +700,11 @@ test('web SSR page result builders allow guest public pages and return notFound 
       projects: [{ id: 'project-public', key: 'public-site', slug: 'public-site', name: 'Public Site' }],
       runs: [],
     },
+    pageProfile,
   });
   assert.equal(overview.props.session, null);
   assert.equal(overview.props.data.projects[0].key, 'public-site');
+  assert.equal(overview.props.pageProfile, pageProfile);
 
   const projectPage = buildProjectPageResult({
     store,
@@ -700,9 +717,11 @@ test('web SSR page result builders allow guest public pages and return notFound 
       releaseNotes: [],
       trendPanels: {},
     },
+    pageProfile,
   });
   assert.equal(projectPage.props.session, null);
   assert.equal(projectPage.props.data.project.slug, 'public-site');
+  assert.equal(projectPage.props.pageProfile, pageProfile);
 
   const projectNotFound = buildProjectPageResult({
     store,
@@ -729,9 +748,11 @@ test('web SSR page result builders allow guest public pages and return notFound 
       failedTests: [],
       coverageComparison: null,
     },
+    pageProfile,
   });
   assert.equal(runPage.props.session, null);
   assert.equal(runPage.props.data.run.id, 'run-public-1');
+  assert.equal(runPage.props.pageProfile, pageProfile);
 
   const runNotFound = buildRunPageResult({
     store,
@@ -741,6 +762,61 @@ test('web SSR page result builders allow guest public pages and return notFound 
     data: null,
   });
   assert.deepEqual(runNotFound, { notFound: true });
+});
+
+test('web page profiling helpers capture server timings and client route milestones', async () => {
+  const pageProfiler = createPageLoadProfiler({
+    pageType: 'project',
+    route: '/projects/public-site',
+  });
+
+  await pageProfiler.measureStep('project-base-query', async () => {});
+  await pageProfiler.measureStep('project-activity-query', async () => {});
+  const pageProfile = pageProfiler.finalize({
+    projectSlug: 'public-site',
+    runCount: 3,
+  });
+
+  assert.equal(pageProfile.pageType, 'project');
+  assert.equal(pageProfile.route, '/projects/public-site');
+  assert.equal(pageProfile.projectSlug, 'public-site');
+  assert.equal(pageProfile.runCount, 3);
+  assert.equal(pageProfile.steps.length, 2);
+
+  const serverTimingHeader = buildServerTimingHeader(pageProfile);
+  assert.match(serverTimingHeader, /project;dur=/);
+  assert.match(serverTimingHeader, /project-base-query;dur=/);
+
+  const originalWindow = globalThis.window;
+  try {
+    globalThis.window = {
+      location: {
+        pathname: '/projects/public-site',
+        search: '',
+        hash: '',
+      },
+      __TEST_STATION_PERF__: {
+        lcp: null,
+        cls: 0,
+        longTaskCount: 0,
+        longTaskDurationMs: 0,
+      },
+    };
+
+    setClientServerPageProfile(pageProfile);
+    beginClientRouteProfile('/runs/run-1', { sourceRoute: '/projects/public-site' });
+    recordClientRouteStage('routeChangeStart', { url: '/runs/run-1' });
+    recordClientPageMark('project-page-ready', { projectSlug: 'public-site' });
+    const completedRoute = completeClientRouteProfile('/runs/run-1');
+
+    assert.equal(globalThis.window.__TEST_STATION_PERF__.serverPageProfile.pageType, 'project');
+    assert.equal(globalThis.window.__TEST_STATION_PERF__.pageMarks[0].name, 'project-page-ready');
+    assert.equal(completedRoute.to, '/runs/run-1');
+    assert.equal(completedRoute.status, 'completed');
+    assert.equal(completedRoute.marks[0].name, 'routeChangeStart');
+  } finally {
+    globalThis.window = originalWindow;
+  }
 });
 
 test('web admin loaders short-circuit for authenticated non-admin viewers', async () => {

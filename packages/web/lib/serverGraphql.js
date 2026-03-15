@@ -22,6 +22,14 @@ import {
 
 export const ADMIN_PAGE_UNAUTHORIZED = Symbol('test-station.admin-page-unauthorized');
 
+async function measureProfileStep(profiler, name, fn, details = null) {
+  if (!profiler || typeof profiler.measureStep !== 'function') {
+    return fn();
+  }
+
+  return profiler.measureStep(name, fn, details);
+}
+
 function normalizeEnvValue(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -71,12 +79,14 @@ export async function executeWebGraphql({ session, query, variables = {}, fetchI
   return payload.data || {};
 }
 
-export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = null }) {
-  const data = await executeWebGraphql({
+export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = null, profiler = null }) {
+  const data = await measureProfileStep(profiler, 'home-feed-query', () => executeWebGraphql({
     session,
     query: WEB_HOME_QUERY,
     fetchImpl,
     requestId,
+  }), {
+    query: 'WEB_HOME_QUERY',
   });
 
   return {
@@ -121,25 +131,31 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
   };
 }
 
-export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch, requestId = null }) {
-  const base = await executeWebGraphql({
+export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch, requestId = null, profiler = null }) {
+  const base = await measureProfileStep(profiler, 'project-base-query', () => executeWebGraphql({
     session,
     query: PROJECT_BY_SLUG_QUERY,
     variables: { slug },
     fetchImpl,
     requestId,
+  }), {
+    query: 'PROJECT_BY_SLUG_QUERY',
+    slug,
   });
 
   if (!base.project) {
     return null;
   }
 
-  const activity = await executeWebGraphql({
+  const activity = await measureProfileStep(profiler, 'project-activity-query', () => executeWebGraphql({
     session,
     query: PROJECT_ACTIVITY_QUERY,
     variables: { projectKey: base.project.key },
     fetchImpl,
     requestId,
+  }), {
+    query: 'PROJECT_ACTIVITY_QUERY',
+    projectKey: base.project.key,
   });
 
   return {
@@ -147,7 +163,7 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
     runs: Array.isArray(activity.runs) ? activity.runs : [],
     coverageTrend: Array.isArray(activity.coverageTrend) ? activity.coverageTrend : [],
     releaseNotes: Array.isArray(activity.releaseNotes) ? activity.releaseNotes : [],
-    trendPanels: await loadProjectTrendPanels({
+    trendPanels: await measureProfileStep(profiler, 'project-trend-panels', () => loadProjectTrendPanels({
       session,
       projectKey: base.project.key,
       latestRunId: Array.isArray(activity.runs) && activity.runs[0] ? activity.runs[0].id : null,
@@ -155,17 +171,23 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
       releaseNotes: Array.isArray(activity.releaseNotes) ? activity.releaseNotes : [],
       fetchImpl,
       requestId,
+      profiler,
+    }), {
+      latestRunId: Array.isArray(activity.runs) && activity.runs[0] ? activity.runs[0].id : null,
     }),
   };
 }
 
-export async function loadRunExplorerPage({ session, runId, fetchImpl = fetch, requestId = null }) {
-  const data = await executeWebGraphql({
+export async function loadRunExplorerPage({ session, runId, fetchImpl = fetch, requestId = null, profiler = null }) {
+  const data = await measureProfileStep(profiler, 'run-detail-query', () => executeWebGraphql({
     session,
     query: RUN_DETAIL_QUERY,
     variables: { runId },
     fetchImpl,
     requestId,
+  }), {
+    query: 'RUN_DETAIL_QUERY',
+    runId,
   });
 
   if (!data.run) {
@@ -182,13 +204,16 @@ export async function loadRunExplorerPage({ session, runId, fetchImpl = fetch, r
   };
 }
 
-export async function loadRunReportHtml({ session, runId, fetchImpl = fetch, requestId = null }) {
-  const data = await executeWebGraphql({
+export async function loadRunReportHtml({ session, runId, fetchImpl = fetch, requestId = null, profiler = null }) {
+  const data = await measureProfileStep(profiler, 'run-report-query', () => executeWebGraphql({
     session,
     query: RUN_REPORT_QUERY,
     variables: { runId },
     fetchImpl,
     requestId,
+  }), {
+    query: 'RUN_REPORT_QUERY',
+    runId,
   });
 
   const run = data.run || null;
@@ -196,10 +221,14 @@ export async function loadRunReportHtml({ session, runId, fetchImpl = fetch, req
     return null;
   }
 
-  const { renderHtmlReport } = await import('@test-station/render-html');
-  const embeddedReport = prepareEmbeddedRunnerReport(run.rawReport);
-  const html = renderHtmlReport(embeddedReport, {
-    title: `${run.project?.name || 'Test Station'} Report - ${run.externalKey}`,
+  const html = await measureProfileStep(profiler, 'run-report-render', async () => {
+    const { renderHtmlReport } = await import('@test-station/render-html');
+    const embeddedReport = prepareEmbeddedRunnerReport(run.rawReport);
+    return renderHtmlReport(embeddedReport, {
+      title: `${run.project?.name || 'Test Station'} Report - ${run.externalKey}`,
+    });
+  }, {
+    runId,
   });
 
   return decorateEmbeddedRunnerReportHtml(html);
@@ -339,6 +368,7 @@ async function loadProjectTrendPanels({
   releaseNotes,
   fetchImpl,
   requestId,
+  profiler = null,
 }) {
   const overlays = buildTrendOverlays(overallTrend, releaseNotes);
   if (!latestRunId) {
@@ -351,12 +381,15 @@ async function loadProjectTrendPanels({
     };
   }
 
-  const scopeCatalog = await executeWebGraphql({
+  const scopeCatalog = await measureProfileStep(profiler, 'project-scope-catalog-query', () => executeWebGraphql({
     session,
     query: RUN_SCOPE_TREND_CATALOG_QUERY,
     variables: { runId: latestRunId },
     fetchImpl,
     requestId,
+  }), {
+    query: 'RUN_SCOPE_TREND_CATALOG_QUERY',
+    runId: latestRunId,
   });
 
   const packageSelections = (Array.isArray(scopeCatalog.runPackages) ? scopeCatalog.runPackages : [])
@@ -388,9 +421,36 @@ async function loadProjectTrendPanels({
     }));
 
   const [packageTrends, moduleTrends, fileTrends] = await Promise.all([
-    loadScopedTrendPanels({ session, projectKey, selections: packageSelections, fetchImpl, requestId }),
-    loadScopedTrendPanels({ session, projectKey, selections: moduleSelections, fetchImpl, requestId }),
-    loadScopedTrendPanels({ session, projectKey, selections: fileSelections, fetchImpl, requestId }),
+    measureProfileStep(profiler, 'package-trend-query-group', () => loadScopedTrendPanels({
+      session,
+      projectKey,
+      selections: packageSelections,
+      fetchImpl,
+      requestId,
+    }), {
+      selectionCount: packageSelections.length,
+      scopeType: 'package',
+    }),
+    measureProfileStep(profiler, 'module-trend-query-group', () => loadScopedTrendPanels({
+      session,
+      projectKey,
+      selections: moduleSelections,
+      fetchImpl,
+      requestId,
+    }), {
+      selectionCount: moduleSelections.length,
+      scopeType: 'module',
+    }),
+    measureProfileStep(profiler, 'file-trend-query-group', () => loadScopedTrendPanels({
+      session,
+      projectKey,
+      selections: fileSelections,
+      fetchImpl,
+      requestId,
+    }), {
+      selectionCount: fileSelections.length,
+      scopeType: 'file',
+    }),
   ]);
 
   return {

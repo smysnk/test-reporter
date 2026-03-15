@@ -4,6 +4,7 @@ import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, MetricGrid, SectionCard, StatusPill, RunBuildChip } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../../lib/format.js';
 import { getWebSession } from '../../lib/auth.js';
+import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../../lib/pageProfiling.js';
 import { buildProjectPageResult } from '../../lib/pageProps.js';
 import { loadProjectExplorerPage } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
@@ -27,6 +28,15 @@ export default function ProjectExplorerPage({ data }) {
   }
 
   const latestCoverage = coverageTrend[0]?.linesPct ?? runs[0]?.coverageSnapshot?.linesPct ?? null;
+
+  React.useEffect(() => {
+    recordClientPageMark('project-page-ready', {
+      projectSlug: project.slug,
+      runCount: runs.length,
+      coveragePointCount: coverageTrend.length,
+      releaseNoteCount: releaseNotes.length,
+    });
+  }, [coverageTrend.length, project.slug, releaseNotes.length, runs.length]);
 
   return React.createElement(
     React.Fragment,
@@ -233,17 +243,33 @@ export default function ProjectExplorerPage({ data }) {
 export const getServerSideProps = wrapper.getServerSideProps((store) => async (context) => {
   const session = await getWebSession(context.req, context.res);
   const slug = typeof context.params?.slug === 'string' ? context.params.slug : '';
+  const pageProfiler = createPageLoadProfiler({
+    pageType: 'project',
+    route: `/projects/${slug}`,
+  });
   const data = await loadProjectExplorerPage({
     session,
     slug,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
+    profiler: pageProfiler,
   });
+  const pageProfile = pageProfiler.finalize({
+    projectSlug: data?.project?.slug || slug,
+    runCount: Array.isArray(data?.runs) ? data.runs.length : 0,
+    coveragePointCount: Array.isArray(data?.coverageTrend) ? data.coverageTrend.length : 0,
+    releaseNoteCount: Array.isArray(data?.releaseNotes) ? data.releaseNotes.length : 0,
+  });
+  const serverTimingHeader = buildServerTimingHeader(pageProfile);
+  if (serverTimingHeader && context.res && typeof context.res.setHeader === 'function') {
+    context.res.setHeader('Server-Timing', serverTimingHeader);
+  }
 
   return buildProjectPageResult({
     store,
     session,
     slug,
     data,
+    pageProfile,
     dispatchers: {
       setViewMode,
       setRuntimeConfig,

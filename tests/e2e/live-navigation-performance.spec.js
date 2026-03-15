@@ -99,6 +99,7 @@ test('benchmarks the public home page with live data', async ({ page }, testInfo
       visibleRunCount: runRows.count,
       visibleProjectCount: projects.count,
     },
+    profiling: await collectProfilingSnapshot(page, 'overview-page-ready'),
   };
 
   assertBudget('homeReadyMs', record.metrics.homeReadyMs);
@@ -121,6 +122,7 @@ test('benchmarks sidebar project focus and project-page load', async ({ page }, 
       await expect(page.getByText('Project focus', { exact: true })).toBeVisible();
     },
   );
+  const projectFocusProfiling = await collectProfilingSnapshot(page, 'overview-page-ready');
 
   const clearButton = await getAllRunsButton(page);
   const clearProjectFocusMs = await measureInteraction(
@@ -132,6 +134,7 @@ test('benchmarks sidebar project focus and project-page load', async ({ page }, 
       await expect(page.getByText('Operations overview', { exact: true })).toBeVisible();
     },
   );
+  const clearProjectFocusProfiling = await collectProfilingSnapshot(page, 'overview-page-ready');
 
   const projectSlug = await resolveBenchmarkProjectSlug(page, projectTitle);
   test.skip(!projectSlug, 'Unable to resolve a project slug for the live benchmark.');
@@ -144,6 +147,7 @@ test('benchmarks sidebar project focus and project-page load', async ({ page }, 
       await expect(page.getByText('Execution feed', { exact: true })).toBeVisible({ timeout: 45_000 });
     },
   );
+  const projectPageProfiling = await collectProfilingSnapshot(page, 'project-page-ready');
 
   const record = {
     scenario: 'sidebar-focus-and-project-load',
@@ -157,6 +161,11 @@ test('benchmarks sidebar project focus and project-page load', async ({ page }, 
     context: {
       projectSlug,
       projectTitle,
+    },
+    profiling: {
+      projectFocus: projectFocusProfiling,
+      clearProjectFocus: clearProjectFocusProfiling,
+      projectPage: projectPageProfiling,
     },
   };
 
@@ -178,6 +187,7 @@ test('benchmarks runner report readiness, operations view, and project-page navi
   test.skip(await runLink.count() === 0, 'No project-scoped run links are visible to benchmark.');
   const runNavigation = await navigateByHrefWithFallback(page, runLink, /\/runs\/[^/?#]+$/);
   await expect(page.getByRole('link', { name: 'Runner report' })).toBeVisible();
+  const runPageProfiling = await collectProfilingSnapshot(page, 'run-page-ready');
   const runId = getRunIdFromUrl(page.url());
 
   const runnerFrame = page.frameLocator('iframe.web-runner-frame');
@@ -188,21 +198,21 @@ test('benchmarks runner report readiness, operations view, and project-page navi
       await expect(runnerFrame.locator('main')).toBeVisible();
     },
   );
+  const runnerReportProfiling = await collectProfilingSnapshot(page, 'runner-frame-height-ready');
 
   const operationsViewLink = page.getByRole('link', { name: 'Operations view' });
-  const operationsViewSwitchMs = await measureInteraction(
-    async () => {
-      await operationsViewLink.click();
-    },
-    async () => {
-      await expect(page).toHaveURL(new RegExp(`/runs/${escapeRegExp(runId)}\\?template=web`));
-      await expect(page.getByText('Run-to-run comparison', { exact: true })).toBeVisible();
-    },
+  const operationsNavigation = await navigateByHrefWithFallback(
+    page,
+    operationsViewLink,
+    new RegExp(`/runs/${escapeRegExp(runId)}\\?template=web`),
   );
+  await expect(page.getByText('Run-to-run comparison', { exact: true })).toBeVisible();
+  const operationsProfiling = await collectProfilingSnapshot(page, 'run-operations-ready');
 
   const projectLink = page.locator('[data-perf-id="run-project-link"], .web-run-detail__header a[href^="/projects/"]').first();
   const projectNavigation = await navigateByHrefWithFallback(page, projectLink, /\/projects\/[^/?#]+$/);
   await expect(page.getByText('Execution feed', { exact: true })).toBeVisible({ timeout: 45_000 });
+  const projectPageProfiling = await collectProfilingSnapshot(page, 'project-page-ready');
 
   const record = {
     scenario: 'run-and-project-navigation',
@@ -210,14 +220,21 @@ test('benchmarks runner report readiness, operations view, and project-page navi
     metrics: {
       runNavigationMs: runNavigation.durationMs,
       runnerReportReadyMs,
-      operationsViewSwitchMs,
+      operationsViewSwitchMs: operationsNavigation.durationMs,
       projectPageNavigationMs: projectNavigation.durationMs,
       ...await collectBrowserMetrics(page),
     },
     context: {
       runId,
       runNavigationMode: runNavigation.mode,
+      operationsViewSwitchMode: operationsNavigation.mode,
       projectPageNavigationMode: projectNavigation.mode,
+    },
+    profiling: {
+      runPage: runPageProfiling,
+      runnerReport: runnerReportProfiling,
+      operationsView: operationsProfiling,
+      projectPage: projectPageProfiling,
     },
   };
 
@@ -278,6 +295,89 @@ async function collectBrowserMetrics(page) {
       return Math.round(value * factor) / factor;
     }
   });
+}
+
+async function collectProfilingSnapshot(page, expectedMarkName = null) {
+  return page.evaluate((markName) => {
+    const perfStore = window.__TEST_STATION_PERF__ || {};
+    const nextDataNode = document.getElementById('__NEXT_DATA__');
+    let nextPageProfile = null;
+
+    if (nextDataNode?.textContent) {
+      try {
+        const parsed = JSON.parse(nextDataNode.textContent);
+        nextPageProfile = parsed?.props?.pageProps?.pageProfile || null;
+      } catch {}
+    }
+
+    const recentPageMarks = Array.isArray(perfStore.pageMarks)
+      ? perfStore.pageMarks.slice(-12)
+      : [];
+    const recentRouteTransitions = Array.isArray(perfStore.routeTransitions)
+      ? perfStore.routeTransitions.slice(-6).map((entry) => ({
+        id: entry.id,
+        from: entry.from,
+        to: entry.to,
+        status: entry.status,
+        durationMs: roundMetric(entry.durationMs),
+        details: entry.details || null,
+        completionDetails: entry.completionDetails || null,
+        error: entry.error || null,
+        marks: Array.isArray(entry.marks) ? entry.marks : [],
+        pageMarks: Array.isArray(entry.pageMarks) ? entry.pageMarks : [],
+      }))
+      : [];
+    const recentResources = performance.getEntriesByType('resource')
+      .filter((entry) => {
+        return entry.name.includes('/graphql')
+          || entry.name.includes('/_next/data/')
+          || entry.name.includes('/api/runs/');
+      })
+      .slice(-20)
+      .map((entry) => ({
+        name: toRelativeResourceName(entry.name),
+        initiatorType: entry.initiatorType || null,
+        startTimeMs: roundMetric(entry.startTime),
+        responseEndMs: roundMetric(entry.responseEnd),
+        durationMs: roundMetric(entry.duration),
+        transferSizeBytes: Number.isFinite(entry.transferSize) ? entry.transferSize : null,
+        encodedBodySizeBytes: Number.isFinite(entry.encodedBodySize) ? entry.encodedBodySize : null,
+        decodedBodySizeBytes: Number.isFinite(entry.decodedBodySize) ? entry.decodedBodySize : null,
+      }));
+
+    return {
+      serverPageProfile: perfStore.serverPageProfile || nextPageProfile,
+      matchingPageMark: markName
+        ? [...recentPageMarks].reverse().find((entry) => entry.name === markName) || null
+        : null,
+      recentPageMarks,
+      recentRouteTransitions,
+      recentResources,
+      resourceSummary: {
+        graphqlRequests: recentResources.filter((entry) => entry.name.includes('/graphql')),
+        nextDataRequests: recentResources.filter((entry) => entry.name.includes('/_next/data/')),
+        runnerReportRequests: recentResources.filter((entry) => entry.name.includes('/api/runs/')),
+      },
+    };
+
+    function toRelativeResourceName(name) {
+      try {
+        const resourceUrl = new URL(name, window.location.origin);
+        return `${resourceUrl.pathname}${resourceUrl.search}`;
+      } catch {
+        return name;
+      }
+    }
+
+    function roundMetric(value, precision = 1) {
+      if (!Number.isFinite(value)) {
+        return null;
+      }
+
+      const factor = 10 ** precision;
+      return Math.round(value * factor) / factor;
+    }
+  }, expectedMarkName);
 }
 
 async function recordBenchmark(testInfo, record) {

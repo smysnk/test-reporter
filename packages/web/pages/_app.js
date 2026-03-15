@@ -8,6 +8,13 @@ import { ThemeProvider, createGlobalStyle } from 'styled-components';
 import { WebShell } from '../components/WebShell.js';
 import { getApolloClient } from '../lib/apolloClient.js';
 import { initializeAnalytics, pageview } from '../lib/gtag.js';
+import {
+  beginClientRouteProfile,
+  completeClientRouteProfile,
+  failClientRouteProfile,
+  recordClientRouteStage,
+  setClientServerPageProfile,
+} from '../lib/pageProfiling.js';
 import { wrapper } from '../store/index.js';
 
 const theme = {
@@ -893,19 +900,48 @@ function WebAppContent({ Component, pageProps }) {
   }, [gaMeasurementId, runtimeConfigLoaded]);
 
   React.useEffect(() => {
-    if (!gaMeasurementId) {
+    if (typeof window === 'undefined') {
       return;
     }
 
-    const handleRouteChange = (url) => {
-      pageview(url);
+    setClientServerPageProfile(pageProps.pageProfile || null);
+  }, [pageProps.pageProfile]);
+
+  React.useEffect(() => {
+    const handleRouteChangeStart = (url) => {
+      beginClientRouteProfile(url, {
+        sourceRoute: router.asPath,
+      });
+      recordClientRouteStage('routeChangeStart', { url });
     };
 
-    router.events.on('routeChangeComplete', handleRouteChange);
-    return () => {
-      router.events.off('routeChangeComplete', handleRouteChange);
+    const handleBeforeHistoryChange = (url) => {
+      recordClientRouteStage('beforeHistoryChange', { url });
     };
-  }, [gaMeasurementId, router.events]);
+
+    const handleRouteChangeComplete = (url) => {
+      recordClientRouteStage('routeChangeComplete', { url });
+      completeClientRouteProfile(url);
+      if (gaMeasurementId) {
+        pageview(url);
+      }
+    };
+
+    const handleRouteChangeError = (error, url) => {
+      failClientRouteProfile(url, error);
+    };
+
+    router.events.on('routeChangeStart', handleRouteChangeStart);
+    router.events.on('beforeHistoryChange', handleBeforeHistoryChange);
+    router.events.on('routeChangeComplete', handleRouteChangeComplete);
+    router.events.on('routeChangeError', handleRouteChangeError);
+    return () => {
+      router.events.off('routeChangeStart', handleRouteChangeStart);
+      router.events.off('beforeHistoryChange', handleBeforeHistoryChange);
+      router.events.off('routeChangeComplete', handleRouteChangeComplete);
+      router.events.off('routeChangeError', handleRouteChangeError);
+    };
+  }, [gaMeasurementId, router]);
 
   return React.createElement(
     ThemeProvider,

@@ -1,6 +1,6 @@
 import { resolvePublicRuntimeConfig } from './runtimeConfig.js';
 
-export function buildOverviewPageResult({ store, session, data, dispatchers = {} }) {
+export function buildOverviewPageResult({ store, session, data, pageProfile = null, dispatchers = {} }) {
   dispatchPageState(store, dispatchers, {
     viewMode: 'overview',
     selectedProjectSlug: null,
@@ -11,11 +11,12 @@ export function buildOverviewPageResult({ store, session, data, dispatchers = {}
     props: {
       session,
       data,
+      pageProfile,
     },
   };
 }
 
-export function buildProjectPageResult({ store, session, slug, data, dispatchers = {} }) {
+export function buildProjectPageResult({ store, session, slug, data, pageProfile = null, dispatchers = {} }) {
   if (!data) {
     return {
       notFound: true,
@@ -32,11 +33,12 @@ export function buildProjectPageResult({ store, session, slug, data, dispatchers
     props: {
       session,
       data,
+      pageProfile,
     },
   };
 }
 
-export function buildRunPageResult({ store, session, runId, templateMode, data, dispatchers = {} }) {
+export function buildRunPageResult({ store, session, runId, templateMode, data, pageProfile = null, dispatchers = {} }) {
   if (!data) {
     return {
       notFound: true,
@@ -54,11 +56,12 @@ export function buildRunPageResult({ store, session, runId, templateMode, data, 
       session,
       data,
       templateMode,
+      pageProfile,
     },
   };
 }
 
-export function buildAdminPageResult({ store, session, data, selectedProjectSlug = null, dispatchers = {} }) {
+export function buildAdminPageResult({ store, session, data, selectedProjectSlug = null, pageProfile = null, dispatchers = {} }) {
   if (!data) {
     return {
       notFound: true,
@@ -75,6 +78,7 @@ export function buildAdminPageResult({ store, session, data, selectedProjectSlug
     props: {
       session,
       data,
+      pageProfile,
     },
   };
 }

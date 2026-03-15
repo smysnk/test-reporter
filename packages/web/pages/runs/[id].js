@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { EmptyState, InlineList, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, formatSignedDelta } from '../../lib/format.js';
 import { getWebSession } from '../../lib/auth.js';
+import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../../lib/pageProfiling.js';
 import { buildRunPageResult } from '../../lib/pageProps.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../../lib/runReportTemplate.js';
 import { buildRunTemplateHref, resolveRunTemplateMode } from '../../lib/runTemplateRouting.js';
@@ -34,6 +35,14 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
       'Open GitHub Actions run',
     )
     : (run.sourceRunId || 'run link unavailable');
+
+  React.useEffect(() => {
+    recordClientPageMark('run-page-ready', {
+      runId: run.id,
+      templateMode,
+      failedTestCount: Array.isArray(data?.failedTests) ? data.failedTests.length : 0,
+    });
+  }, [data?.failedTests?.length, run.id, templateMode]);
 
   return React.createElement(
     React.Fragment,
@@ -94,6 +103,16 @@ function OperationsRunDetail({ data }) {
   const runFiles = Array.isArray(data?.runFiles) ? data.runFiles : [];
   const failedTests = Array.isArray(data?.failedTests) ? data.failedTests : [];
   const coverageComparison = data?.coverageComparison || null;
+
+  React.useEffect(() => {
+    recordClientPageMark('run-operations-ready', {
+      packageCount: runPackages.length,
+      moduleCount: runModules.length,
+      fileCount: runFiles.length,
+      failedTestCount: failedTests.length,
+      hasCoverageComparison: coverageComparison !== null,
+    });
+  }, [coverageComparison, failedTests.length, runFiles.length, runModules.length, runPackages.length]);
 
   return React.createElement(
     React.Fragment,
@@ -416,6 +435,7 @@ function RunnerReportSection({ runId, externalKey }) {
 function RunnerReportFrame({ runId, title }) {
   const iframeRef = React.useRef(null);
   const [frameHeight, setFrameHeight] = React.useState(1200);
+  const hasReportedHeightRef = React.useRef(false);
 
   React.useEffect(() => {
     const handleMessage = (event) => {
@@ -431,6 +451,13 @@ function RunnerReportFrame({ runId, title }) {
       const nextHeight = Number.parseInt(event.data.height, 10);
       if (Number.isFinite(nextHeight) && nextHeight > 0) {
         setFrameHeight(Math.max(960, nextHeight));
+        if (!hasReportedHeightRef.current) {
+          hasReportedHeightRef.current = true;
+          recordClientPageMark('runner-frame-height-ready', {
+            runId,
+            height: Math.max(960, nextHeight),
+          });
+        }
       }
     };
 
@@ -447,6 +474,9 @@ function RunnerReportFrame({ runId, title }) {
     className: 'web-runner-frame',
     scrolling: 'no',
     sandbox: 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox',
+    onLoad: () => {
+      recordClientPageMark('runner-frame-load', { runId });
+    },
     style: {
       height: `${frameHeight}px`,
     },
@@ -489,11 +519,26 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   const session = await getWebSession(context.req, context.res);
   const runId = typeof context.params?.id === 'string' ? context.params.id : '';
   const templateMode = resolveRunTemplateMode(context.query?.template);
+  const pageProfiler = createPageLoadProfiler({
+    pageType: 'run',
+    route: `/runs/${runId}${templateMode === 'web' ? '?template=web' : ''}`,
+  });
   const data = await loadRunExplorerPage({
     session,
     runId,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
+    profiler: pageProfiler,
   });
+  const pageProfile = pageProfiler.finalize({
+    runId,
+    templateMode,
+    failedTestCount: Array.isArray(data?.failedTests) ? data.failedTests.length : 0,
+    artifactCount: Array.isArray(data?.run?.artifacts) ? data.run.artifacts.length : 0,
+  });
+  const serverTimingHeader = buildServerTimingHeader(pageProfile);
+  if (serverTimingHeader && context.res && typeof context.res.setHeader === 'function') {
+    context.res.setHeader('Server-Timing', serverTimingHeader);
+  }
 
   return buildRunPageResult({
     store,
@@ -501,6 +546,7 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
     runId,
     templateMode,
     data,
+    pageProfile,
     dispatchers: {
       setViewMode,
       setRuntimeConfig,

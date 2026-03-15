@@ -295,6 +295,15 @@ Artifacts:
 - timestamped benchmark snapshots under `artifacts/e2e-performance/`
 - Playwright JSON output at `artifacts/e2e-performance/playwright-results.json`
 
+Each benchmark record now also carries a `profiling` block with:
+
+- server-side page-load timings captured during `getServerSideProps`
+- browser page-ready marks for overview, project, run, operations, and runner-frame milestones
+- recent client-side route-transition events
+- resource timings for `/graphql`, `/_next/data/`, and runner-report iframe requests
+
+These profiling fields only appear once the target deployment is running a build that includes the instrumentation hooks from this repo.
+
 Optional environment variables:
 
 - `TEST_STATION_E2E_BASE_URL`: target deployment to benchmark
@@ -307,6 +316,35 @@ Optional environment variables:
 - `TEST_STATION_E2E_BUDGET_RUNNER_REPORT_READY_MS`
 - `TEST_STATION_E2E_BUDGET_OPERATIONS_VIEW_SWITCH_MS`
 - `TEST_STATION_E2E_BUDGET_PROJECT_PAGE_NAVIGATION_MS`
+
+### Live UI Interaction Regressions
+
+This repo also carries a separate live-data interaction suite for the visible navigation surfaces. Unlike the benchmark suite, these tests do not fall back to direct route changes, so they fail when a click target stops navigating.
+
+Typical usage:
+
+```sh
+yarn playwright install --with-deps chromium
+TEST_STATION_E2E_BASE_URL=https://test-station.smysnk.com yarn test:e2e:interactions
+```
+
+What it checks:
+
+- clicking a home-page run row opens the run detail page
+- clicking a project execution-feed run link opens the run detail page
+- clicking `Operations view` switches from the runner report to the operations template
+- clicking the project link on a run detail page navigates back to the related project page
+
+Artifacts:
+
+- Playwright JSON output at `artifacts/e2e-interactions/playwright-results.json`
+- traces and screenshots under `artifacts/e2e-interactions/test-results/`
+
+Optional environment variables:
+
+- `TEST_STATION_E2E_BASE_URL`: target deployment to exercise
+- `TEST_STATION_E2E_STORAGE_STATE`: optional Playwright storage-state file when the target requires authentication
+- `TEST_STATION_E2E_INTERACTIONS_OUTPUT_DIR`: override the interaction artifact directory
 
 If the app redirects to `/auth/signin` and no storage state is provided, or if there are no public runs/projects visible, the benchmark suite skips rather than failing with misleading timing output.
 
