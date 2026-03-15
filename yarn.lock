@@ -894,6 +894,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@next/third-parties@npm:15.5.12":
+  version: 15.5.12
+  resolution: "@next/third-parties@npm:15.5.12"
+  dependencies:
+    third-party-capital: "npm:1.0.20"
+  peerDependencies:
+    next: ^13.0.0 || ^14.0.0 || ^15.0.0
+    react: ^18.2.0 || 19.0.0-rc-de68d2f4-20241204 || ^19.0.0
+  checksum: 10c0/47fc79c9d0a39726b646b23e92777e45ec688e68bfbc1c3d8974da436bc3e23ea5730df8d29f1a9c473709035039412e806d81fffe322fd3cc822f102dfb7e84
+  languageName: node
+  linkType: hard
+
 "@npmcli/agent@npm:^4.0.0":
   version: 4.0.0
   resolution: "@npmcli/agent@npm:4.0.0"
@@ -4452,6 +4464,13 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"third-party-capital@npm:1.0.20":
+  version: 1.0.20
+  resolution: "third-party-capital@npm:1.0.20"
+  checksum: 10c0/7f45ff156ec9d7e2957a5b39061be22b780ffbd2d93c127252d908e2bff6cdd09f827a95909d457c8096e036f155006a38e355a06ee11cb6d63c7f4b150bbfb0
+  languageName: node
+  linkType: hard
+
 "tinybench@npm:^2.9.0":
   version: 2.9.0
   resolution: "tinybench@npm:2.9.0"
@@ -4769,6 +4788,7 @@ __metadata:
   resolution: "web@workspace:packages/web"
   dependencies:
     "@apollo/client": "npm:^3.9.12"
+    "@next/third-parties": "npm:15.5.12"
     "@reduxjs/toolkit": "npm:^1.9.5"
     "@test-station/render-html": "workspace:*"
     "@types/react": "npm:^18.3.12"

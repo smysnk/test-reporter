@@ -1,8 +1,8 @@
 import React from 'react';
+import { GoogleAnalytics } from '@next/third-parties/google';
 import { ApolloProvider } from '@apollo/client';
 import { SessionProvider } from 'next-auth/react';
 import { useRouter } from 'next/router';
-import Script from 'next/script';
 import { Provider, useSelector } from 'react-redux';
 import { ThemeProvider, createGlobalStyle } from 'styled-components';
 import { WebShell } from '../components/WebShell.js';
@@ -677,27 +677,7 @@ function WebAppContent({ Component, pageProps }) {
       React.Fragment,
       null,
       runtimeConfigLoaded && gaMeasurementId
-        ? React.createElement(
-          React.Fragment,
-          null,
-          React.createElement(Script, {
-            src: `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(gaMeasurementId)}`,
-            strategy: 'afterInteractive',
-          }),
-          React.createElement(
-            Script,
-            {
-              id: 'google-analytics',
-              strategy: 'afterInteractive',
-            },
-            `
-              window.dataLayer = window.dataLayer || [];
-              window.gtag = window.gtag || function gtag(){window.dataLayer.push(arguments);};
-              window.gtag('js', new Date());
-              window.gtag('config', '${gaMeasurementId}');
-            `,
-          ),
-        )
+        ? React.createElement(GoogleAnalytics, { gaId: gaMeasurementId })
         : null,
       React.createElement(GlobalStyle, null),
       React.createElement(
