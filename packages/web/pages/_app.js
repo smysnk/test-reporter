@@ -418,25 +418,26 @@ const GlobalStyle = createGlobalStyle`
     align-items: center;
     flex-wrap: wrap;
   }
-  .web-explorer-table__meta-link {
-    color: ${(props) => props.theme.colors.accent};
-    font-size: 0.84rem;
-    font-weight: 600;
-  }
   .web-explorer-table__cell {
     white-space: nowrap;
   }
   .web-explorer-table__cell--status {
     white-space: normal;
   }
-  .web-explorer-table__cell--mono {
-    font-family: "SFMono-Regular", "SFMono", "Menlo", "Consolas", monospace;
-    font-size: 0.9rem;
-  }
   .web-explorer-table__build {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+  }
+  .web-explorer-table__text-link {
+    color: ${(props) => props.theme.colors.accent};
+    font-weight: 600;
+  }
+  .web-explorer-table__text-value {
+    color: ${(props) => props.theme.colors.text};
+  }
+  .web-explorer-table__text-value--muted {
+    color: ${(props) => props.theme.colors.muted};
   }
   .web-inline-list {
     display: flex;

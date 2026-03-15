@@ -1,8 +1,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { useDispatch, useSelector } from 'react-redux';
-import { MetricGrid, SectionCard, StatusPill, EmptyState, RunBuildChip } from '../components/WebBits.js';
-import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../lib/format.js';
+import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/WebBits.js';
+import { formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../lib/format.js';
 import { buildHomeExplorerModel } from '../lib/homeExplorer.js';
 import { getWebSession } from '../lib/auth.js';
 import { buildOverviewPageResult } from '../lib/pageProps.js';
@@ -34,6 +34,14 @@ function SidebarButton({ active = false, title, meta, chips = [], onClick }) {
   );
 }
 
+function formatLandingBuildLabel(run) {
+  if (Number.isFinite(run?.projectVersion?.buildNumber)) {
+    return `#${Math.trunc(Number(run.projectVersion.buildNumber))}`;
+  }
+
+  return formatRunBuildLabel(run);
+}
+
 function RunTable({ runs, selectedProject }) {
   if (!Array.isArray(runs) || runs.length === 0) {
     return React.createElement(EmptyState, {
@@ -60,8 +68,6 @@ function RunTable({ runs, selectedProject }) {
           React.createElement('th', null, 'Status'),
           React.createElement('th', null, 'Build'),
           React.createElement('th', null, 'Branch'),
-          React.createElement('th', null, 'Commit'),
-          React.createElement('th', null, 'Finished'),
           React.createElement('th', null, 'Duration'),
           React.createElement('th', null, 'Coverage'),
         ),
@@ -76,7 +82,7 @@ function RunTable({ runs, selectedProject }) {
           const metaLabel = selectedProject
             ? formatRepositoryName(run.project?.repositoryUrl)
             : run.externalKey || formatRepositoryName(run.project?.repositoryUrl);
-          const buildLabel = formatRunBuildLabel(run);
+          const buildLabel = formatLandingBuildLabel(run);
           const primaryHref = selectedProject
             ? `/runs/${run.id}`
             : run.project?.slug
@@ -104,16 +110,6 @@ function RunTable({ runs, selectedProject }) {
                   'div',
                   { className: 'web-explorer-table__meta-row' },
                   React.createElement('span', { className: 'web-explorer-table__meta' }, metaLabel),
-                  !selectedProject
-                    ? React.createElement(
-                      Link,
-                      {
-                        href: `/runs/${run.id}`,
-                        className: 'web-explorer-table__meta-link',
-                      },
-                      'Open run',
-                    )
-                    : null,
                 ),
               ),
             ),
@@ -129,24 +125,39 @@ function RunTable({ runs, selectedProject }) {
                 'div',
                 { className: 'web-explorer-table__build' },
                 buildLabel
-                  ? React.createElement(RunBuildChip, { run })
-                  : React.createElement('span', { className: 'web-chip web-chip--muted' }, 'No build'),
+                  ? (
+                    run.sourceUrl
+                      ? React.createElement(
+                        'a',
+                        {
+                          href: run.sourceUrl,
+                          target: '_blank',
+                          rel: 'noreferrer',
+                          className: 'web-explorer-table__text-link',
+                        },
+                        buildLabel,
+                      )
+                      : React.createElement(
+                        'span',
+                        { className: 'web-explorer-table__text-value' },
+                        buildLabel,
+                      )
+                  )
+                  : React.createElement('span', { className: 'web-explorer-table__text-value web-explorer-table__text-value--muted' }, 'No build'),
               ),
             ),
             React.createElement(
               'td',
               { className: 'web-explorer-table__cell' },
-              React.createElement('span', { className: 'web-chip web-chip--muted' }, run.branch || 'no-branch'),
-            ),
-            React.createElement(
-              'td',
-              { className: 'web-explorer-table__cell web-explorer-table__cell--mono' },
-              formatCommitSha(run.commitSha),
-            ),
-            React.createElement(
-              'td',
-              { className: 'web-explorer-table__cell' },
-              formatDateTime(run.completedAt),
+              React.createElement(
+                'span',
+                {
+                  className: run.branch
+                    ? 'web-explorer-table__text-value'
+                    : 'web-explorer-table__text-value web-explorer-table__text-value--muted',
+                },
+                run.branch || 'no-branch',
+              ),
             ),
             React.createElement(
               'td',
