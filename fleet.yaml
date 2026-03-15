@@ -5,7 +5,7 @@ helm:
   chart: ./fleet/test-station
   values:
     image:
-      tag: staging
+      tag: main
     global:
       publicDomain: test-station.smysnk.com
     server:

@@ -392,6 +392,31 @@ const GlobalStyle = createGlobalStyle`
     table-layout: auto;
     min-width: 960px;
   }
+  .web-explorer-table__row {
+    cursor: pointer;
+    outline: none;
+  }
+  .web-explorer-table__row td {
+    transition: background-color 160ms ease;
+  }
+  .web-explorer-table__row:hover td,
+  .web-explorer-table__row:focus td {
+    background: rgba(107, 178, 255, 0.08);
+  }
+  .web-explorer-table__row:hover td:first-child,
+  .web-explorer-table__row:focus td:first-child {
+    border-top-left-radius: 16px;
+    border-bottom-left-radius: 16px;
+  }
+  .web-explorer-table__row:hover td:last-child,
+  .web-explorer-table__row:focus td:last-child {
+    border-top-right-radius: 16px;
+    border-bottom-right-radius: 16px;
+  }
+  .web-explorer-table__row:hover .web-explorer-table__primary,
+  .web-explorer-table__row:focus .web-explorer-table__primary {
+    color: ${(props) => props.theme.colors.accent};
+  }
   .web-explorer-table th:last-child,
   .web-explorer-table td:last-child {
     padding-right: 0;
@@ -403,6 +428,7 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-explorer-table__primary {
     color: ${(props) => props.theme.colors.text};
+    transition: color 160ms ease;
     font-weight: 700;
     overflow-wrap: anywhere;
   }

@@ -1,9 +1,9 @@
-name: Staging Release Pipeline
+name: Main Release Pipeline
 
 on:
   push:
     branches:
-      - staging
+      - main
   workflow_dispatch:
     inputs:
       publish_npm:
@@ -12,7 +12,7 @@ on:
         default: true
         type: boolean
       deploy_fleet:
-        description: "Deploy the staging Fleet bundle after the image build"
+        description: "Deploy the Fleet bundle after the image build"
         required: false
         default: true
         type: boolean
@@ -190,7 +190,7 @@ jobs:
       - name: Validate and optionally publish npm packages
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_PUBLISH: ${{ ((github.event_name == 'push' && github.ref_name == 'staging') || inputs.publish_npm) && '1' || '0' }}
+          NPM_PUBLISH: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || inputs.publish_npm) && '1' || '0' }}
         run: ./scripts/release/release-npm-packages.sh
 
   docker-image:
@@ -200,7 +200,7 @@ jobs:
       packages: write
     uses: ./.github/workflows/image-build.yml
     with:
-      image_tag: staging
+      image_tag: main
       push_image: true
     secrets: inherit
 
@@ -227,5 +227,5 @@ jobs:
           chmod 600 "$kubeconfig_path"
           echo "KUBECONFIG_PATH=$kubeconfig_path" >> "$GITHUB_ENV"
 
-      - name: Deploy Fleet bundle and roll staging workloads
+      - name: Deploy Fleet bundle and roll main workloads
         run: ./scripts/deploy-fleet.sh --kubeconfig "$KUBECONFIG_PATH" --restart

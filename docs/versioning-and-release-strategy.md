@@ -78,18 +78,18 @@ Internal source layout inside `packages/*/src` is not a compatibility promise.
 6. Verify the generated output contains `report.json`, `modules.json`, `ownership.json`, `index.html`, and expected raw artifacts.
 7. Verify the generated HTML report opens and renders module/package drilldown correctly.
 8. If the release touched thresholds, diagnostics, or adapter-specific coverage paths, verify those surfaces in the generated report and console summary.
-9. Push the validated release commit to the `staging` branch.
-10. Let the staging release workflow compute the npm package version from the GitHub Actions build number.
-11. Let the staging release workflow run the npm release helper, build the container image, and deploy the Fleet bundle in order.
+9. Push the validated release commit to the `main` branch.
+10. Let the main release workflow compute the npm package version from the GitHub Actions build number.
+11. Let the main release workflow run the npm release helper, build the container image, and deploy the Fleet bundle in order.
 
-Manual workflow dispatch can run the same staging release workflow with `publish_npm` or `deploy_fleet` toggled off when you need a validation-only pass.
+Manual workflow dispatch can run the same main release workflow with `publish_npm` or `deploy_fleet` toggled off when you need a validation-only pass.
 
 ## Build-number npm publishing
 
 The npm release workflow uses a build-number versioning model:
 
 - checked-in package manifests keep the baseline semver line such as `0.2.0`
-- the staging release workflow computes a concrete publish version from CI metadata
+- the main release workflow computes a concrete publish version from CI metadata
 - the default mode is `major.minor.<github_run_number>`
 - all publishable `@test-station/*` packages are rewritten to that same concrete version before `npm pack` or `npm publish`
 - internal `@test-station/*` package dependencies are rewritten from `workspace:*` to the same concrete publish version for the release artifact

@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { useDispatch, useSelector } from 'react-redux';
 import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/WebBits.js';
 import { formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../lib/format.js';
@@ -48,7 +49,13 @@ function formatLandingBuildLabel(run) {
   return formatRunBuildLabel(run);
 }
 
+function isInteractiveRowTarget(target) {
+  return Boolean(target?.closest?.('a, button, input, select, textarea, summary'));
+}
+
 function RunTable({ runs, selectedProject }) {
+  const router = useRouter();
+
   if (!Array.isArray(runs) || runs.length === 0) {
     return React.createElement(EmptyState, {
       title: selectedProject ? 'No recent runs for this project' : 'No recent runs',
@@ -70,7 +77,7 @@ function RunTable({ runs, selectedProject }) {
         React.createElement(
           'tr',
           null,
-          React.createElement('th', null, selectedProject ? 'Run' : 'Project'),
+          React.createElement('th', null, 'Run'),
           React.createElement('th', null, 'Status'),
           React.createElement('th', null, 'Build'),
           React.createElement('th', null, 'Branch'),
@@ -89,29 +96,41 @@ function RunTable({ runs, selectedProject }) {
             ? formatRepositoryName(run.project?.repositoryUrl)
             : run.externalKey || formatRepositoryName(run.project?.repositoryUrl);
           const buildLabel = formatLandingBuildLabel(run);
-          const primaryHref = selectedProject
-            ? `/runs/${run.id}`
-            : run.project?.slug
-              ? `/projects/${run.project.slug}`
-              : `/runs/${run.id}`;
+          const runHref = `/runs/${run.id}`;
 
           return React.createElement(
             'tr',
-            { key: run.id },
+            {
+              key: run.id,
+              className: 'web-explorer-table__row',
+              tabIndex: 0,
+              role: 'link',
+              'aria-label': `Open run ${run.externalKey || run.id}`,
+              onClick: (event) => {
+                if (isInteractiveRowTarget(event.target)) {
+                  return;
+                }
+
+                void router.push(runHref);
+              },
+              onKeyDown: (event) => {
+                if (isInteractiveRowTarget(event.target)) {
+                  return;
+                }
+
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  void router.push(runHref);
+                }
+              },
+            },
             React.createElement(
               'td',
               null,
               React.createElement(
                 'div',
                 { className: 'web-explorer-table__entity' },
-                React.createElement(
-                  Link,
-                  {
-                    href: primaryHref,
-                    className: 'web-explorer-table__primary',
-                  },
-                  primaryLabel,
-                ),
+                React.createElement('span', { className: 'web-explorer-table__primary' }, primaryLabel),
                 React.createElement(
                   'div',
                   { className: 'web-explorer-table__meta-row' },

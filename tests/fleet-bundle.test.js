@@ -47,13 +47,14 @@ test('fleet values and workflow use the unified image contract without stray ref
   const dockerfile = fs.readFileSync(path.join(repoRoot, 'docker/Dockerfile'), 'utf8');
 
   assert.match(fleetYaml, /publicDomain:\s*test-station\.smysnk\.com/);
-  assert.match(fleetYaml, /image:\s*\n\s*tag:\s*staging/);
+  assert.match(fleetYaml, /image:\s*\n\s*tag:\s*main/);
   assert.match(fleetYaml, /existingSecret:\s*test-station-runtime-secret/);
   assert.match(fleetYaml, /className:\s*traefik/);
   assert.match(fleetYaml, /cert-manager\.io\/cluster-issuer:\s*letsencrypt-prod/);
   assert.match(fleetYaml, /tls:\s*\n\s*enabled:\s*true/);
   assert.match(fleetYaml, /enabled:\s*true/);
   assert.match(gitRepoYaml, /paths:\s*\n\s*-\s*\./);
+  assert.match(gitRepoYaml, /branch:\s*main/);
   assert.doesNotMatch(gitRepoYaml, /helm:\s*\n\s*values:/);
   assert.match(valuesYaml, /publicDomain:\s*""/);
   assert.match(valuesYaml, /ingressPaths:\s*\n\s*-\s*path:\s*\/api\/ingest/);

@@ -261,6 +261,13 @@ export function renderHtmlReport(report, options = {}) {
       font-size: 1rem;
       font-weight: 600;
     }
+    .module-card__owner {
+      font-size: 0.72rem;
+      font-weight: 300;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
     .module-card__meta {
       font-size: 0.85rem;
       color: var(--muted);
@@ -1042,6 +1049,13 @@ function renderOwnerPill(owner) {
   return `<span class="owner-pill">Owner: ${escapeHtml(owner)}</span>`;
 }
 
+function renderOwnerMeta(owner) {
+  if (!owner) {
+    return '';
+  }
+  return `<span class="module-card__owner">Owner: ${escapeHtml(owner)}</span>`;
+}
+
 function renderThresholdPill(threshold) {
   if (!threshold?.configured) {
     return '';
@@ -1123,6 +1137,7 @@ function renderModuleCard(moduleEntry) {
   const dominantPackages = Array.isArray(moduleEntry.dominantPackages) && moduleEntry.dominantPackages.length > 0
     ? moduleEntry.dominantPackages.join(', ')
     : 'No packages';
+  const thresholdMarkup = renderThresholdPill(moduleEntry.threshold);
   const filterAttrs = renderFilterAttributes({
     nodeType: 'module-card',
     moduleNames: [moduleEntry.module],
@@ -1135,16 +1150,14 @@ function renderModuleCard(moduleEntry) {
     <button type="button" class="module-card status-${status}" data-open-target="${escapeHtml(targetId)}" data-view-target="module" ${filterAttrs}>
       <div class="module-card__header">
         <div class="module-card__summary">
+          ${renderOwnerMeta(moduleEntry.owner)}
           <span class="module-card__name">${escapeHtml(moduleEntry.module)}</span>
           <span class="module-card__meta">${escapeHtml(formatSummary(moduleEntry.summary))}</span>
           <span class="module-card__meta">${escapeHtml(formatDuration(moduleEntry.durationMs || 0))} • ${escapeHtml(`${moduleEntry.packageCount || 0} package${moduleEntry.packageCount === 1 ? '' : 's'}`)}</span>
         </div>
         ${renderStatusPill(status)}
       </div>
-      <div class="module-card__badges">
-        ${renderOwnerPill(moduleEntry.owner)}
-        ${renderThresholdPill(moduleEntry.threshold)}
-      </div>
+      ${thresholdMarkup ? `<div class="module-card__badges">${thresholdMarkup}</div>` : ''}
       <div class="module-card__coverage">
         ${renderCoverageMiniMetric('Lines', moduleEntry.coverage?.lines)}
         ${renderCoverageMiniMetric('Branches', moduleEntry.coverage?.branches)}

@@ -365,6 +365,14 @@ test('renderer returns baseline html', () => {
   assert.match(html, /80\.0%/);
 });
 
+test('renderer shows owner as thin header text above the module card title', () => {
+  const html = renderHtmlReport(createSampleReport(), { title: 'example' });
+  const moduleCard = html.match(/<button type="button" class="module-card status-failed"[\s\S]*?<\/button>/)?.[0] || '';
+
+  assert.match(moduleCard, /module-card__owner">Owner: core-team<\/span>\s*<span class="module-card__name">runtime<\/span>/);
+  assert.doesNotMatch(moduleCard, /owner-pill/);
+});
+
 test('renderer shows statement tooltip state and fixed-width file coverage metrics', () => {
   const report = createSampleReport();
   const files = [

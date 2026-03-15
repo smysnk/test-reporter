@@ -6,7 +6,7 @@ on:
       image_tag:
         description: "Branch or release tag to publish alongside the sha tag"
         required: false
-        default: staging
+        default: main
         type: string
       push_image:
         description: "Push the built image to the target registry"
@@ -18,7 +18,7 @@ on:
       image_tag:
         description: "Branch or release tag to publish alongside the sha tag"
         required: false
-        default: manual
+        default: main
         type: string
       push_image:
         description: "Push the built image to the target registry"
