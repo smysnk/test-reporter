@@ -23,7 +23,7 @@ import {
   setClientServerPageProfile,
 } from '../packages/web/lib/pageProfiling.js';
 import { buildAdminPageResult, buildOverviewPageResult, buildProjectPageResult, buildRunPageResult } from '../packages/web/lib/pageProps.js';
-import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, RUN_DETAIL_QUERY } from '../packages/web/lib/queries.js';
+import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, RUN_DETAIL_QUERY, RUN_HEADER_QUERY } from '../packages/web/lib/queries.js';
 import { resolvePublicRuntimeConfig } from '../packages/web/lib/runtimeConfig.js';
 import {
   ADMIN_PAGE_UNAUTHORIZED,
@@ -1153,6 +1153,19 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
           sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
           project: { slug: 'workspace', name: 'Workspace' },
           projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
+          coverageSnapshot: { linesPct: 80 },
+        },
+      },
+    },
+    {
+      data: {
+        run: {
+          id: 'run-1',
+          externalKey: 'workspace:github-actions:1001',
+          sourceRunId: '1001',
+          sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
+          project: { slug: 'workspace', name: 'Workspace' },
+          projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
           artifacts: [],
           suites: [],
           coverageSnapshot: { linesPct: 80 },
@@ -1183,17 +1196,37 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
       },
     },
   ];
-  const fetchImpl = async (_url, _options) => new Response(JSON.stringify(responses.shift()), {
-    status: 200,
-    headers: { 'content-type': 'application/json' },
-  });
+  const graphqlQueries = [];
+  const fetchImpl = async (_url, options) => {
+    graphqlQueries.push(JSON.parse(options.body).query);
+    return new Response(JSON.stringify(responses.shift()), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
 
-  const run = await loadRunExplorerPage({ session, runId: 'run-1', fetchImpl });
-  assert.equal(run.run.id, 'run-1');
-  assert.equal(run.failedTests.length, 1);
-  assert.equal(run.runModules[0].module, 'runtime');
-  assert.equal(run.coverageComparison.deltaLinesPct, 6);
-  assert.equal(run.coverageComparison.fileChanges[0].filePath, '/repo/packages/core/src/index.js');
+  const runnerView = await loadRunExplorerPage({
+    session,
+    runId: 'run-1',
+    templateMode: 'runner',
+    fetchImpl,
+  });
+  assert.equal(runnerView.run.id, 'run-1');
+  assert.deepEqual(runnerView.failedTests, []);
+  assert.deepEqual(runnerView.runModules, []);
+  assert.equal(runnerView.coverageComparison, null);
+
+  const operationsView = await loadRunExplorerPage({
+    session,
+    runId: 'run-1',
+    templateMode: 'web',
+    fetchImpl,
+  });
+  assert.equal(operationsView.run.id, 'run-1');
+  assert.equal(operationsView.failedTests.length, 1);
+  assert.equal(operationsView.runModules[0].module, 'runtime');
+  assert.equal(operationsView.coverageComparison.deltaLinesPct, 6);
+  assert.equal(operationsView.coverageComparison.fileChanges[0].filePath, '/repo/packages/core/src/index.js');
 
   const direct = await executeWebGraphql({
     session,
@@ -1211,6 +1244,9 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(formatRepositoryName('https://github.com/smysnk/test-station.git'), 'smysnk/test-station');
   assert.equal(formatRunBuildLabel({ projectVersion: { buildNumber: 88 } }), 'build #88');
   assert.equal(formatRunBuildLabel({ sourceRunId: '1001' }), 'run 1001');
+  assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader')), true);
+  assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader') && query.includes('runPackages(runId: $runId)')), false);
+  assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPackages(runId: $runId)')), true);
 });
 
 test('web run build chip and GraphQL queries include build metadata and source links', () => {
@@ -1234,6 +1270,9 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceRunId/);
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceUrl/);
   assert.match(PROJECT_ACTIVITY_QUERY, /buildNumber/);
+  assert.match(RUN_HEADER_QUERY, /sourceRunId/);
+  assert.match(RUN_HEADER_QUERY, /sourceUrl/);
+  assert.match(RUN_HEADER_QUERY, /buildNumber/);
   assert.match(RUN_DETAIL_QUERY, /sourceRunId/);
   assert.match(RUN_DETAIL_QUERY, /sourceUrl/);
   assert.match(RUN_DETAIL_QUERY, /buildNumber/);

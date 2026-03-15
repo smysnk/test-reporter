@@ -529,6 +529,7 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   const data = await loadRunExplorerPage({
     session,
     runId,
+    templateMode,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
     requestTrace,
     profiler: pageProfiler,

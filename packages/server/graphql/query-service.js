@@ -164,23 +164,33 @@ export function createGraphqlQueryService(options = {}) {
     async findRun({ id = null, externalKey = null, actor }) {
       const projects = await this.listProjects({ actor });
       const projectMap = mapBy(projects, 'id');
-      const runs = await loadAll(models.Run);
-      const run = runs.find((candidate) => (
-        projectMap.has(candidate.projectId)
-        && ((id && candidate.id === id) || (externalKey && candidate.externalKey === externalKey))
-      )) || null;
+      const visibleProjectIds = Array.from(projectMap.keys());
+      if (visibleProjectIds.length === 0 || (!id && !externalKey)) {
+        return null;
+      }
+
+      const run = await loadOne(models.Run, {
+        where: {
+          projectId: visibleProjectIds,
+          ...(id ? { id } : {}),
+          ...(externalKey ? { externalKey } : {}),
+        },
+      });
 
       if (!run) {
         return null;
       }
 
-      const versionMap = mapBy(await loadAll(models.ProjectVersion), 'id');
-      const coverageSnapshotMap = mapBy(await loadAll(models.CoverageSnapshot), 'runId');
-
       return decorateRun(run, {
         project: projectMap.get(run.projectId) || null,
-        projectVersion: versionMap.get(run.projectVersionId) || null,
-        coverageSnapshot: coverageSnapshotMap.get(run.id) || null,
+        projectVersion: run.projectVersionId
+          ? await loadOne(models.ProjectVersion, {
+            where: { id: run.projectVersionId },
+          })
+          : null,
+        coverageSnapshot: await loadOne(models.CoverageSnapshot, {
+          where: { runId: run.id },
+        }),
       });
     },
 
@@ -578,6 +588,40 @@ async function loadAll(model, options = undefined) {
   return rows.map((row) => toPlainRecord(row));
 }
 
+async function loadOne(model, options = undefined) {
+  if (!model) {
+    return null;
+  }
+
+  if (typeof model.findOne === 'function') {
+    const row = await model.findOne(options);
+    return toPlainRecord(row);
+  }
+
+  if (typeof model.findAll === 'function') {
+    const rows = await model.findAll();
+    const match = rows
+      .map((row) => toPlainRecord(row))
+      .find((row) => matchesWhere(row, options?.where || {})) || null;
+
+    if (!match) {
+      return null;
+    }
+
+    if (Array.isArray(options?.attributes) && options.attributes.length > 0) {
+      return Object.fromEntries(
+        options.attributes
+          .filter((attribute) => Object.hasOwn(match, attribute))
+          .map((attribute) => [attribute, match[attribute]]),
+      );
+    }
+
+    return match;
+  }
+
+  return null;
+}
+
 function toPlainRecord(row) {
   if (!row) {
     return null;
@@ -599,6 +643,16 @@ function mapBy(values, key) {
     }
   }
   return map;
+}
+
+function matchesWhere(row, where) {
+  return Object.entries(where || {}).every(([key, value]) => {
+    if (Array.isArray(value)) {
+      return value.includes(row?.[key]);
+    }
+
+    return row?.[key] === value;
+  });
 }
 
 function normalizeLimit(value) {

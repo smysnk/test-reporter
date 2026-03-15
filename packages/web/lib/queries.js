@@ -288,6 +288,42 @@ export const RUN_DETAIL_QUERY = `
   }
 `;
 
+export const RUN_HEADER_QUERY = `
+  query WebRunHeader($runId: ID!) {
+    run(id: $runId) {
+      id
+      externalKey
+      status
+      branch
+      commitSha
+      sourceProvider
+      sourceRunId
+      sourceUrl
+      triggeredBy
+      startedAt
+      completedAt
+      durationMs
+      summary
+      project {
+        key
+        slug
+        name
+        repositoryUrl
+      }
+      projectVersion {
+        versionKey
+        buildNumber
+      }
+      coverageSnapshot {
+        linesPct
+        branchesPct
+        functionsPct
+        statementsPct
+      }
+    }
+  }
+`;
+
 export const RUN_REPORT_QUERY = `
   query WebRunReport($runId: ID!) {
     run(id: $runId) {

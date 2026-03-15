@@ -15,6 +15,7 @@ import {
   WEB_HOME_QUERY,
   PROJECT_ACTIVITY_QUERY,
   PROJECT_BY_SLUG_QUERY,
+  RUN_HEADER_QUERY,
   RUN_SCOPE_TREND_CATALOG_QUERY,
   RUN_DETAIL_QUERY,
   RUN_REPORT_QUERY,
@@ -239,17 +240,27 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
   };
 }
 
-export async function loadRunExplorerPage({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
-  const result = await measureProfileStep(profiler, 'run-detail-query', () => executeWebGraphqlRequest({
+export async function loadRunExplorerPage({
+  session,
+  runId,
+  templateMode = 'runner',
+  fetchImpl = fetch,
+  requestId = null,
+  requestTrace = null,
+  profiler = null,
+}) {
+  const useOperationsQuery = templateMode === 'web';
+  const result = await measureProfileStep(profiler, useOperationsQuery ? 'run-detail-query' : 'run-header-query', () => executeWebGraphqlRequest({
     session,
-    query: RUN_DETAIL_QUERY,
+    query: useOperationsQuery ? RUN_DETAIL_QUERY : RUN_HEADER_QUERY,
     variables: { runId },
     fetchImpl,
     requestId,
     requestTrace,
   }), (response) => ({
-    query: 'RUN_DETAIL_QUERY',
+    query: useOperationsQuery ? 'RUN_DETAIL_QUERY' : 'RUN_HEADER_QUERY',
     runId,
+    templateMode,
     ...response?.meta,
   }));
   const data = result.data;
@@ -260,11 +271,11 @@ export async function loadRunExplorerPage({ session, runId, fetchImpl = fetch, r
 
   return {
     run: data.run,
-    runPackages: Array.isArray(data.runPackages) ? data.runPackages : [],
-    runModules: Array.isArray(data.runModules) ? data.runModules : [],
-    runFiles: Array.isArray(data.runFiles) ? data.runFiles : [],
-    failedTests: Array.isArray(data.tests) ? data.tests : [],
-    coverageComparison: data.runCoverageComparison || null,
+    runPackages: useOperationsQuery && Array.isArray(data.runPackages) ? data.runPackages : [],
+    runModules: useOperationsQuery && Array.isArray(data.runModules) ? data.runModules : [],
+    runFiles: useOperationsQuery && Array.isArray(data.runFiles) ? data.runFiles : [],
+    failedTests: useOperationsQuery && Array.isArray(data.tests) ? data.tests : [],
+    coverageComparison: useOperationsQuery ? (data.runCoverageComparison || null) : null,
   };
 }
 
