@@ -16,7 +16,7 @@ function selectOverviewProject(dispatch, slug) {
   dispatch(setViewMode('overview'));
 }
 
-function SidebarButton({ active = false, title, meta, status, onClick }) {
+function SidebarButton({ active = false, title, meta, status, onClick, perfId = null, projectSlug = null }) {
   return React.createElement(
     'button',
     {
@@ -24,6 +24,8 @@ function SidebarButton({ active = false, title, meta, status, onClick }) {
       className: active ? 'web-explorer__sidebar-item web-explorer__sidebar-item--active' : 'web-explorer__sidebar-item',
       onClick,
       'aria-pressed': active,
+      ...(perfId ? { 'data-perf-id': perfId } : {}),
+      ...(projectSlug ? { 'data-project-slug': projectSlug } : {}),
     },
     React.createElement(
       'div',
@@ -123,6 +125,8 @@ function RunTable({ runs, selectedProject }) {
               tabIndex: 0,
               role: 'link',
               'aria-label': `Open run ${run.externalKey || run.id}`,
+              'data-perf-id': `run-row:${run.id}`,
+              'data-run-id': run.id,
               onClick: (event) => {
                 if (isInteractiveRowTarget(event.target)) {
                   return;
@@ -287,6 +291,7 @@ export default function WebIndexPage({ data }) {
             title: 'All recent runs',
             meta: `${model.totalRuns} recent runs across ${model.totalProjects} visible project${model.totalProjects === 1 ? '' : 's'}`,
             onClick: () => selectOverviewProject(dispatch, null),
+            perfId: 'sidebar-all-runs',
           }),
           ...model.projects.map((project) => React.createElement(SidebarButton, {
             key: project.id,
@@ -295,6 +300,8 @@ export default function WebIndexPage({ data }) {
             meta: `${project.recentRunCount} recent run${project.recentRunCount === 1 ? '' : 's'}`,
             status: project.latestRun?.status || null,
             onClick: () => selectOverviewProject(dispatch, project.slug),
+            perfId: `sidebar-project:${project.slug}`,
+            projectSlug: project.slug,
           })),
         )
         : React.createElement(EmptyState, {

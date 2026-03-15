@@ -53,7 +53,14 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
         React.createElement(
           'div',
           { className: 'web-list__row' },
-          React.createElement(Link, { href: `/projects/${run.project?.slug}` }, run.project?.name || 'Project'),
+          React.createElement(
+            Link,
+            {
+              href: `/projects/${run.project?.slug}`,
+              'data-perf-id': 'run-project-link',
+            },
+            run.project?.name || 'Project',
+          ),
           React.createElement(StatusPill, { status: run.status }),
         ),
         React.createElement(TemplateSwitch, {
@@ -370,6 +377,7 @@ function TemplateSwitch({ runId, activeTemplate }) {
       Link,
       {
         href: buildRunTemplateHref(runId, 'web'),
+        'data-perf-id': 'run-template-web',
         className: activeTemplate === 'web'
           ? 'web-segmented-control__link web-segmented-control__link--active'
           : 'web-segmented-control__link',
@@ -380,6 +388,7 @@ function TemplateSwitch({ runId, activeTemplate }) {
       Link,
       {
         href: buildRunTemplateHref(runId, 'runner'),
+        'data-perf-id': 'run-template-runner',
         className: activeTemplate === 'runner'
           ? 'web-segmented-control__link web-segmented-control__link--active'
           : 'web-segmented-control__link',
@@ -436,6 +445,7 @@ function RunnerReportFrame({ runId, title }) {
     src: `/api/runs/${encodeURIComponent(runId)}/report`,
     title,
     className: 'web-runner-frame',
+    scrolling: 'no',
     sandbox: 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox',
     style: {
       height: `${frameHeight}px`,

@@ -269,6 +269,47 @@ Typical prerequisite:
 yarn playwright install --with-deps
 ```
 
+### Live UI Performance Benchmarks
+
+This repo also carries a manual Playwright benchmark suite for the deployed web interface. It is intended for live-data navigation checks and is not part of the default CI pass.
+
+Typical usage:
+
+```sh
+yarn playwright install --with-deps chromium
+TEST_STATION_E2E_BASE_URL=https://test-station.smysnk.com yarn test:e2e:performance
+```
+
+What it benchmarks:
+
+- public home-page readiness with live project and run data
+- sidebar project focus latency
+- run-row navigation into `/runs/[id]`
+- runner-report iframe readiness
+- switching from runner report to operations view
+- navigation from a run into the related project page
+
+Artifacts:
+
+- summary JSON at `artifacts/e2e-performance/latest.json`
+- timestamped benchmark snapshots under `artifacts/e2e-performance/`
+- Playwright JSON output at `artifacts/e2e-performance/playwright-results.json`
+
+Optional environment variables:
+
+- `TEST_STATION_E2E_BASE_URL`: target deployment to benchmark
+- `TEST_STATION_E2E_STORAGE_STATE`: optional Playwright storage-state file when the target requires authentication
+- `TEST_STATION_E2E_OUTPUT_DIR`: override the benchmark artifact directory
+- `TEST_STATION_E2E_BUDGET_HOME_READY_MS`
+- `TEST_STATION_E2E_BUDGET_PROJECT_FOCUS_MS`
+- `TEST_STATION_E2E_BUDGET_PROJECT_CLEAR_MS`
+- `TEST_STATION_E2E_BUDGET_RUN_NAVIGATION_MS`
+- `TEST_STATION_E2E_BUDGET_RUNNER_REPORT_READY_MS`
+- `TEST_STATION_E2E_BUDGET_OPERATIONS_VIEW_SWITCH_MS`
+- `TEST_STATION_E2E_BUDGET_PROJECT_PAGE_NAVIGATION_MS`
+
+If the app redirects to `/auth/signin` and no storage state is provided, or if there are no public runs/projects visible, the benchmark suite skips rather than failing with misleading timing output.
+
 ### Publishing CI Runs To `/api/ingest`
 
 The deployed server accepts machine reports at `POST /api/ingest` with shared-key auth. The checked-in main release workflow publishes the self-test report to `https://test-station.smysnk.com/api/ingest`.

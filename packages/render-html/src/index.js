@@ -258,23 +258,33 @@ export function renderHtmlReport(report, options = {}) {
       align-items: flex-start;
     }
     .module-card__name {
-      font-size: 1rem;
+      font-size: clamp(0.96rem, 1.5vw, 1.08rem);
       font-weight: 600;
+      line-height: 1.08;
+      overflow-wrap: anywhere;
     }
     .module-card__owner {
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       font-weight: 300;
+      line-height: 1.15;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--muted);
+      overflow-wrap: anywhere;
     }
     .module-card__meta {
-      font-size: 0.85rem;
+      display: block;
+      max-width: 100%;
+      font-size: 0.75rem;
+      line-height: 1.18;
       color: var(--muted);
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: anywhere;
     }
     .module-card__summary {
       display: grid;
-      gap: 4px;
+      gap: 3px;
+      min-width: 0;
     }
     .owner-pill {
       display: inline-flex;
@@ -466,7 +476,7 @@ export function renderHtmlReport(report, options = {}) {
     .test-row[open] { border-color: var(--border-strong); }
     .test-row__summary {
       display: grid;
-      grid-template-columns: auto 1fr auto auto;
+      grid-template-columns: auto minmax(0, 1fr) auto;
       gap: 12px;
       align-items: start;
       list-style: none;
@@ -512,16 +522,28 @@ export function renderHtmlReport(report, options = {}) {
       align-items: center;
     }
     .test-row__name { min-width: 0; }
+    .test-row__aside {
+      display: grid;
+      gap: 4px;
+      justify-items: end;
+      min-width: 0;
+      text-align: right;
+    }
     .test-row__title {
       display: block;
       font-weight: 600;
       margin-bottom: 4px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: normal;
     }
     .test-row__file,
-    .test-row__duration { font-size: 0.83rem; color: var(--muted); }
+    .test-row__duration {
+      font-size: 0.83rem;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
     .test-row__details {
       display: none;
       margin-top: 16px;
@@ -535,10 +557,13 @@ export function renderHtmlReport(report, options = {}) {
     }
     .detail-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
       gap: 14px;
+      align-items: start;
     }
     .detail-card {
+      min-width: 0;
+      overflow: visible;
       padding: 14px;
       border-radius: 14px;
       border: 1px solid rgba(124, 160, 224, 0.12);
@@ -556,10 +581,23 @@ export function renderHtmlReport(report, options = {}) {
       padding-left: 18px;
       display: grid;
       gap: 8px;
+      min-width: 0;
+    }
+    .detail-card li,
+    .failure-list li {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .detail-card code {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
     .detail-card pre {
       margin: 0;
       white-space: pre-wrap;
+      overflow-wrap: anywhere;
       word-break: break-word;
       font-size: 0.82rem;
       color: #d7e5ff;
@@ -755,7 +793,12 @@ export function renderHtmlReport(report, options = {}) {
       .toolbar { align-items: flex-start; }
       .toolbar__controls { justify-content: flex-start; }
       .toolbar__filters { justify-content: flex-start; }
-      .test-row__summary { grid-template-columns: auto 1fr; }
+      .test-row__summary { grid-template-columns: auto minmax(0, 1fr); }
+      .test-row__aside {
+        grid-column: 2;
+        justify-items: start;
+        text-align: left;
+      }
     }
   </style>
 </head>
@@ -1053,7 +1096,7 @@ function renderOwnerMeta(owner) {
   if (!owner) {
     return '';
   }
-  return `<span class="module-card__owner">Owner: ${escapeHtml(owner)}</span>`;
+  return `<span class="module-card__owner">${escapeHtml(owner)}</span>`;
 }
 
 function renderThresholdPill(threshold) {
@@ -1486,8 +1529,10 @@ function renderTest(suite, test, rootDir, filterContext = {}) {
           <span class="test-row__title">${escapeHtml(test.fullName || test.name || 'Unnamed test')}</span>
           <span class="test-row__file">${escapeHtml(formatTestLocation(test, rootDir))}</span>
         </div>
-        <span class="test-row__duration">${escapeHtml(formatDuration(test.durationMs || 0))}</span>
-        <span class="test-row__file">${escapeHtml(suite.label || '')}</span>
+        <div class="test-row__aside">
+          <span class="test-row__duration">${escapeHtml(formatDuration(test.durationMs || 0))}</span>
+          <span class="test-row__file">${escapeHtml(suite.label || '')}</span>
+        </div>
       </summary>
       <div class="test-row__details">
         <div class="detail-grid">

@@ -295,7 +295,8 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-table-wrap {
     width: 100%;
-    overflow-x: auto;
+    min-width: 0;
+    overflow: visible;
   }
   .web-table th,
   .web-table td {

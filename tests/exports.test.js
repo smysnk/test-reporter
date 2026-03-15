@@ -369,8 +369,31 @@ test('renderer shows owner as thin header text above the module card title', () 
   const html = renderHtmlReport(createSampleReport(), { title: 'example' });
   const moduleCard = html.match(/<button type="button" class="module-card status-failed"[\s\S]*?<\/button>/)?.[0] || '';
 
-  assert.match(moduleCard, /module-card__owner">Owner: core-team<\/span>\s*<span class="module-card__name">runtime<\/span>/);
+  assert.match(moduleCard, /module-card__owner">core-team<\/span>\s*<span class="module-card__name">runtime<\/span>/);
+  assert.doesNotMatch(moduleCard, /Owner: core-team/);
   assert.doesNotMatch(moduleCard, /owner-pill/);
+});
+
+test('renderer wraps detailed test evidence without forcing horizontal overflow', () => {
+  const html = renderHtmlReport(createSampleReport(), { title: 'example' });
+
+  assert.match(html, /class="test-row__aside"/);
+  assert.match(html, /\.test-row__summary\s*\{\s*display:\s*grid;\s*grid-template-columns:\s*auto minmax\(0, 1fr\) auto;/);
+  assert.match(html, /\.test-row__title\s*\{[\s\S]*white-space:\s*normal;/);
+  assert.match(html, /\.detail-grid\s*\{[\s\S]*minmax\(min\(100%, 360px\), 1fr\)/);
+  assert.match(html, /\.detail-card\s*\{[\s\S]*overflow:\s*visible;/);
+  assert.match(html, /\.detail-card code\s*\{[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.match(html, /\.detail-card pre\s*\{[\s\S]*overflow-wrap:\s*anywhere;/);
+  assert.doesNotMatch(html, /overflow:\s*(auto|scroll)/);
+});
+
+test('renderer keeps focused package cards compact and legible', () => {
+  const html = renderHtmlReport(createSampleReport(), { title: 'example' });
+  const moduleCard = html.match(/<button type="button" class="module-card status-failed"[\s\S]*?<\/button>/)?.[0] || '';
+
+  assert.match(html, /\.module-card__meta\s*\{[\s\S]*font-size:\s*0\.75rem;/);
+  assert.match(moduleCard, /2 total • 1 passed • 1 failed • 0 skipped/);
+  assert.match(moduleCard, /27ms • 1 package/);
 });
 
 test('renderer shows statement tooltip state and fixed-width file coverage metrics', () => {

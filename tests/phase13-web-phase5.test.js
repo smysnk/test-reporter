@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import {
@@ -1270,6 +1271,15 @@ test('web runner report embed script measures the report content instead of the 
   assert.match(html, /document\.querySelector\('main'\)/);
   assert.match(html, /content\?\.scrollHeight/);
   assert.doesNotMatch(html, /body\?\.scrollHeight/);
+});
+
+test('web focused run view avoids nested scroll containers around the report', () => {
+  const appStylesSource = fs.readFileSync(new URL('../packages/web/pages/_app.js', import.meta.url), 'utf8');
+  const runPageSource = fs.readFileSync(new URL('../packages/web/pages/runs/[id].js', import.meta.url), 'utf8');
+
+  assert.match(appStylesSource, /\.web-table-wrap\s*\{[\s\S]*overflow:\s*visible;/);
+  assert.doesNotMatch(appStylesSource, /\.web-table-wrap\s*\{[\s\S]*overflow-x:\s*auto;/);
+  assert.match(runPageSource, /scrolling:\s*'no'/);
 });
 
 test('web run template routing defaults to the runner report and keeps the operations view addressable', () => {
