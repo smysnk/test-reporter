@@ -14,6 +14,7 @@ import { ensureNextAuthUrl } from '../packages/web/lib/nextAuthEnv.js';
 import { formatBuildNumber, formatCommitSha, formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../packages/web/lib/format.js';
 import { buildAdminPageResult, buildOverviewPageResult, buildProjectPageResult, buildRunPageResult } from '../packages/web/lib/pageProps.js';
 import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, RUN_DETAIL_QUERY } from '../packages/web/lib/queries.js';
+import { resolvePublicRuntimeConfig } from '../packages/web/lib/runtimeConfig.js';
 import {
   ADMIN_PAGE_UNAUTHORIZED,
   executeWebGraphql,
@@ -312,6 +313,33 @@ test('web defaults SERVER_URL to localhost using SERVER_PORT when unset', () => 
       delete process.env.SERVER_PORT;
     } else {
       process.env.SERVER_PORT = originalServerPort;
+    }
+  }
+});
+
+test('web public runtime config exposes graphql path and analytics measurement id', () => {
+  const originalGraphqlPath = process.env.WEB_GRAPHQL_PATH;
+  const originalGaMeasurementId = process.env.GA_MEASUREMENT_ID;
+
+  try {
+    process.env.WEB_GRAPHQL_PATH = '/runtime-graphql';
+    process.env.GA_MEASUREMENT_ID = 'G-TESTSTATION123';
+
+    assert.deepEqual(resolvePublicRuntimeConfig(), {
+      graphqlPath: '/runtime-graphql',
+      GA_MEASUREMENT_ID: 'G-TESTSTATION123',
+    });
+  } finally {
+    if (originalGraphqlPath === undefined) {
+      delete process.env.WEB_GRAPHQL_PATH;
+    } else {
+      process.env.WEB_GRAPHQL_PATH = originalGraphqlPath;
+    }
+
+    if (originalGaMeasurementId === undefined) {
+      delete process.env.GA_MEASUREMENT_ID;
+    } else {
+      process.env.GA_MEASUREMENT_ID = originalGaMeasurementId;
     }
   }
 });
@@ -924,6 +952,8 @@ test('web admin loaders normalize overview and project access data for admin pag
 });
 
 test('web admin page result builder dispatches admin state and selected project context', () => {
+  const originalGraphqlPath = process.env.WEB_GRAPHQL_PATH;
+  const originalGaMeasurementId = process.env.GA_MEASUREMENT_ID;
   const actions = [];
   const store = {
     dispatch(action) {
@@ -931,38 +961,55 @@ test('web admin page result builder dispatches admin state and selected project 
     },
   };
 
-  const result = buildAdminPageResult({
-    store,
-    session: { userId: 'admin-1' },
-    selectedProjectSlug: 'workspace',
-    data: {
-      viewer: {
-        isAdmin: true,
+  try {
+    process.env.WEB_GRAPHQL_PATH = '/runtime-graphql';
+    process.env.GA_MEASUREMENT_ID = 'G-TESTSTATION123';
+
+    const result = buildAdminPageResult({
+      store,
+      session: { userId: 'admin-1' },
+      selectedProjectSlug: 'workspace',
+      data: {
+        viewer: {
+          isAdmin: true,
+        },
+        projects: [],
       },
-      projects: [],
-    },
-    dispatchers: {
-      setViewMode: (value) => ({ type: 'view', payload: value }),
-      setRuntimeConfig: (value) => ({ type: 'runtime', payload: value }),
-      setSelectedProjectSlug: (value) => ({ type: 'project', payload: value }),
-      setSelectedRunId: (value) => ({ type: 'run', payload: value }),
-    },
-  });
+      dispatchers: {
+        setViewMode: (value) => ({ type: 'view', payload: value }),
+        setRuntimeConfig: (value) => ({ type: 'runtime', payload: value }),
+        setSelectedProjectSlug: (value) => ({ type: 'project', payload: value }),
+        setSelectedRunId: (value) => ({ type: 'run', payload: value }),
+      },
+    });
 
-  assert.equal(result.props.session.userId, 'admin-1');
-  assert.equal(result.props.data.viewer.isAdmin, true);
-  assert.deepEqual(actions, [
-    { type: 'view', payload: 'admin' },
-    { type: 'runtime', payload: { graphqlPath: '/graphql' } },
-    { type: 'project', payload: 'workspace' },
-    { type: 'run', payload: null },
-  ]);
+    assert.equal(result.props.session.userId, 'admin-1');
+    assert.equal(result.props.data.viewer.isAdmin, true);
+    assert.deepEqual(actions, [
+      { type: 'view', payload: 'admin' },
+      { type: 'runtime', payload: { graphqlPath: '/runtime-graphql', GA_MEASUREMENT_ID: 'G-TESTSTATION123' } },
+      { type: 'project', payload: 'workspace' },
+      { type: 'run', payload: null },
+    ]);
 
-  assert.deepEqual(buildAdminPageResult({
-    store,
-    session: null,
-    data: null,
-  }), { notFound: true });
+    assert.deepEqual(buildAdminPageResult({
+      store,
+      session: null,
+      data: null,
+    }), { notFound: true });
+  } finally {
+    if (originalGraphqlPath === undefined) {
+      delete process.env.WEB_GRAPHQL_PATH;
+    } else {
+      process.env.WEB_GRAPHQL_PATH = originalGraphqlPath;
+    }
+
+    if (originalGaMeasurementId === undefined) {
+      delete process.env.GA_MEASUREMENT_ID;
+    } else {
+      process.env.GA_MEASUREMENT_ID = originalGaMeasurementId;
+    }
+  }
 });
 
 test('web runner report handler allows anonymous public report rendering', async () => {

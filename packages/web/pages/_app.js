@@ -1,10 +1,13 @@
 import React from 'react';
 import { ApolloProvider } from '@apollo/client';
 import { SessionProvider } from 'next-auth/react';
-import { Provider } from 'react-redux';
+import { useRouter } from 'next/router';
+import Script from 'next/script';
+import { Provider, useSelector } from 'react-redux';
 import { ThemeProvider, createGlobalStyle } from 'styled-components';
 import { WebShell } from '../components/WebShell.js';
 import { getApolloClient } from '../lib/apolloClient.js';
+import { initializeAnalytics, pageview } from '../lib/gtag.js';
 import { wrapper } from '../store/index.js';
 
 const theme = {
@@ -629,12 +632,88 @@ const GlobalStyle = createGlobalStyle`
   }
 `;
 
+function WebAppContent({ Component, pageProps }) {
+  const viewer = pageProps.data?.viewer || null;
+  const runtimeConfig = useSelector((state) => state.runtime.config);
+  const runtimeConfigLoaded = useSelector((state) => state.runtime.loaded);
+  const gaMeasurementId = runtimeConfig?.GA_MEASUREMENT_ID || null;
+  const router = useRouter();
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !runtimeConfig) {
+      return;
+    }
+
+    window.__RUNTIME_CONFIG__ = runtimeConfig;
+  }, [runtimeConfig]);
+
+  React.useEffect(() => {
+    if (!runtimeConfigLoaded || !gaMeasurementId) {
+      return;
+    }
+
+    initializeAnalytics();
+  }, [gaMeasurementId, runtimeConfigLoaded]);
+
+  React.useEffect(() => {
+    if (!gaMeasurementId) {
+      return;
+    }
+
+    const handleRouteChange = (url) => {
+      pageview(url);
+    };
+
+    router.events.on('routeChangeComplete', handleRouteChange);
+    return () => {
+      router.events.off('routeChangeComplete', handleRouteChange);
+    };
+  }, [gaMeasurementId, router.events]);
+
+  return React.createElement(
+    ThemeProvider,
+    { theme },
+    React.createElement(
+      React.Fragment,
+      null,
+      runtimeConfigLoaded && gaMeasurementId
+        ? React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(Script, {
+            src: `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(gaMeasurementId)}`,
+            strategy: 'afterInteractive',
+          }),
+          React.createElement(
+            Script,
+            {
+              id: 'google-analytics',
+              strategy: 'afterInteractive',
+            },
+            `
+              window.dataLayer = window.dataLayer || [];
+              window.gtag = window.gtag || function gtag(){window.dataLayer.push(arguments);};
+              window.gtag('js', new Date());
+              window.gtag('config', '${gaMeasurementId}');
+            `,
+          ),
+        )
+        : null,
+      React.createElement(GlobalStyle, null),
+      React.createElement(
+        WebShell,
+        { viewer },
+        React.createElement(Component, pageProps),
+      ),
+    ),
+  );
+}
+
 export default function WebApp({ Component, ...rest }) {
   const { store, props } = wrapper.useWrappedStore(rest);
   const client = getApolloClient();
   const pageProps = props.pageProps || {};
   const session = pageProps.session || null;
-  const viewer = pageProps.data?.viewer || null;
 
   return React.createElement(
     SessionProvider,
@@ -645,20 +724,7 @@ export default function WebApp({ Component, ...rest }) {
       React.createElement(
         Provider,
         { store },
-        React.createElement(
-          ThemeProvider,
-          { theme },
-          React.createElement(
-            React.Fragment,
-            null,
-            React.createElement(GlobalStyle, null),
-            React.createElement(
-              WebShell,
-              { viewer },
-              React.createElement(Component, pageProps),
-            ),
-          ),
-        ),
+        React.createElement(WebAppContent, { Component, pageProps }),
       ),
     ),
   );

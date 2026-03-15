@@ -56,6 +56,7 @@ web:
     NODE_ENV: production
     WEB_PORT: "3001"
     WEB_GRAPHQL_PATH: /graphql
+    GA_MEASUREMENT_ID: ""
     SERVER_URL: ""
     NEXTAUTH_URL: ""
     WEB_DEMO_AUTH_ENABLED: "false"

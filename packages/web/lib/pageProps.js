@@ -1,3 +1,5 @@
+import { resolvePublicRuntimeConfig } from './runtimeConfig.js';
+
 export function buildOverviewPageResult({ store, session, data, dispatchers = {} }) {
   dispatchPageState(store, dispatchers, {
     viewMode: 'overview',
@@ -86,7 +88,7 @@ function dispatchPageState(store, dispatchers, values) {
     store.dispatch(dispatchers.setViewMode(values.viewMode));
   }
   if (typeof dispatchers.setRuntimeConfig === 'function') {
-    store.dispatch(dispatchers.setRuntimeConfig({ graphqlPath: '/graphql' }));
+    store.dispatch(dispatchers.setRuntimeConfig(resolvePublicRuntimeConfig()));
   }
   if (typeof dispatchers.setSelectedProjectSlug === 'function') {
     store.dispatch(dispatchers.setSelectedProjectSlug(values.selectedProjectSlug));

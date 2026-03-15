@@ -41,6 +41,7 @@ services:
       WEB_PORT: ${WEB_PORT:-3001}
       SERVER_PORT: ${SERVER_PORT:-4400}
       SERVER_URL: ${SERVER_URL:-http://server:4400}
+      GA_MEASUREMENT_ID: ${GA_MEASUREMENT_ID:-}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-test-station-web-development-secret}
       WEB_DEMO_AUTH_ENABLED: ${WEB_DEMO_AUTH_ENABLED:-false}
