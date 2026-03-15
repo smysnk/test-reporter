@@ -21,6 +21,23 @@ import { createProjectAccessService } from './access-service.js';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
+const RUN_LIST_ATTRIBUTES = [
+  'id',
+  'projectId',
+  'projectVersionId',
+  'externalKey',
+  'sourceProvider',
+  'sourceRunId',
+  'sourceUrl',
+  'triggeredBy',
+  'branch',
+  'commitSha',
+  'startedAt',
+  'completedAt',
+  'durationMs',
+  'status',
+  'reportSchemaVersion',
+];
 
 export function createGraphqlQueryService(options = {}) {
   const models = options.models || {
@@ -61,22 +78,50 @@ export function createGraphqlQueryService(options = {}) {
 
     async listRuns({ actor, projectId = null, projectKey = null, status = null, limit = DEFAULT_LIMIT }) {
       const projects = await this.listProjects({ actor });
-      const projectMap = mapBy(projects, 'id');
-      let runs = await loadAll(models.Run);
-
-      runs = runs.filter((run) => projectMap.has(run.projectId));
-      if (projectId) {
-        runs = runs.filter((run) => run.projectId === projectId);
-      }
-      if (projectKey) {
-        runs = runs.filter((run) => projectMap.get(run.projectId)?.key === projectKey);
-      }
-      if (status) {
-        runs = runs.filter((run) => run.status === status);
+      const scopedProjects = projects.filter((project) => (
+        (projectId ? project.id === projectId : true)
+        && (projectKey ? project.key === projectKey : true)
+      ));
+      if (scopedProjects.length === 0) {
+        return [];
       }
 
-      const versionMap = mapBy(await loadAll(models.ProjectVersion), 'id');
-      const coverageSnapshotMap = mapBy(await loadAll(models.CoverageSnapshot), 'runId');
+      const projectMap = mapBy(scopedProjects, 'id');
+      let runs = await loadAll(models.Run, {
+        where: {
+          projectId: Array.from(projectMap.keys()),
+          ...(status ? { status } : {}),
+        },
+        order: [
+          ['completedAt', 'DESC'],
+          ['startedAt', 'DESC'],
+          ['createdAt', 'DESC'],
+        ],
+        limit: normalizeLimit(limit),
+        attributes: RUN_LIST_ATTRIBUTES,
+      });
+      runs = runs.filter((run) => (
+        projectMap.has(run.projectId)
+        && (status ? run.status === status : true)
+      ));
+
+      const runIds = runs.map((run) => run.id).filter(Boolean);
+      const versionIds = Array.from(new Set(runs.map((run) => run.projectVersionId).filter(Boolean)));
+
+      const [projectVersions, coverageSnapshots] = await Promise.all([
+        versionIds.length > 0
+          ? loadAll(models.ProjectVersion, {
+            where: { id: versionIds },
+          })
+          : [],
+        runIds.length > 0
+          ? loadAll(models.CoverageSnapshot, {
+            where: { runId: runIds },
+          })
+          : [],
+      ]);
+      const versionMap = mapBy(projectVersions, 'id');
+      const coverageSnapshotMap = mapBy(coverageSnapshots, 'runId');
 
       return runs
         .map((run) => decorateRun(run, {
@@ -86,6 +131,30 @@ export function createGraphqlQueryService(options = {}) {
         }))
         .sort(compareRunsNewestFirst)
         .slice(0, normalizeLimit(limit));
+    },
+
+    async listRunFeed({ actor, limit = DEFAULT_LIMIT }) {
+      const runs = await this.listRuns({ actor, limit });
+
+      return runs.map((run) => ({
+        id: run.id,
+        externalKey: run.externalKey,
+        status: run.status,
+        branch: run.branch || null,
+        commitSha: run.commitSha || null,
+        sourceRunId: run.sourceRunId || null,
+        sourceUrl: run.sourceUrl || null,
+        completedAt: run.completedAt || null,
+        durationMs: toInteger(run.durationMs),
+        projectId: run.projectId,
+        projectKey: run.project?.key || '',
+        projectSlug: run.project?.slug || '',
+        projectName: run.project?.name || run.externalKey,
+        projectRepositoryUrl: run.project?.repositoryUrl || null,
+        versionKey: run.projectVersion?.versionKey || null,
+        buildNumber: toInteger(run.projectVersion?.buildNumber),
+        linesPct: run.coverageSnapshot?.linesPct ?? null,
+      }));
     },
 
     async findRun({ id = null, externalKey = null, actor }) {
@@ -496,12 +565,12 @@ function normalizeCoverageFile(coverageFile) {
   };
 }
 
-async function loadAll(model) {
+async function loadAll(model, options = undefined) {
   if (!model || typeof model.findAll !== 'function') {
     return [];
   }
 
-  const rows = await model.findAll();
+  const rows = await model.findAll(options);
   return rows.map((row) => toPlainRecord(row));
 }
 

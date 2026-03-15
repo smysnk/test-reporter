@@ -155,6 +155,26 @@ export const queryTypeDefs = `#graphql
     artifacts: [Artifact!]!
   }
 
+  type RunFeedEntry {
+    id: ID!
+    externalKey: String!
+    status: String!
+    branch: String
+    commitSha: String
+    sourceRunId: String
+    sourceUrl: String
+    completedAt: String
+    durationMs: Int
+    projectId: ID!
+    projectKey: String!
+    projectSlug: String!
+    projectName: String!
+    projectRepositoryUrl: String
+    versionKey: String
+    buildNumber: Int
+    linesPct: Float
+  }
+
   type RunPackageSummary {
     name: String!
     location: String
@@ -284,6 +304,7 @@ export const queryTypeDefs = `#graphql
     me: Actor
     projects: [Project!]!
     project(id: ID, key: String, slug: String): Project
+    runFeed(limit: Int): [RunFeedEntry!]!
     runs(projectId: ID, projectKey: String, status: String, limit: Int): [Run!]!
     run(id: ID, externalKey: String): Run
     runPackages(runId: ID!): [RunPackageSummary!]!
@@ -311,6 +332,7 @@ export const queryResolvers = {
     me: (_root, _args, context) => resolveViewer(context),
     projects: (_root, _args, context) => context.queryService.listProjects({ actor: context.actor }),
     project: (_root, args, context) => context.queryService.findProject({ ...args, actor: context.actor }),
+    runFeed: (_root, args, context) => context.queryService.listRunFeed({ ...args, actor: context.actor }),
     runs: (_root, args, context) => context.queryService.listRuns({ ...args, actor: context.actor }),
     run: (_root, args, context) => context.queryService.findRun({ ...args, actor: context.actor }),
     runPackages: (_root, args, context) => context.queryService.listRunPackages({ ...args, actor: context.actor }),

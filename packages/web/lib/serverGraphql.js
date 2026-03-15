@@ -82,7 +82,35 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
   return {
     viewer: data.viewer || data.me || null,
     projects: Array.isArray(data.projects) ? data.projects : [],
-    runs: Array.isArray(data.runs) ? data.runs : [],
+    runs: Array.isArray(data.runFeed)
+      ? data.runFeed.map((entry) => ({
+        id: entry.id,
+        externalKey: entry.externalKey,
+        status: entry.status,
+        branch: entry.branch,
+        commitSha: entry.commitSha,
+        sourceRunId: entry.sourceRunId,
+        sourceUrl: entry.sourceUrl,
+        completedAt: entry.completedAt,
+        durationMs: entry.durationMs,
+        projectId: entry.projectId,
+        project: {
+          key: entry.projectKey,
+          slug: entry.projectSlug,
+          name: entry.projectName,
+          repositoryUrl: entry.projectRepositoryUrl,
+        },
+        projectVersion: entry.versionKey || Number.isFinite(entry.buildNumber)
+          ? {
+            versionKey: entry.versionKey,
+            buildNumber: entry.buildNumber,
+          }
+          : null,
+        coverageSnapshot: Number.isFinite(entry.linesPct)
+          ? { linesPct: entry.linesPct }
+          : null,
+      }))
+      : [],
   };
 }
 

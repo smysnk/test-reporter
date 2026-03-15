@@ -424,14 +424,20 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
         data: {
           viewer: { id: 'user-1', name: 'Web User', email: 'user@example.com', role: 'member' },
           projects: [{ id: 'project-1', key: 'workspace', slug: 'workspace', name: 'Workspace' }],
-          runs: [{
+          runFeed: [{
             id: 'run-1',
             externalKey: 'workspace:github-actions:1001',
             status: 'failed',
+            projectId: 'project-1',
+            projectKey: 'workspace',
+            projectSlug: 'workspace',
+            projectName: 'Workspace',
+            projectRepositoryUrl: 'https://example.test/workspace',
+            versionKey: 'commit:abc123',
+            buildNumber: 88,
+            linesPct: 80,
             sourceRunId: '1001',
             sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
-            projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
-            coverageSnapshot: { linesPct: 80 },
           }],
         },
       }), {
@@ -609,7 +615,7 @@ test('web GraphQL helpers and proxy allow anonymous public reads without actor h
       data: {
         viewer: null,
         projects: [{ id: 'project-public', key: 'public-site', slug: 'public-site', name: 'Public Site' }],
-        runs: [],
+        runFeed: [],
       },
     }), {
       status: 200,
@@ -1133,7 +1139,7 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(html, /build #88/);
   assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
   assert.match(WEB_HOME_QUERY, /viewer/);
-  assert.match(WEB_HOME_QUERY, /runs\(limit:\s*24\)/);
+  assert.match(WEB_HOME_QUERY, /runFeed\(limit:\s*24\)/);
   assert.match(WEB_HOME_QUERY, /sourceRunId/);
   assert.match(WEB_HOME_QUERY, /sourceUrl/);
   assert.match(WEB_HOME_QUERY, /buildNumber/);

@@ -1039,6 +1039,135 @@ test('resolveActorFromRequest upserts persisted users, applies bootstrap admin e
   }]);
 });
 
+test('listRuns queries the lightweight feed fields with DB-side limit and related lookups', async () => {
+  let runFindAllOptions = null;
+  let versionFindAllOptions = null;
+  let snapshotFindAllOptions = null;
+
+  const queryService = createGraphqlQueryService({
+    accessService: {
+      async filterProjects({ projects }) {
+        return projects;
+      },
+    },
+    models: {
+      Project: createFindAllModel([
+        {
+          id: 'project-1',
+          key: 'workspace',
+          slug: 'workspace',
+          name: 'Workspace',
+          isPublic: true,
+        },
+      ]),
+      Run: {
+        async findAll(options = {}) {
+          runFindAllOptions = options;
+          return [
+            {
+              id: 'run-2',
+              projectId: 'project-1',
+              projectVersionId: 'version-2',
+              externalKey: 'workspace:github-actions:1002',
+              status: 'passed',
+              completedAt: '2026-03-15T12:00:00.000Z',
+              durationMs: 1000,
+            },
+            {
+              id: 'run-1',
+              projectId: 'project-1',
+              projectVersionId: 'version-1',
+              externalKey: 'workspace:github-actions:1001',
+              status: 'failed',
+              completedAt: '2026-03-14T12:00:00.000Z',
+              durationMs: 1200,
+            },
+          ];
+        },
+      },
+      ProjectVersion: {
+        async findAll(options = {}) {
+          versionFindAllOptions = options;
+          return [
+            { id: 'version-1', versionKey: 'commit:abc123', buildNumber: 88 },
+            { id: 'version-2', versionKey: 'commit:def456', buildNumber: 89 },
+          ];
+        },
+      },
+      CoverageSnapshot: {
+        async findAll(options = {}) {
+          snapshotFindAllOptions = options;
+          return [
+            { id: 'coverage-1', runId: 'run-1', linesPct: 80 },
+            { id: 'coverage-2', runId: 'run-2', linesPct: 90 },
+          ];
+        },
+      },
+      Group: createFindAllModel([]),
+      ProjectFile: createFindAllModel([]),
+      ProjectGroupAccess: createFindAllModel([]),
+      ProjectModule: createFindAllModel([]),
+      ProjectPackage: createFindAllModel([]),
+      ProjectRoleAccess: createFindAllModel([]),
+      ReleaseNote: createFindAllModel([]),
+      Role: createFindAllModel([]),
+      SuiteRun: createFindAllModel([]),
+      TestExecution: createFindAllModel([]),
+      Artifact: createFindAllModel([]),
+    },
+  });
+
+  const runs = await queryService.listRuns({
+    actor: {
+      id: 'guest',
+      userId: null,
+      email: null,
+      name: 'Guest',
+      role: 'guest',
+      isAdmin: false,
+      isGuest: true,
+      roleKeys: [],
+      groupKeys: [],
+    },
+    limit: 5,
+  });
+
+  assert.equal(runs.length, 2);
+  assert.equal(runs[0].externalKey, 'workspace:github-actions:1002');
+  assert.deepEqual(runFindAllOptions.where, {
+    projectId: ['project-1'],
+  });
+  assert.equal(runFindAllOptions.limit, 5);
+  assert.deepEqual(runFindAllOptions.order, [
+    ['completedAt', 'DESC'],
+    ['startedAt', 'DESC'],
+    ['createdAt', 'DESC'],
+  ]);
+  assert.deepEqual(runFindAllOptions.attributes, [
+    'id',
+    'projectId',
+    'projectVersionId',
+    'externalKey',
+    'sourceProvider',
+    'sourceRunId',
+    'sourceUrl',
+    'triggeredBy',
+    'branch',
+    'commitSha',
+    'startedAt',
+    'completedAt',
+    'durationMs',
+    'status',
+    'reportSchemaVersion',
+  ]);
+  assert.deepEqual(versionFindAllOptions.where, {
+    id: ['version-2', 'version-1'],
+  });
+  assert.deepEqual(snapshotFindAllOptions.where, {
+    runId: ['run-2', 'run-1'],
+  });
+});
+
 function createGraphqlModels() {
   const report = createRunReport();
   const publicReport = createPublicRunReport();

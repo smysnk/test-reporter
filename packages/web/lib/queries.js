@@ -14,7 +14,7 @@ export const WEB_HOME_QUERY = `
       defaultBranch
       repositoryUrl
     }
-    runs(limit: 24) {
+    runFeed(limit: 24) {
       id
       externalKey
       status
@@ -24,19 +24,14 @@ export const WEB_HOME_QUERY = `
       sourceUrl
       completedAt
       durationMs
-      project {
-        key
-        slug
-        name
-        repositoryUrl
-      }
-      projectVersion {
-        versionKey
-        buildNumber
-      }
-      coverageSnapshot {
-        linesPct
-      }
+      projectId
+      projectKey
+      projectSlug
+      projectName
+      projectRepositoryUrl
+      versionKey
+      buildNumber
+      linesPct
     }
   }
 `;
