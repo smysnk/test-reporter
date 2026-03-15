@@ -35,6 +35,7 @@ import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
 import { RunBuildChip } from '../packages/web/components/WebBits.js';
+import { buildHomeExplorerModel } from '../packages/web/lib/homeExplorer.js';
 
 test('web auth options expose the sign-in page and session actor metadata', async () => {
   const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
@@ -1132,6 +1133,7 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(html, /build #88/);
   assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
   assert.match(WEB_HOME_QUERY, /viewer/);
+  assert.match(WEB_HOME_QUERY, /runs\(limit:\s*24\)/);
   assert.match(WEB_HOME_QUERY, /sourceRunId/);
   assert.match(WEB_HOME_QUERY, /sourceUrl/);
   assert.match(WEB_HOME_QUERY, /buildNumber/);
@@ -1141,6 +1143,68 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(RUN_DETAIL_QUERY, /sourceRunId/);
   assert.match(RUN_DETAIL_QUERY, /sourceUrl/);
   assert.match(RUN_DETAIL_QUERY, /buildNumber/);
+});
+
+test('web home explorer model sorts sidebar projects by activity and filters the selected project feed', () => {
+  const projects = [
+    {
+      id: 'project-a',
+      key: 'alpha',
+      slug: 'alpha',
+      name: 'Alpha',
+      repositoryUrl: 'https://github.com/example/alpha.git',
+    },
+    {
+      id: 'project-b',
+      key: 'beta',
+      slug: 'beta',
+      name: 'Beta',
+      repositoryUrl: 'https://github.com/example/beta.git',
+    },
+    {
+      id: 'project-c',
+      key: 'charlie',
+      slug: 'charlie',
+      name: 'Charlie',
+      repositoryUrl: 'https://github.com/example/charlie.git',
+    },
+  ];
+  const runs = [
+    {
+      id: 'run-beta-1',
+      project: { slug: 'beta' },
+      completedAt: '2026-03-15T10:00:00.000Z',
+      coverageSnapshot: { linesPct: 91.2 },
+    },
+    {
+      id: 'run-alpha-1',
+      project: { slug: 'alpha' },
+      completedAt: '2026-03-14T10:00:00.000Z',
+      coverageSnapshot: { linesPct: 88.4 },
+    },
+  ];
+
+  const selected = buildHomeExplorerModel({
+    projects,
+    runs,
+    selectedProjectSlug: 'beta',
+  });
+
+  assert.equal(selected.selectedProject.slug, 'beta');
+  assert.deepEqual(selected.visibleRuns.map((run) => run.id), ['run-beta-1']);
+  assert.deepEqual(selected.projects.map((project) => project.slug), ['beta', 'alpha', 'charlie']);
+  assert.equal(selected.projects[0].recentRunCount, 1);
+  assert.equal(selected.projects[2].latestRun, null);
+  assert.equal(selected.latestCoverage, 91.2);
+
+  const allRuns = buildHomeExplorerModel({
+    projects,
+    runs,
+    selectedProjectSlug: 'missing-project',
+  });
+
+  assert.equal(allRuns.selectedProject, null);
+  assert.deepEqual(allRuns.visibleRuns.map((run) => run.id), ['run-beta-1', 'run-alpha-1']);
 });
 
 test('web can render the runner report template from stored raw report data', async () => {

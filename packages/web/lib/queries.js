@@ -14,7 +14,7 @@ export const WEB_HOME_QUERY = `
       defaultBranch
       repositoryUrl
     }
-    runs(limit: 8) {
+    runs(limit: 24) {
       id
       externalKey
       status

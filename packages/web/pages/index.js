@@ -1,119 +1,324 @@
 import React from 'react';
 import Link from 'next/link';
+import { useDispatch, useSelector } from 'react-redux';
 import { MetricGrid, SectionCard, StatusPill, EmptyState, RunBuildChip } from '../components/WebBits.js';
-import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../lib/format.js';
+import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../lib/format.js';
+import { buildHomeExplorerModel } from '../lib/homeExplorer.js';
 import { getWebSession } from '../lib/auth.js';
 import { buildOverviewPageResult } from '../lib/pageProps.js';
 import { loadWebHomePage } from '../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../store/index.js';
 
-export default function WebIndexPage({ data }) {
-  const projects = Array.isArray(data?.projects) ? data.projects : [];
-  const runs = Array.isArray(data?.runs) ? data.runs : [];
-  const latestCoverage = runs.find((run) => Number.isFinite(run?.coverageSnapshot?.linesPct))?.coverageSnapshot?.linesPct ?? null;
+function selectOverviewProject(dispatch, slug) {
+  dispatch(setSelectedProjectSlug(slug));
+  dispatch(setSelectedRunId(null));
+  dispatch(setViewMode('overview'));
+}
+
+function SidebarButton({ active = false, title, meta, chips = [], onClick }) {
+  return React.createElement(
+    'button',
+    {
+      type: 'button',
+      className: active ? 'web-explorer__sidebar-item web-explorer__sidebar-item--active' : 'web-explorer__sidebar-item',
+      onClick,
+      'aria-pressed': active,
+    },
+    React.createElement(
+      'div',
+      { className: 'web-explorer__sidebar-row' },
+      React.createElement('strong', { className: 'web-explorer__sidebar-title' }, title),
+      ...(Array.isArray(chips) ? chips : []).filter(Boolean),
+    ),
+    meta ? React.createElement('span', { className: 'web-explorer__sidebar-meta' }, meta) : null,
+  );
+}
+
+function RunTable({ runs, selectedProject }) {
+  if (!Array.isArray(runs) || runs.length === 0) {
+    return React.createElement(EmptyState, {
+      title: selectedProject ? 'No recent runs for this project' : 'No recent runs',
+      copy: selectedProject
+        ? 'This project is visible, but there are no recent executions in the current feed window yet.'
+        : 'Ingest a test-station report to populate the execution feed.',
+    });
+  }
 
   return React.createElement(
-    React.Fragment,
-    null,
+    'div',
+    { className: 'web-table-wrap' },
     React.createElement(
-      SectionCard,
+      'table',
+      { className: 'web-table web-explorer-table' },
+      React.createElement(
+        'thead',
+        null,
+        React.createElement(
+          'tr',
+          null,
+          React.createElement('th', null, selectedProject ? 'Run' : 'Project'),
+          React.createElement('th', null, 'Status'),
+          React.createElement('th', null, 'Build'),
+          React.createElement('th', null, 'Branch'),
+          React.createElement('th', null, 'Commit'),
+          React.createElement('th', null, 'Finished'),
+          React.createElement('th', null, 'Duration'),
+          React.createElement('th', null, 'Coverage'),
+        ),
+      ),
+      React.createElement(
+        'tbody',
+        null,
+        ...runs.map((run) => {
+          const primaryLabel = selectedProject
+            ? run.externalKey || run.project?.name || 'Run'
+            : run.project?.name || run.externalKey || 'Unknown project';
+          const metaLabel = selectedProject
+            ? formatRepositoryName(run.project?.repositoryUrl)
+            : run.externalKey || formatRepositoryName(run.project?.repositoryUrl);
+          const buildLabel = formatRunBuildLabel(run);
+          const primaryHref = selectedProject
+            ? `/runs/${run.id}`
+            : run.project?.slug
+              ? `/projects/${run.project.slug}`
+              : `/runs/${run.id}`;
+
+          return React.createElement(
+            'tr',
+            { key: run.id },
+            React.createElement(
+              'td',
+              null,
+              React.createElement(
+                'div',
+                { className: 'web-explorer-table__entity' },
+                React.createElement(
+                  Link,
+                  {
+                    href: primaryHref,
+                    className: 'web-explorer-table__primary',
+                  },
+                  primaryLabel,
+                ),
+                React.createElement(
+                  'div',
+                  { className: 'web-explorer-table__meta-row' },
+                  React.createElement('span', { className: 'web-explorer-table__meta' }, metaLabel),
+                  !selectedProject
+                    ? React.createElement(
+                      Link,
+                      {
+                        href: `/runs/${run.id}`,
+                        className: 'web-explorer-table__meta-link',
+                      },
+                      'Open run',
+                    )
+                    : null,
+                ),
+              ),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell web-explorer-table__cell--status' },
+              React.createElement(StatusPill, { status: run.status }),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell' },
+              React.createElement(
+                'div',
+                { className: 'web-explorer-table__build' },
+                buildLabel
+                  ? React.createElement(RunBuildChip, { run })
+                  : React.createElement('span', { className: 'web-chip web-chip--muted' }, 'No build'),
+              ),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell' },
+              React.createElement('span', { className: 'web-chip web-chip--muted' }, run.branch || 'no-branch'),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell web-explorer-table__cell--mono' },
+              formatCommitSha(run.commitSha),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell' },
+              formatDateTime(run.completedAt),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell' },
+              formatDuration(run.durationMs),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell' },
+              formatCoveragePct(run.coverageSnapshot?.linesPct),
+            ),
+          );
+        }),
+      ),
+    ),
+  );
+}
+
+export default function WebIndexPage({ data }) {
+  const dispatch = useDispatch();
+  const selectedProjectSlug = useSelector((state) => state.explorer.selectedProjectSlug);
+  const model = buildHomeExplorerModel({
+    projects: data?.projects,
+    runs: data?.runs,
+    selectedProjectSlug,
+  });
+
+  React.useEffect(() => {
+    if (selectedProjectSlug && !model.selectedProject) {
+      selectOverviewProject(dispatch, null);
+    }
+  }, [dispatch, model.selectedProject, selectedProjectSlug]);
+
+  const sectionTitle = model.selectedProject
+    ? model.selectedProject.name
+    : 'Recent test runs';
+  const sectionCopy = model.selectedProject
+    ? 'Project context now owns the main view: recent executions, latest status, and quick links stay focused on the selected repository.'
+    : 'No project is pinned right now, so the main view stays wide and shows the latest activity across every visible repository.';
+  const metricItems = model.selectedProject
+    ? [
       {
-        eyebrow: 'Operations Overview',
-        title: 'Project and run explorer',
-        copy: 'The web now opens on a live operator dashboard: accessible projects, recent executions, and the latest coverage signal in one place.',
+        label: 'Repository',
+        value: formatRepositoryName(model.selectedProject.repositoryUrl),
+        copy: model.selectedProject.defaultBranch
+          ? `default branch ${model.selectedProject.defaultBranch}`
+          : 'default branch unavailable',
       },
-      React.createElement(MetricGrid, {
-        items: [
-          { label: 'Projects', value: String(projects.length), copy: 'Visible to this viewer' },
-          { label: 'Recent Runs', value: String(runs.length), copy: 'Latest executions across visible projects' },
-          { label: 'Latest Line Coverage', value: formatCoveragePct(latestCoverage), copy: 'Most recent run with coverage data' },
-        ],
-      }),
+      {
+        label: 'Recent Runs',
+        value: String(model.visibleRuns.length),
+        copy: 'Runs currently visible in this focused feed',
+      },
+      {
+        label: 'Latest Line Coverage',
+        value: formatCoveragePct(model.selectedProject.latestCoverage),
+        copy: 'Most recent line coverage snapshot for this project',
+      },
+    ]
+    : [
+      { label: 'Projects', value: String(model.totalProjects), copy: 'Visible to this viewer right now' },
+      { label: 'Recent Runs', value: String(model.totalRuns), copy: 'Latest executions across all visible projects' },
+      { label: 'Latest Line Coverage', value: formatCoveragePct(model.latestCoverage), copy: 'Most recent run with coverage data' },
+    ];
+
+  return React.createElement(
+    'div',
+    { className: 'web-explorer' },
+    React.createElement(
+      'aside',
+      { className: 'web-card web-card--compact web-explorer__sidebar' },
+      React.createElement('p', { className: 'web-card__eyebrow' }, 'Projects'),
+      React.createElement('h2', { className: 'web-card__title' }, 'Explorer sidebar'),
+      React.createElement(
+        'p',
+        { className: 'web-card__copy' },
+        'Use the left rail to pin a repository into focus. Clear the selection any time to fall back to the shared recent-run feed.',
+      ),
+      model.projects.length > 0
+        ? React.createElement(
+          'div',
+          { className: 'web-explorer__sidebar-list' },
+          React.createElement(SidebarButton, {
+            active: !model.selectedProject,
+            title: 'All recent runs',
+            meta: `${model.totalRuns} recent runs across ${model.totalProjects} visible project${model.totalProjects === 1 ? '' : 's'}`,
+            chips: [
+              React.createElement('span', { className: 'web-chip web-chip--muted', key: 'recent-all' }, 'live feed'),
+            ],
+            onClick: () => selectOverviewProject(dispatch, null),
+          }),
+          ...model.projects.map((project) => React.createElement(SidebarButton, {
+            key: project.id,
+            active: model.selectedProject?.slug === project.slug,
+            title: project.name,
+            meta: `${formatRepositoryName(project.repositoryUrl)} • ${project.recentRunCount} recent run${project.recentRunCount === 1 ? '' : 's'}`,
+            chips: [
+              React.createElement('span', { className: 'web-chip web-chip--muted', key: `${project.id}:key` }, project.key),
+              project.latestRun ? React.createElement(StatusPill, { key: `${project.id}:status`, status: project.latestRun.status }) : null,
+            ],
+            onClick: () => selectOverviewProject(dispatch, project.slug),
+          })),
+        )
+        : React.createElement(EmptyState, {
+          title: 'No projects available',
+          copy: 'No public projects are visible yet. Sign in to see private projects granted to your account.',
+        }),
     ),
     React.createElement(
       'div',
-      { className: 'web-grid web-grid--two' },
+      { className: 'web-explorer__main' },
       React.createElement(
         SectionCard,
         {
-          eyebrow: 'Projects',
-          title: 'Explore by repository',
-          copy: 'Jump into a project to inspect release notes, historical runs, and coverage movement.',
-          compact: true,
+          eyebrow: model.selectedProject ? 'Project focus' : 'Operations overview',
+          title: sectionTitle,
+          copy: sectionCopy,
         },
-        projects.length > 0
+        React.createElement(MetricGrid, { items: metricItems }),
+        model.selectedProject
           ? React.createElement(
-            'div',
-            { className: 'web-list' },
-            ...projects.map((project) => React.createElement(
-              Link,
-              {
-                key: project.id,
-                href: `/projects/${project.slug}`,
-                className: 'web-list__item',
-              },
+            React.Fragment,
+            null,
+            React.createElement(
+              'div',
+              { className: 'web-explorer__summary' },
+              React.createElement('span', { className: 'web-chip web-chip--muted' }, model.selectedProject.key),
+              model.selectedProject.defaultBranch
+                ? React.createElement('span', { className: 'web-chip web-chip--muted' }, model.selectedProject.defaultBranch)
+                : null,
+              model.selectedProject.latestRun
+                ? React.createElement(StatusPill, { status: model.selectedProject.latestRun.status })
+                : React.createElement('span', { className: 'web-chip web-chip--muted' }, 'No recent runs'),
+            ),
+            React.createElement(
+              'div',
+              { className: 'web-explorer__actions' },
               React.createElement(
-                'div',
-                { className: 'web-list__row' },
-                React.createElement('strong', { className: 'web-list__title' }, project.name),
-                React.createElement('span', { className: 'web-chip' }, project.key),
+                Link,
+                {
+                  href: `/projects/${model.selectedProject.slug}`,
+                  className: 'web-button web-button--ghost',
+                },
+                'Open project page',
               ),
-              React.createElement(
-                'div',
-                { className: 'web-list__meta' },
-                project.defaultBranch ? `default branch ${project.defaultBranch}` : 'default branch unavailable',
-              ),
-            )),
+            ),
           )
-          : React.createElement(EmptyState, {
-            title: 'No projects available',
-            copy: 'No public projects are visible yet. Sign in to see private projects granted to your account.',
-          }),
-      ),
-      React.createElement(
-        SectionCard,
-        {
-          eyebrow: 'Runs',
-          title: 'Recent execution feed',
-          copy: 'Focus on the latest regressions first, then pivot into the project and run detail pages.',
-          compact: true,
-        },
-        runs.length > 0
-          ? React.createElement(
+          : null,
+        React.createElement(
+          'div',
+          { className: 'web-explorer__section' },
+          React.createElement(
             'div',
-            { className: 'web-list' },
-            ...runs.map((run) => React.createElement(
-              Link,
-              {
-                key: run.id,
-                href: `/runs/${run.id}`,
-                className: 'web-list__item',
-              },
-              React.createElement(
-                'div',
-                { className: 'web-list__row' },
-                React.createElement('strong', { className: 'web-list__title' }, run.project?.name || run.externalKey),
-                React.createElement(StatusPill, { status: run.status }),
-              ),
-              React.createElement(
-                'div',
-                { className: 'web-list__meta' },
-                `${formatRepositoryName(run.project?.repositoryUrl)} • ${formatCommitSha(run.commitSha)} • ${formatDateTime(run.completedAt)}`,
-              ),
-              React.createElement(
-                'div',
-                { className: 'web-list__row' },
-                React.createElement('span', { className: 'web-chip' }, run.branch || 'no-branch'),
-                React.createElement(RunBuildChip, { run }),
-                React.createElement('span', { className: 'web-chip' }, formatDuration(run.durationMs)),
-                React.createElement('span', { className: 'web-chip' }, `lines ${formatCoveragePct(run.coverageSnapshot?.linesPct)}`),
-              ),
-            )),
-          )
-          : React.createElement(EmptyState, {
-            title: 'No recent runs',
-            copy: 'Ingest a test-station report to populate the execution feed.',
+            { className: 'web-explorer__section-heading' },
+            React.createElement(
+              'h3',
+              { className: 'web-explorer__section-title' },
+              model.selectedProject ? `${model.selectedProject.name} recent runs` : 'Latest runs across all visible projects',
+            ),
+            React.createElement(
+              'p',
+              { className: 'web-explorer__section-copy' },
+              model.selectedProject
+                ? 'This table stays scoped to the selected repository until you clear the sidebar selection.'
+                : 'Use the sidebar to narrow the feed to a single project without leaving the landing page.',
+            ),
+          ),
+          React.createElement(RunTable, {
+            runs: model.visibleRuns,
+            selectedProject: model.selectedProject,
           }),
+        ),
       ),
     ),
   );

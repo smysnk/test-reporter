@@ -64,7 +64,7 @@ const GlobalStyle = createGlobalStyle`
     gap: 20px;
     padding: 28px;
     margin: 0 auto 24px;
-    max-width: 1120px;
+    max-width: 1280px;
     background:
       radial-gradient(circle at top left, rgba(107, 178, 255, 0.18), transparent 34%),
       linear-gradient(145deg, rgba(24, 39, 65, 0.96), rgba(10, 18, 34, 0.92));
@@ -100,7 +100,7 @@ const GlobalStyle = createGlobalStyle`
     font-size: 0.95rem;
   }
   .web-shell__main {
-    max-width: 1120px;
+    max-width: 1280px;
     margin: 0 auto;
     display: grid;
     gap: 24px;
@@ -287,6 +287,156 @@ const GlobalStyle = createGlobalStyle`
   .web-table__path {
     font-family: "SFMono-Regular", "SFMono", "Menlo", "Consolas", monospace;
     font-size: 0.9rem;
+  }
+  .web-explorer {
+    display: grid;
+    gap: 24px;
+    align-items: start;
+  }
+  .web-explorer__sidebar {
+    display: grid;
+    gap: 18px;
+    min-width: 0;
+  }
+  .web-explorer__sidebar-list {
+    display: grid;
+    gap: 10px;
+  }
+  .web-explorer__sidebar-item {
+    width: 100%;
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    background:
+      linear-gradient(155deg, rgba(20, 34, 58, 0.88), rgba(10, 17, 31, 0.92));
+    color: ${(props) => props.theme.colors.text};
+    text-align: left;
+    font: inherit;
+    cursor: pointer;
+    transition: border-color 160ms ease, transform 160ms ease, background 160ms ease;
+  }
+  .web-explorer__sidebar-item:hover {
+    border-color: ${(props) => props.theme.colors.borderStrong};
+    transform: translateY(-1px);
+  }
+  .web-explorer__sidebar-item--active {
+    border-color: ${(props) => props.theme.colors.borderStrong};
+    background:
+      radial-gradient(circle at top left, rgba(107, 178, 255, 0.2), transparent 55%),
+      linear-gradient(155deg, rgba(25, 41, 68, 0.96), rgba(12, 20, 36, 0.94));
+    box-shadow: inset 0 0 0 1px rgba(107, 178, 255, 0.14);
+  }
+  .web-explorer__sidebar-row {
+    display: flex;
+    gap: 10px;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .web-explorer__sidebar-title {
+    flex: 1 1 180px;
+    min-width: 0;
+    font-size: 1rem;
+    overflow-wrap: anywhere;
+  }
+  .web-explorer__sidebar-meta {
+    color: ${(props) => props.theme.colors.muted};
+    font-size: 0.9rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+  }
+  .web-explorer__main {
+    min-width: 0;
+    display: grid;
+    gap: 24px;
+  }
+  .web-explorer__summary {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 22px;
+  }
+  .web-explorer__actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+  }
+  .web-explorer__section {
+    display: grid;
+    gap: 18px;
+    margin-top: 24px;
+    min-width: 0;
+  }
+  .web-explorer__section-heading {
+    display: grid;
+    gap: 8px;
+  }
+  .web-explorer__section-title {
+    margin: 0;
+    font-size: 1.25rem;
+    overflow-wrap: anywhere;
+  }
+  .web-explorer__section-copy {
+    margin: 0;
+    color: ${(props) => props.theme.colors.muted};
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  .web-explorer-table th,
+  .web-explorer-table td {
+    padding-right: 16px;
+  }
+  .web-explorer-table {
+    table-layout: auto;
+    min-width: 960px;
+  }
+  .web-explorer-table th:last-child,
+  .web-explorer-table td:last-child {
+    padding-right: 0;
+  }
+  .web-explorer-table__entity {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+  }
+  .web-explorer-table__primary {
+    color: ${(props) => props.theme.colors.text};
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+  .web-explorer-table__meta {
+    color: ${(props) => props.theme.colors.muted};
+    font-size: 0.86rem;
+    overflow-wrap: anywhere;
+  }
+  .web-explorer-table__meta-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .web-explorer-table__meta-link {
+    color: ${(props) => props.theme.colors.accent};
+    font-size: 0.84rem;
+    font-weight: 600;
+  }
+  .web-explorer-table__cell {
+    white-space: nowrap;
+  }
+  .web-explorer-table__cell--status {
+    white-space: normal;
+  }
+  .web-explorer-table__cell--mono {
+    font-family: "SFMono-Regular", "SFMono", "Menlo", "Consolas", monospace;
+    font-size: 0.9rem;
+  }
+  .web-explorer-table__build {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
   }
   .web-inline-list {
     display: flex;
@@ -628,6 +778,15 @@ const GlobalStyle = createGlobalStyle`
     }
     .web-shell__toolbar {
       justify-items: end;
+    }
+  }
+  @media (min-width: 980px) {
+    .web-explorer {
+      grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
+    }
+    .web-explorer__sidebar {
+      position: sticky;
+      top: 32px;
     }
   }
 `;
