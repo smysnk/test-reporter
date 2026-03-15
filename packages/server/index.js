@@ -10,6 +10,11 @@ import env from '../../config/env.mjs';
 import { dbReady } from './db.js';
 import { buildGraphqlContext, resolvers, schemaVersion, typeDefs } from './graphql/index.js';
 import { createIngestRouter } from './ingest/index.js';
+import {
+  applyTraceHeadersToNodeResponse,
+  createGraphqlTracePlugin,
+  resolveServerRequestTrace,
+} from './requestTrace.js';
 import './models/index.js';
 
 export async function createServer(options = {}) {
@@ -18,7 +23,10 @@ export async function createServer(options = {}) {
   const graphqlServer = new ApolloServer({
     typeDefs,
     resolvers,
-    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+    plugins: [
+      ApolloServerPluginDrainHttpServer({ httpServer }),
+      createGraphqlTracePlugin(),
+    ],
   });
 
   await graphqlServer.start();
@@ -27,6 +35,12 @@ export async function createServer(options = {}) {
     origin: resolveCorsOrigin(options),
     credentials: true,
   }));
+  app.use((req, res, next) => {
+    const requestTrace = resolveServerRequestTrace(req);
+    req.testStationTrace = requestTrace;
+    applyTraceHeadersToNodeResponse(res, requestTrace);
+    next();
+  });
   app.use(express.json({ limit: options.jsonLimit || '10mb' }));
 
   app.get('/healthz', (_req, res) => {
@@ -40,8 +54,9 @@ export async function createServer(options = {}) {
   app.use('/api/ingest', createIngestRouter(options));
 
   app.use('/graphql', expressMiddleware(graphqlServer, {
-    context: async ({ req }) => buildGraphqlContext({
+    context: async ({ req, res }) => buildGraphqlContext({
       req,
+      res,
       options,
     }),
   }));

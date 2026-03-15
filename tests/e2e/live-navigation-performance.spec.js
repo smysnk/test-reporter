@@ -347,10 +347,14 @@ async function collectProfilingSnapshot(page, expectedMarkName = null) {
 
     return {
       serverPageProfile: perfStore.serverPageProfile || nextPageProfile,
+      currentPageTrace: perfStore.currentPageTrace || nextPageProfile?.trace || null,
       matchingPageMark: markName
         ? [...recentPageMarks].reverse().find((entry) => entry.name === markName) || null
         : null,
       recentPageMarks,
+      recentRequestTraces: Array.isArray(perfStore.requestTraces)
+        ? perfStore.requestTraces.slice(-12)
+        : [],
       recentRouteTransitions,
       recentResources,
       resourceSummary: {

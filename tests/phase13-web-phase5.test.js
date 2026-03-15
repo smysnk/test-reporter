@@ -642,6 +642,7 @@ test('web GraphQL helpers and proxy allow anonymous public reads without actor h
   assert.equal(home.projects[0].key, 'public-site');
   assert.equal(requests[0].headers['x-test-station-actor-id'], undefined);
   assert.equal(requests[0].headers['x-request-id'], 'req-guest');
+  assert.equal(requests[0].headers['x-test-station-trace-id'], 'req-guest');
 
   const responseState = createResponseRecorder();
   const handler = createGraphqlProxyHandler({
@@ -679,8 +680,12 @@ test('web GraphQL helpers and proxy allow anonymous public reads without actor h
       projects: [{ key: 'public-site' }],
     },
   });
+  assert.equal(responseState.headers['x-request-id'], 'proxy-guest');
+  assert.equal(responseState.headers['x-test-station-trace-id'], 'proxy-guest');
   assert.equal(requests[1].headers['x-test-station-actor-id'], undefined);
-  assert.equal(requests[1].headers['x-request-id'], 'proxy-guest');
+  assert.match(requests[1].headers['x-request-id'], /^webproxy-/);
+  assert.equal(requests[1].headers['x-test-station-trace-id'], 'proxy-guest');
+  assert.equal(requests[1].headers['x-test-station-parent-request-id'], 'proxy-guest');
 });
 
 test('web SSR page result builders allow guest public pages and return notFound for private resources', async () => {
@@ -1124,6 +1129,8 @@ test('web runner report handler allows anonymous public report rendering', async
 
   assert.equal(responseState.statusCode, 200);
   assert.equal(responseState.headers['content-type'], 'text/html; charset=utf-8');
+  assert.equal(responseState.headers['x-request-id'], 'runner-guest');
+  assert.equal(responseState.headers['x-test-station-trace-id'], 'runner-guest');
   assert.match(responseState.bodyText, /public report/);
 });
 

@@ -6,6 +6,7 @@ import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/W
 import { formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../lib/format.js';
 import { buildHomeExplorerModel } from '../lib/homeExplorer.js';
 import { getWebSession } from '../lib/auth.js';
+import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../lib/requestTrace.js';
 import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../lib/pageProfiling.js';
 import { buildOverviewPageResult } from '../lib/pageProps.js';
 import { loadWebHomePage } from '../lib/serverGraphql.js';
@@ -390,6 +391,8 @@ export default function WebIndexPage({ data }) {
 
 export const getServerSideProps = wrapper.getServerSideProps((store) => async (context) => {
   const session = await getWebSession(context.req, context.res);
+  const requestTrace = resolveWebRequestTrace(context.req);
+  applyTraceHeadersToNextResponse(context.res, requestTrace);
   const pageProfiler = createPageLoadProfiler({
     pageType: 'overview',
     route: '/',
@@ -397,15 +400,18 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   const data = await loadWebHomePage({
     session,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
+    requestTrace,
     profiler: pageProfiler,
   });
   const pageProfile = pageProfiler.finalize({
+    trace: requestTrace,
     visibleProjectCount: Array.isArray(data?.projects) ? data.projects.length : 0,
     visibleRunCount: Array.isArray(data?.runs) ? data.runs.length : 0,
   });
   const serverTimingHeader = buildServerTimingHeader(pageProfile);
   if (serverTimingHeader && context.res && typeof context.res.setHeader === 'function') {
     context.res.setHeader('Server-Timing', serverTimingHeader);
+    pageProfile.serverTiming = serverTimingHeader;
   }
 
   return buildOverviewPageResult({

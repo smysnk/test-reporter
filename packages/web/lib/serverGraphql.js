@@ -1,5 +1,11 @@
 import { buildWebActorHeaders } from './auth.js';
 import {
+  buildTraceHeaders,
+  createStandaloneWebTrace,
+  createWebChildTrace,
+  extractTraceResponseMeta,
+} from './requestTrace.js';
+import {
   ADMIN_GROUPS_QUERY,
   ADMIN_OVERVIEW_QUERY,
   ADMIN_PROJECT_ACCESS_QUERY,
@@ -30,6 +36,67 @@ async function measureProfileStep(profiler, name, fn, details = null) {
   return profiler.measureStep(name, fn, details);
 }
 
+function resolveDownstreamTrace({ requestTrace = null, requestId = null, requestIdPrefix = 'webgql' } = {}) {
+  if (requestTrace) {
+    return createWebChildTrace(requestTrace, requestIdPrefix);
+  }
+
+  if (requestId) {
+    return createStandaloneWebTrace(requestId, requestIdPrefix);
+  }
+
+  return createStandaloneWebTrace(null, requestIdPrefix);
+}
+
+async function executeWebGraphqlRequest({
+  session,
+  query,
+  variables = {},
+  fetchImpl = fetch,
+  requestId = null,
+  requestTrace = null,
+}) {
+  const downstreamTrace = resolveDownstreamTrace({
+    requestTrace,
+    requestId,
+    requestIdPrefix: 'webgql',
+  });
+  const response = await fetchImpl(resolveWebGraphqlUrl(), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      ...buildTraceHeaders(downstreamTrace),
+      ...buildWebActorHeaders(session),
+    },
+    body: JSON.stringify({
+      query,
+      variables,
+    }),
+  });
+
+  const payload = await response.json();
+  const meta = {
+    requestTrace: downstreamTrace,
+    responseTrace: extractTraceResponseMeta(response.headers),
+  };
+
+  if (!response.ok || Array.isArray(payload.errors) && payload.errors.length > 0) {
+    const message = Array.isArray(payload.errors) && payload.errors.length > 0
+      ? payload.errors[0].message
+      : `GraphQL request failed with status ${response.status}`;
+    const error = new Error(message);
+    error.statusCode = response.status;
+    error.payload = payload;
+    error.trace = meta;
+    throw error;
+  }
+
+  return {
+    data: payload.data || {},
+    meta,
+  };
+}
+
 function normalizeEnvValue(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -51,43 +118,30 @@ export function resolveWebGraphqlUrl() {
   return `${resolveWebServerUrl().replace(/\/$/, '')}/graphql`;
 }
 
-export async function executeWebGraphql({ session, query, variables = {}, fetchImpl = fetch, requestId = null }) {
-  const response = await fetchImpl(resolveWebGraphqlUrl(), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      ...(requestId ? { 'x-request-id': requestId } : {}),
-      ...buildWebActorHeaders(session),
-    },
-    body: JSON.stringify({
-      query,
-      variables,
-    }),
+export async function executeWebGraphql({ session, query, variables = {}, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query,
+    variables,
+    fetchImpl,
+    requestId,
+    requestTrace,
   });
-
-  const payload = await response.json();
-  if (!response.ok || Array.isArray(payload.errors) && payload.errors.length > 0) {
-    const message = Array.isArray(payload.errors) && payload.errors.length > 0
-      ? payload.errors[0].message
-      : `GraphQL request failed with status ${response.status}`;
-    const error = new Error(message);
-    error.statusCode = response.status;
-    error.payload = payload;
-    throw error;
-  }
-
-  return payload.data || {};
+  return result.data;
 }
 
-export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = null, profiler = null }) {
-  const data = await measureProfileStep(profiler, 'home-feed-query', () => executeWebGraphql({
+export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
+  const result = await measureProfileStep(profiler, 'home-feed-query', () => executeWebGraphqlRequest({
     session,
     query: WEB_HOME_QUERY,
     fetchImpl,
     requestId,
-  }), {
+    requestTrace,
+  }), (response) => ({
     query: 'WEB_HOME_QUERY',
-  });
+    ...response?.meta,
+  }));
+  const data = result.data;
 
   return {
     viewer: data.viewer || data.me || null,
@@ -131,32 +185,38 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
   };
 }
 
-export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch, requestId = null, profiler = null }) {
-  const base = await measureProfileStep(profiler, 'project-base-query', () => executeWebGraphql({
+export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
+  const baseResult = await measureProfileStep(profiler, 'project-base-query', () => executeWebGraphqlRequest({
     session,
     query: PROJECT_BY_SLUG_QUERY,
     variables: { slug },
     fetchImpl,
     requestId,
-  }), {
+    requestTrace,
+  }), (response) => ({
     query: 'PROJECT_BY_SLUG_QUERY',
     slug,
-  });
+    ...response?.meta,
+  }));
+  const base = baseResult.data;
 
   if (!base.project) {
     return null;
   }
 
-  const activity = await measureProfileStep(profiler, 'project-activity-query', () => executeWebGraphql({
+  const activityResult = await measureProfileStep(profiler, 'project-activity-query', () => executeWebGraphqlRequest({
     session,
     query: PROJECT_ACTIVITY_QUERY,
     variables: { projectKey: base.project.key },
     fetchImpl,
     requestId,
-  }), {
+    requestTrace,
+  }), (response) => ({
     query: 'PROJECT_ACTIVITY_QUERY',
     projectKey: base.project.key,
-  });
+    ...response?.meta,
+  }));
+  const activity = activityResult.data;
 
   return {
     project: base.project,
@@ -171,6 +231,7 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
       releaseNotes: Array.isArray(activity.releaseNotes) ? activity.releaseNotes : [],
       fetchImpl,
       requestId,
+      requestTrace,
       profiler,
     }), {
       latestRunId: Array.isArray(activity.runs) && activity.runs[0] ? activity.runs[0].id : null,
@@ -178,17 +239,20 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
   };
 }
 
-export async function loadRunExplorerPage({ session, runId, fetchImpl = fetch, requestId = null, profiler = null }) {
-  const data = await measureProfileStep(profiler, 'run-detail-query', () => executeWebGraphql({
+export async function loadRunExplorerPage({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
+  const result = await measureProfileStep(profiler, 'run-detail-query', () => executeWebGraphqlRequest({
     session,
     query: RUN_DETAIL_QUERY,
     variables: { runId },
     fetchImpl,
     requestId,
-  }), {
+    requestTrace,
+  }), (response) => ({
     query: 'RUN_DETAIL_QUERY',
     runId,
-  });
+    ...response?.meta,
+  }));
+  const data = result.data;
 
   if (!data.run) {
     return null;
@@ -204,17 +268,20 @@ export async function loadRunExplorerPage({ session, runId, fetchImpl = fetch, r
   };
 }
 
-export async function loadRunReportHtml({ session, runId, fetchImpl = fetch, requestId = null, profiler = null }) {
-  const data = await measureProfileStep(profiler, 'run-report-query', () => executeWebGraphql({
+async function loadRunReportHtmlResult({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
+  const result = await measureProfileStep(profiler, 'run-report-query', () => executeWebGraphqlRequest({
     session,
     query: RUN_REPORT_QUERY,
     variables: { runId },
     fetchImpl,
     requestId,
-  }), {
+    requestTrace,
+  }), (response) => ({
     query: 'RUN_REPORT_QUERY',
     runId,
-  });
+    ...response?.meta,
+  }));
+  const data = result.data;
 
   const run = data.run || null;
   if (!run || !run.rawReport) {
@@ -231,11 +298,27 @@ export async function loadRunReportHtml({ session, runId, fetchImpl = fetch, req
     runId,
   });
 
-  return decorateEmbeddedRunnerReportHtml(html);
+  return {
+    html: decorateEmbeddedRunnerReportHtml(html),
+    meta: result.meta,
+  };
 }
 
-export async function loadAdminOverviewPage({ session, fetchImpl = fetch, requestId = null }) {
-  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+export async function loadRunReportHtml({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
+  const result = await loadRunReportHtmlResult({
+    session,
+    runId,
+    fetchImpl,
+    requestId,
+    requestTrace,
+    profiler,
+  });
+
+  return result?.html || null;
+}
+
+export async function loadAdminOverviewPage({ session, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId, requestTrace });
   if (!viewer) {
     return ADMIN_PAGE_UNAUTHORIZED;
   }
@@ -245,6 +328,7 @@ export async function loadAdminOverviewPage({ session, fetchImpl = fetch, reques
     query: ADMIN_OVERVIEW_QUERY,
     fetchImpl,
     requestId,
+    requestTrace,
   });
 
   return {
@@ -256,8 +340,8 @@ export async function loadAdminOverviewPage({ session, fetchImpl = fetch, reques
   };
 }
 
-export async function loadAdminProjectsPage({ session, fetchImpl = fetch, requestId = null }) {
-  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+export async function loadAdminProjectsPage({ session, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId, requestTrace });
   if (!viewer) {
     return ADMIN_PAGE_UNAUTHORIZED;
   }
@@ -267,6 +351,7 @@ export async function loadAdminProjectsPage({ session, fetchImpl = fetch, reques
     query: ADMIN_PROJECTS_QUERY,
     fetchImpl,
     requestId,
+    requestTrace,
   });
 
   return {
@@ -275,8 +360,8 @@ export async function loadAdminProjectsPage({ session, fetchImpl = fetch, reques
   };
 }
 
-export async function loadAdminProjectAccessPage({ session, slug, fetchImpl = fetch, requestId = null }) {
-  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+export async function loadAdminProjectAccessPage({ session, slug, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId, requestTrace });
   if (!viewer) {
     return ADMIN_PAGE_UNAUTHORIZED;
   }
@@ -287,6 +372,7 @@ export async function loadAdminProjectAccessPage({ session, slug, fetchImpl = fe
     variables: { slug },
     fetchImpl,
     requestId,
+    requestTrace,
   });
 
   if (!data.adminProjectAccess) {
@@ -301,8 +387,8 @@ export async function loadAdminProjectAccessPage({ session, slug, fetchImpl = fe
   };
 }
 
-export async function loadAdminRolesPage({ session, fetchImpl = fetch, requestId = null }) {
-  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+export async function loadAdminRolesPage({ session, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId, requestTrace });
   if (!viewer) {
     return ADMIN_PAGE_UNAUTHORIZED;
   }
@@ -312,6 +398,7 @@ export async function loadAdminRolesPage({ session, fetchImpl = fetch, requestId
     query: ADMIN_ROLES_QUERY,
     fetchImpl,
     requestId,
+    requestTrace,
   });
 
   return {
@@ -320,8 +407,8 @@ export async function loadAdminRolesPage({ session, fetchImpl = fetch, requestId
   };
 }
 
-export async function loadAdminGroupsPage({ session, fetchImpl = fetch, requestId = null }) {
-  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+export async function loadAdminGroupsPage({ session, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId, requestTrace });
   if (!viewer) {
     return ADMIN_PAGE_UNAUTHORIZED;
   }
@@ -331,6 +418,7 @@ export async function loadAdminGroupsPage({ session, fetchImpl = fetch, requestI
     query: ADMIN_GROUPS_QUERY,
     fetchImpl,
     requestId,
+    requestTrace,
   });
 
   return {
@@ -339,8 +427,8 @@ export async function loadAdminGroupsPage({ session, fetchImpl = fetch, requestI
   };
 }
 
-export async function loadAdminUsersPage({ session, fetchImpl = fetch, requestId = null }) {
-  const viewer = await loadAdminViewer({ session, fetchImpl, requestId });
+export async function loadAdminUsersPage({ session, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const viewer = await loadAdminViewer({ session, fetchImpl, requestId, requestTrace });
   if (!viewer) {
     return ADMIN_PAGE_UNAUTHORIZED;
   }
@@ -350,6 +438,7 @@ export async function loadAdminUsersPage({ session, fetchImpl = fetch, requestId
     query: ADMIN_USERS_QUERY,
     fetchImpl,
     requestId,
+    requestTrace,
   });
 
   return {
@@ -368,6 +457,7 @@ async function loadProjectTrendPanels({
   releaseNotes,
   fetchImpl,
   requestId,
+  requestTrace,
   profiler = null,
 }) {
   const overlays = buildTrendOverlays(overallTrend, releaseNotes);
@@ -381,16 +471,19 @@ async function loadProjectTrendPanels({
     };
   }
 
-  const scopeCatalog = await measureProfileStep(profiler, 'project-scope-catalog-query', () => executeWebGraphql({
+  const scopeCatalogResult = await measureProfileStep(profiler, 'project-scope-catalog-query', () => executeWebGraphqlRequest({
     session,
     query: RUN_SCOPE_TREND_CATALOG_QUERY,
     variables: { runId: latestRunId },
     fetchImpl,
     requestId,
-  }), {
+    requestTrace,
+  }), (response) => ({
     query: 'RUN_SCOPE_TREND_CATALOG_QUERY',
     runId: latestRunId,
-  });
+    ...response?.meta,
+  }));
+  const scopeCatalog = scopeCatalogResult.data;
 
   const packageSelections = (Array.isArray(scopeCatalog.runPackages) ? scopeCatalog.runPackages : [])
     .slice(0, 3)
@@ -427,6 +520,7 @@ async function loadProjectTrendPanels({
       selections: packageSelections,
       fetchImpl,
       requestId,
+      requestTrace,
     }), {
       selectionCount: packageSelections.length,
       scopeType: 'package',
@@ -437,6 +531,7 @@ async function loadProjectTrendPanels({
       selections: moduleSelections,
       fetchImpl,
       requestId,
+      requestTrace,
     }), {
       selectionCount: moduleSelections.length,
       scopeType: 'module',
@@ -447,6 +542,7 @@ async function loadProjectTrendPanels({
       selections: fileSelections,
       fetchImpl,
       requestId,
+      requestTrace,
     }), {
       selectionCount: fileSelections.length,
       scopeType: 'file',
@@ -462,7 +558,7 @@ async function loadProjectTrendPanels({
   };
 }
 
-async function loadScopedTrendPanels({ session, projectKey, selections, fetchImpl, requestId }) {
+async function loadScopedTrendPanels({ session, projectKey, selections, fetchImpl, requestId, requestTrace }) {
   const resolvedSelections = Array.isArray(selections) ? selections.filter(Boolean) : [];
   const responses = await Promise.all(resolvedSelections.map(async (selection) => {
     const result = await executeWebGraphql({
@@ -477,6 +573,7 @@ async function loadScopedTrendPanels({ session, projectKey, selections, fetchImp
       },
       fetchImpl,
       requestId,
+      requestTrace,
     });
 
     return {
@@ -488,16 +585,22 @@ async function loadScopedTrendPanels({ session, projectKey, selections, fetchImp
   return responses.filter((entry) => entry.points.length > 0);
 }
 
-async function loadAdminViewer({ session, fetchImpl, requestId }) {
+async function loadAdminViewer({ session, fetchImpl, requestId, requestTrace }) {
   const data = await executeWebGraphql({
     session,
     query: VIEWER_ACCESS_QUERY,
     fetchImpl,
     requestId,
+    requestTrace,
   });
 
   return data.viewer?.isAdmin === true ? data.viewer : null;
 }
+
+export {
+  executeWebGraphqlRequest,
+  loadRunReportHtmlResult,
+};
 
 function buildTrendOverlays(points, releaseNotes) {
   const overlays = [];

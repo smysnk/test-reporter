@@ -1,3 +1,11 @@
+import {
+  TRACE_COOKIE_NAME,
+  buildTraceHeaders,
+  createChildTraceContext,
+  generateTraceIdentifier,
+  serializeTraceCookie,
+} from '../../../config/request-trace.mjs';
+
 function nowMs() {
   if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
     return performance.now();
@@ -49,14 +57,16 @@ export function createPageLoadProfiler({ pageType, route = null } = {}) {
   return {
     async measureStep(name, fn, details = null) {
       const stepStartedAt = nowMs();
+      let result;
       try {
-        return await fn();
+        result = await fn();
+        return result;
       } finally {
         steps.push({
           name,
           startMs: roundMetric(stepStartedAt - startedAt),
           durationMs: roundMetric(nowMs() - stepStartedAt),
-          details: details || null,
+          details: typeof details === 'function' ? details(result) : (details || null),
         });
       }
     },
@@ -108,11 +118,17 @@ export function ensureClientProfilerStore() {
   if (!Array.isArray(store.pageMarks)) {
     store.pageMarks = [];
   }
+  if (!Array.isArray(store.requestTraces)) {
+    store.requestTraces = [];
+  }
   if (!Number.isInteger(store.routeTransitionSequence)) {
     store.routeTransitionSequence = 0;
   }
   if (!Object.prototype.hasOwnProperty.call(store, 'serverPageProfile')) {
     store.serverPageProfile = null;
+  }
+  if (!Object.prototype.hasOwnProperty.call(store, 'currentPageTrace')) {
+    store.currentPageTrace = null;
   }
 
   return store;
@@ -125,6 +141,18 @@ export function setClientServerPageProfile(pageProfile) {
   }
 
   store.serverPageProfile = pageProfile || null;
+  store.currentPageTrace = pageProfile?.trace || null;
+  if (pageProfile?.trace) {
+    store.requestTraces.push({
+      type: 'page-response',
+      route: pageProfile.route || getCurrentBrowserRoute(),
+      trace: pageProfile.trace,
+      serverTiming: pageProfile.serverTiming || null,
+      pageType: pageProfile.pageType || null,
+      totalMs: pageProfile.totalMs || null,
+    });
+    limitList(store.requestTraces, 40);
+  }
   return store.serverPageProfile;
 }
 
@@ -135,10 +163,12 @@ export function beginClientRouteProfile(url, details = null) {
   }
 
   const absoluteStartMs = nowMs();
+  const traceId = generateTraceIdentifier('trace');
   const routeTransition = {
     id: store.routeTransitionSequence + 1,
     from: getCurrentBrowserRoute(),
     to: url || null,
+    traceId,
     status: 'pending',
     startedAtMs: roundMetric(absoluteStartMs),
     durationMs: null,
@@ -152,6 +182,9 @@ export function beginClientRouteProfile(url, details = null) {
   store.activeRouteTransition = routeTransition;
   store.routeTransitions.push(routeTransition);
   limitList(store.routeTransitions, 25);
+  if (typeof document !== 'undefined') {
+    document.cookie = serializeTraceCookie(traceId);
+  }
   return routeTransition;
 }
 
@@ -240,3 +273,43 @@ export function recordClientPageMark(name, details = null) {
   }
   return pageMark;
 }
+
+export function createClientRequestTrace(details = null) {
+  const store = ensureClientProfilerStore();
+  if (!store) {
+    return null;
+  }
+
+  const activeTransition = store.activeRouteTransition || null;
+  const currentPageTrace = store.currentPageTrace || null;
+  const traceContext = createChildTraceContext({
+    requestId: currentPageTrace?.requestId || null,
+    traceId: activeTransition?.traceId || currentPageTrace?.traceId || generateTraceIdentifier('trace'),
+    parentRequestId: currentPageTrace?.parentRequestId || null,
+  }, {
+    requestIdPrefix: 'webapi',
+  });
+
+  return {
+    traceContext,
+    headers: buildTraceHeaders(traceContext),
+    details: details || null,
+  };
+}
+
+export function recordClientRequestTrace(entry) {
+  const store = ensureClientProfilerStore();
+  if (!store) {
+    return null;
+  }
+
+  store.requestTraces.push({
+    ...entry,
+    route: getCurrentBrowserRoute(),
+    recordedAtMs: roundMetric(nowMs()),
+  });
+  limitList(store.requestTraces, 40);
+  return store.requestTraces[store.requestTraces.length - 1] || null;
+}
+
+export { TRACE_COOKIE_NAME };

@@ -1,6 +1,8 @@
 import { ApolloClient, HttpLink, InMemoryCache, ApolloLink, from } from '@apollo/client';
 import { onError } from '@apollo/client/link/error';
+import { extractTraceContextFromHeaders, readHeaderValue } from '../../../config/request-trace.mjs';
 import { handleUnauthorizedApolloError } from './authErrors.js';
+import { createClientRequestTrace, recordClientRequestTrace } from './pageProfiling.js';
 
 const GRAPHQL_URL = process.env.NEXT_PUBLIC_GRAPHQL_PATH || '/graphql';
 
@@ -22,6 +24,7 @@ function createApolloClient() {
   const httpLink = new HttpLink({
     uri: GRAPHQL_URL,
     credentials: 'include',
+    fetch: createTracedFetch(),
   });
 
   const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
@@ -49,4 +52,37 @@ function createApolloClient() {
     link: from([errorLink, requestMetadataLink, httpLink]),
     cache: new InMemoryCache(),
   });
+}
+
+function createTracedFetch() {
+  return async function tracedFetch(input, init = {}) {
+    const requestTrace = createClientRequestTrace({
+      kind: 'graphql-proxy',
+      url: typeof input === 'string' ? input : input?.url || GRAPHQL_URL,
+    });
+    const response = await fetch(input, {
+      ...init,
+      headers: {
+        ...(init.headers || {}),
+        ...(requestTrace?.headers || {}),
+      },
+    });
+
+    if (requestTrace) {
+      recordClientRequestTrace({
+        type: 'fetch',
+        target: typeof input === 'string' ? input : input?.url || GRAPHQL_URL,
+        requestTrace: requestTrace.traceContext,
+        responseTrace: extractTraceContextFromHeaders(response.headers),
+        upstreamRequestId: readHeaderValue(response.headers, 'x-test-station-upstream-request-id'),
+        upstreamTraceId: readHeaderValue(response.headers, 'x-test-station-upstream-trace-id'),
+        upstreamParentRequestId: readHeaderValue(response.headers, 'x-test-station-upstream-parent-request-id'),
+        serverTiming: readHeaderValue(response.headers, 'server-timing'),
+        status: response.status,
+        ok: response.ok,
+      });
+    }
+
+    return response;
+  };
 }

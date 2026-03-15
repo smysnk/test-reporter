@@ -208,6 +208,39 @@ test('GraphQL exposes guest-safe public reads and hides private resources', asyn
   await closeServer(server);
 });
 
+test('GraphQL returns trace headers and request profiling metadata', async () => {
+  const server = await createServer({
+    port: 0,
+    corsOrigin: 'http://localhost:3001',
+    models: createGraphqlModels(),
+  });
+
+  await listen(server);
+  const response = await graphqlRequest(server, {
+    query: `
+      query TraceProbe {
+        viewer {
+          id
+        }
+      }
+    `,
+  }, {
+    'x-request-id': 'browser-request-123',
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers['x-request-id'], 'browser-request-123');
+  assert.equal(response.headers['x-test-station-trace-id'], 'browser-request-123');
+  assert.match(response.headers['server-timing'] || '', /graphql;dur=/);
+  assert.equal(response.payload.extensions.testStationTrace.requestId, 'browser-request-123');
+  assert.equal(response.payload.extensions.testStationTrace.traceId, 'browser-request-123');
+  assert.equal(response.payload.extensions.testStationTrace.parentRequestId, null);
+  assert.equal(response.payload.extensions.testStationTrace.operationName, 'TraceProbe');
+  assert.equal(typeof response.payload.extensions.testStationTrace.durationMs, 'number');
+
+  await closeServer(server);
+});
+
 test('GraphQL exposes project, run, file, test, artifact, trend, and release-note reads for authorized actors', async () => {
   const server = await createServer({
     port: 0,
@@ -2434,6 +2467,7 @@ async function graphqlRequest(server, payload, headers = {}) {
 
   return {
     status: response.status,
+    headers: Object.fromEntries(response.headers.entries()),
     payload: await response.json(),
   };
 }

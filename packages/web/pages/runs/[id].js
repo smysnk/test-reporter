@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { EmptyState, InlineList, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, formatSignedDelta } from '../../lib/format.js';
 import { getWebSession } from '../../lib/auth.js';
+import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../../lib/requestTrace.js';
 import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../../lib/pageProfiling.js';
 import { buildRunPageResult } from '../../lib/pageProps.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../../lib/runReportTemplate.js';
@@ -519,6 +520,8 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   const session = await getWebSession(context.req, context.res);
   const runId = typeof context.params?.id === 'string' ? context.params.id : '';
   const templateMode = resolveRunTemplateMode(context.query?.template);
+  const requestTrace = resolveWebRequestTrace(context.req);
+  applyTraceHeadersToNextResponse(context.res, requestTrace);
   const pageProfiler = createPageLoadProfiler({
     pageType: 'run',
     route: `/runs/${runId}${templateMode === 'web' ? '?template=web' : ''}`,
@@ -527,9 +530,11 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
     session,
     runId,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
+    requestTrace,
     profiler: pageProfiler,
   });
   const pageProfile = pageProfiler.finalize({
+    trace: requestTrace,
     runId,
     templateMode,
     failedTestCount: Array.isArray(data?.failedTests) ? data.failedTests.length : 0,
@@ -538,6 +543,7 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   const serverTimingHeader = buildServerTimingHeader(pageProfile);
   if (serverTimingHeader && context.res && typeof context.res.setHeader === 'function') {
     context.res.setHeader('Server-Timing', serverTimingHeader);
+    pageProfile.serverTiming = serverTimingHeader;
   }
 
   return buildRunPageResult({

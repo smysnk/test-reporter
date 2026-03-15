@@ -4,6 +4,7 @@ import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, MetricGrid, SectionCard, StatusPill, RunBuildChip } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../../lib/format.js';
 import { getWebSession } from '../../lib/auth.js';
+import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../../lib/requestTrace.js';
 import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../../lib/pageProfiling.js';
 import { buildProjectPageResult } from '../../lib/pageProps.js';
 import { loadProjectExplorerPage } from '../../lib/serverGraphql.js';
@@ -243,6 +244,8 @@ export default function ProjectExplorerPage({ data }) {
 export const getServerSideProps = wrapper.getServerSideProps((store) => async (context) => {
   const session = await getWebSession(context.req, context.res);
   const slug = typeof context.params?.slug === 'string' ? context.params.slug : '';
+  const requestTrace = resolveWebRequestTrace(context.req);
+  applyTraceHeadersToNextResponse(context.res, requestTrace);
   const pageProfiler = createPageLoadProfiler({
     pageType: 'project',
     route: `/projects/${slug}`,
@@ -251,9 +254,11 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
     session,
     slug,
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
+    requestTrace,
     profiler: pageProfiler,
   });
   const pageProfile = pageProfiler.finalize({
+    trace: requestTrace,
     projectSlug: data?.project?.slug || slug,
     runCount: Array.isArray(data?.runs) ? data.runs.length : 0,
     coveragePointCount: Array.isArray(data?.coverageTrend) ? data.coverageTrend.length : 0,
@@ -262,6 +267,7 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   const serverTimingHeader = buildServerTimingHeader(pageProfile);
   if (serverTimingHeader && context.res && typeof context.res.setHeader === 'function') {
     context.res.setHeader('Server-Timing', serverTimingHeader);
+    pageProfile.serverTiming = serverTimingHeader;
   }
 
   return buildProjectPageResult({

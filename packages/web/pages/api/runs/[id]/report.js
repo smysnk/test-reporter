@@ -1,7 +1,14 @@
 import { getWebSession } from '../../../../lib/auth.js';
-import { loadRunReportHtml } from '../../../../lib/serverGraphql.js';
+import { loadRunReportHtmlResult } from '../../../../lib/serverGraphql.js';
+import {
+  UPSTREAM_PARENT_REQUEST_ID_HEADER,
+  UPSTREAM_REQUEST_ID_HEADER,
+  UPSTREAM_TRACE_ID_HEADER,
+  applyTraceHeadersToNextResponse,
+  resolveWebRequestTrace,
+} from '../../../../lib/requestTrace.js';
 
-export function createRunReportHandler({ getSession = getWebSession, loadReportHtml = loadRunReportHtml } = {}) {
+export function createRunReportHandler({ getSession = getWebSession, loadReportHtml = loadRunReportHtmlResult } = {}) {
   return async function webRunReportHandler(req, res) {
     if (req.method !== 'GET') {
       res.setHeader('allow', 'GET');
@@ -10,6 +17,8 @@ export function createRunReportHandler({ getSession = getWebSession, loadReportH
     }
 
     const session = await getSession(req, res);
+    const requestTrace = resolveWebRequestTrace(req);
+    applyTraceHeadersToNextResponse(res, requestTrace);
     const runId = typeof req.query.id === 'string' ? req.query.id : '';
     if (!runId) {
       renderHtmlResponse(res, 400, renderStatusHtml({
@@ -20,11 +29,28 @@ export function createRunReportHandler({ getSession = getWebSession, loadReportH
     }
 
     try {
-      const html = await loadReportHtml({
+      const result = await loadReportHtml({
         session,
         runId,
         requestId: typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : null,
+        requestTrace,
       });
+      const html = typeof result === 'string' ? result : result?.html;
+      const upstreamTrace = typeof result === 'string' ? null : result?.meta?.responseTrace?.trace;
+      const upstreamServerTiming = typeof result === 'string' ? null : result?.meta?.responseTrace?.serverTiming;
+
+      if (upstreamServerTiming) {
+        res.setHeader('server-timing', upstreamServerTiming);
+      }
+      if (upstreamTrace?.requestId) {
+        res.setHeader(UPSTREAM_REQUEST_ID_HEADER, upstreamTrace.requestId);
+      }
+      if (upstreamTrace?.traceId) {
+        res.setHeader(UPSTREAM_TRACE_ID_HEADER, upstreamTrace.traceId);
+      }
+      if (upstreamTrace?.parentRequestId) {
+        res.setHeader(UPSTREAM_PARENT_REQUEST_ID_HEADER, upstreamTrace.parentRequestId);
+      }
 
       if (!html) {
         renderHtmlResponse(res, 404, renderStatusHtml({

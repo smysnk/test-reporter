@@ -300,9 +300,18 @@ Each benchmark record now also carries a `profiling` block with:
 - server-side page-load timings captured during `getServerSideProps`
 - browser page-ready marks for overview, project, run, operations, and runner-frame milestones
 - recent client-side route-transition events
+- recent browser-side traced fetches and their upstream response ids
 - resource timings for `/graphql`, `/_next/data/`, and runner-report iframe requests
 
 These profiling fields only appear once the target deployment is running a build that includes the instrumentation hooks from this repo.
+
+The traced web responses also expose:
+
+- `x-request-id`
+- `x-test-station-trace-id`
+- `x-test-station-parent-request-id` when a request is part of a larger chain
+- `x-test-station-upstream-request-id` / `x-test-station-upstream-trace-id` on proxied web API responses
+- `Server-Timing` for SSR page loads and GraphQL endpoint timing
 
 Optional environment variables:
 

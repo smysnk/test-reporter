@@ -1,8 +1,10 @@
 import env from '../../../config/env.mjs';
 import { authenticateSharedKeyRequest } from '../ingest/auth.js';
 import { Group, Role, User, UserGroup, UserRole } from '../models/index.js';
+import { resolveServerRequestTrace } from '../requestTrace.js';
 
-export async function createGraphqlContext({ req, options = {}, queryService, ingestionService, accessService, adminService }) {
+export async function createGraphqlContext({ req, res, options = {}, queryService, ingestionService, accessService, adminService }) {
+  const requestTrace = req?.testStationTrace || resolveServerRequestTrace(req);
   const actor = await resolveActorFromRequest(req, options);
   const auth = authenticateSharedKeyRequest(req, options, {
     allowMissing: true,
@@ -11,7 +13,9 @@ export async function createGraphqlContext({ req, options = {}, queryService, in
   });
 
   return {
-    requestId: req.headers['x-request-id'] || null,
+    requestId: requestTrace.requestId,
+    requestTrace,
+    res,
     actor,
     auth,
     accessService,
