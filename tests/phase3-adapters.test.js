@@ -165,6 +165,28 @@ test('playwright adapter collects suite-scoped browser Istanbul coverage when re
   );
 });
 
+test('playwright adapter surfaces top-level launcher errors when no tests are emitted', async () => {
+  const project = createProject();
+  const cwd = path.join(fixtureRoot, 'playwright');
+  const adapter = createPlaywrightAdapter();
+  const result = await adapter.run({
+    project,
+    suite: {
+      id: 'playwright-launch-error',
+      label: 'Playwright Launch Error Fixture',
+      packageName: 'fixtures',
+      cwd,
+      command: [process.execPath, './launch-error.mjs'],
+    },
+    execution: { coverage: false },
+  });
+
+  assert.equal(result.status, 'failed');
+  assert.deepEqual(result.summary, { total: 0, passed: 0, failed: 0, skipped: 0 });
+  assert.equal(result.tests.length, 0);
+  assert.deepEqual(result.warnings, ['Error: Failed to launch: Error: spawn /bin/sh ENOENT']);
+});
+
 test('shell adapter executes command and synthesizes suite result', async () => {
   const project = createProject();
   const cwd = path.join(fixtureRoot, 'shell');

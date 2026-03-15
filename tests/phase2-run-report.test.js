@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runReport, formatConsoleSummary, readJson } from '@test-station/core';
+import { buildReportFromSuiteResults, formatConsoleSummary, readJson, runReport } from '@test-station/core';
 
 const repoRoot = path.resolve(import.meta.dirname, '..');
 const fixtureDir = path.join(repoRoot, 'tests', 'fixtures', 'phase2');
@@ -109,4 +109,50 @@ test('runReport captures GitHub Actions default environment in report metadata',
   } finally {
     process.env = originalEnv;
   }
+});
+
+test('buildReportFromSuiteResults keeps zero-test failed suites failed at the package level', () => {
+  const report = buildReportFromSuiteResults({
+    config: {},
+    project: {
+      name: 'fixture-project',
+      rootDir: repoRoot,
+      outputDir: path.join(repoRoot, 'artifacts'),
+    },
+    packageCatalog: [
+      {
+        name: 'web',
+        location: 'packages/web',
+        index: 0,
+      },
+    ],
+    execution: {},
+    policy: null,
+  }, [
+    {
+      id: 'prompt-terminal-e2e',
+      label: 'Prompt terminal e2e',
+      runtime: 'playwright',
+      command: 'yarn test:e2e e2e/prompt-terminal.spec.ts',
+      cwd: repoRoot,
+      status: 'failed',
+      durationMs: 1446,
+      summary: { total: 0, passed: 0, failed: 0, skipped: 0 },
+      coverage: null,
+      tests: [],
+      warnings: ['Error: Failed to launch: Error: spawn /bin/sh ENOENT'],
+      output: {
+        stdout: '',
+        stderr: 'Error: Failed to launch: Error: spawn /bin/sh ENOENT',
+      },
+      rawArtifacts: [],
+      packageName: 'web',
+    },
+  ], 1446);
+
+  assert.equal(report.summary.failedPackages, 1);
+  assert.equal(report.summary.skippedPackages, 0);
+  assert.equal(report.packages[0].status, 'failed');
+  assert.equal(report.packages[0].summary.total, 0);
+  assert.equal(report.packages[0].suites[0].status, 'failed');
 });

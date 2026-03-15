@@ -76,7 +76,10 @@ export function normalizeSuiteResult(rawResult, suite, packageName) {
     runtime: suite.adapter,
     command: formatCommand(suite.command),
     cwd: suite.cwd,
-    status: normalizeStatus(rawResult?.status || deriveStatusFromSummary(summary)),
+    status: deriveCollectionStatus({
+      summary,
+      reportedStatus: rawResult?.status,
+    }),
     durationMs: Number.isFinite(rawResult?.durationMs) ? rawResult.durationMs : 0,
     summary,
     coverage,
@@ -306,20 +309,31 @@ function buildModulesFromPackages(packages, coverageFiles, policy) {
               owner: themeEntry.owner,
               coverage: coverageSummaryFromFiles(themeEntry.coverageFiles),
               packages: Array.from(themeEntry.packageMap.values())
-                .map((packageEntry) => ({
-                  name: packageEntry.name,
-                  summary: summarizeTests(packageEntry.tests),
-                  durationMs: summarizeDuration(packageEntry.tests),
-                  frameworks: Array.from(packageEntry.frameworks).sort(),
-                  suites: Array.from(packageEntry.suites.values()).map((suiteEntry) => {
+                .map((packageEntry) => {
+                  const suites = Array.from(packageEntry.suites.values()).map((suiteEntry) => {
                     const suiteSummary = summarizeTests(suiteEntry.tests);
                     return {
                       ...suiteEntry,
                       summary: suiteSummary,
-                      status: deriveStatusFromSummary(suiteSummary),
+                      status: deriveCollectionStatus({
+                        summary: suiteSummary,
+                        reportedStatus: suiteEntry.status,
+                      }),
                     };
-                  }),
-                }))
+                  });
+                  const packageSummary = summarizeTests(packageEntry.tests);
+                  return {
+                    name: packageEntry.name,
+                    summary: packageSummary,
+                    durationMs: summarizeDuration(packageEntry.tests),
+                    frameworks: Array.from(packageEntry.frameworks).sort(),
+                    status: deriveCollectionStatus({
+                      summary: packageSummary,
+                      suites,
+                    }),
+                    suites,
+                  };
+                })
                 .sort((left, right) => left.name.localeCompare(right.name)),
             };
           })
@@ -384,7 +398,10 @@ function finalizePackageResult(pkg) {
   const summary = summarizeSuites(pkg.suites);
   return {
     ...pkg,
-    status: deriveStatusFromSummary(summary),
+    status: deriveCollectionStatus({
+      summary,
+      suites: pkg.suites,
+    }),
     summary,
     coverage: mergeCoverageSummaries(pkg.suites.map((suite) => suite.coverage).filter(Boolean)),
     modules: dedupe(pkg.suites.flatMap((suite) => suite.tests.map((test) => test.module || 'uncategorized'))).sort(),
@@ -511,10 +528,36 @@ export function deriveStatusFromSummary(summary) {
   return 'passed';
 }
 
+export function deriveCollectionStatus({ summary, reportedStatus = null, suites = [] } = {}) {
+  const normalizedReportedStatus = normalizeOptionalStatus(reportedStatus);
+  const suiteStatuses = (Array.isArray(suites) ? suites : []).map((suite) => normalizeOptionalStatus(suite?.status));
+
+  if (suiteStatuses.includes('failed') || normalizedReportedStatus === 'failed') {
+    return 'failed';
+  }
+
+  if (summary && summary.total > 0) {
+    return deriveStatusFromSummary(summary);
+  }
+
+  if (suiteStatuses.includes('passed') || normalizedReportedStatus === 'passed') {
+    return 'passed';
+  }
+
+  return 'skipped';
+}
+
 export function normalizeStatus(status) {
   if (status === 'failed') return 'failed';
   if (status === 'skipped') return 'skipped';
   return 'passed';
+}
+
+function normalizeOptionalStatus(status) {
+  if (status === 'failed' || status === 'skipped' || status === 'passed') {
+    return status;
+  }
+  return null;
 }
 
 export function formatCommand(command) {

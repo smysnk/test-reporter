@@ -49,7 +49,7 @@ export function createPlaywrightAdapter() {
           content: JSON.stringify(payload, null, 2),
         },
       ];
-      const warnings = [];
+      const warnings = extractTopLevelErrorMessages(payload);
       let coverage = null;
 
       if (browserCoverageEnabled && coverageDir) {
@@ -237,6 +237,17 @@ function parsePlaywrightReport(report, workspaceDir) {
     }),
     tests: tests.sort(sortTests),
   };
+}
+
+function extractTopLevelErrorMessages(report) {
+  return (Array.isArray(report?.errors) ? report.errors : [])
+    .map((error) => {
+      if (typeof error?.message === 'string' && error.message.trim().length > 0) {
+        return trimForReport(error.message.trim(), 1000);
+      }
+      return trimForReport(JSON.stringify(error, null, 2), 1000);
+    })
+    .filter(Boolean);
 }
 
 function mergeBrowserCoverage(options) {

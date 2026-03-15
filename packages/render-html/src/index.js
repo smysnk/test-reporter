@@ -1156,14 +1156,18 @@ function renderModuleCard(moduleEntry) {
 }
 
 function renderPackageCard(pkg) {
-  const status = pkg.status || deriveStatusFromSummary(pkg.summary);
+  const status = deriveDisplayStatus({
+    summary: pkg.summary,
+    reportedStatus: pkg.status,
+    suites: pkg.suites,
+  });
   const targetId = `package-${slugify(pkg.name)}`;
   const filterAttrs = renderFilterAttributes({
     nodeType: 'package-card',
     moduleNames: pkg.modules,
     packageNames: [pkg.name],
     frameworks: pkg.frameworks,
-    hasFailures: (pkg.summary?.failed || 0) > 0,
+    hasFailures: status === 'failed' || (pkg.summary?.failed || 0) > 0,
     lineCoverage: pkg.coverage?.lines?.pct,
   });
   return `
@@ -1224,7 +1228,11 @@ function renderModuleSection(moduleEntry, rootDir) {
 }
 
 function renderPackageSection(pkg, rootDir) {
-  const status = pkg.status || deriveStatusFromSummary(pkg.summary);
+  const status = deriveDisplayStatus({
+    summary: pkg.summary,
+    reportedStatus: pkg.status,
+    suites: pkg.suites,
+  });
   const suites = Array.isArray(pkg.suites) ? pkg.suites : [];
   const suiteMarkup = suites.length === 0
     ? '<div class="suite"><div class="suite__summaryRow"><div><span class="suite__label">No test suites</span></div><div class="suite__summary">No package test script was found.</div></div></div>'
@@ -1234,7 +1242,7 @@ function renderPackageSection(pkg, rootDir) {
     moduleNames: pkg.modules,
     packageNames: [pkg.name],
     frameworks: pkg.frameworks,
-    hasFailures: (pkg.summary?.failed || 0) > 0,
+    hasFailures: status === 'failed' || (pkg.summary?.failed || 0) > 0,
     lineCoverage: pkg.coverage?.lines?.pct,
   });
   return `
@@ -1292,7 +1300,11 @@ function renderThemeSection(moduleEntry, themeEntry, rootDir) {
 }
 
 function renderThemePackageSection(moduleEntry, themeEntry, packageEntry, rootDir) {
-  const status = deriveStatusFromSummary(packageEntry.summary);
+  const status = deriveDisplayStatus({
+    summary: packageEntry.summary,
+    reportedStatus: packageEntry.status,
+    suites: packageEntry.suites,
+  });
   const suites = Array.isArray(packageEntry.suites) ? packageEntry.suites : [];
   const suiteMarkup = suites.length === 0
     ? '<div class="suite"><div class="suite__summaryRow"><div><span class="suite__label">No test suites</span></div><div class="suite__summary">No suite results were grouped under this package.</div></div></div>'
@@ -1302,7 +1314,7 @@ function renderThemePackageSection(moduleEntry, themeEntry, packageEntry, rootDi
     moduleNames: [moduleEntry.module],
     packageNames: [packageEntry.name],
     frameworks: packageEntry.frameworks,
-    hasFailures: (packageEntry.summary?.failed || 0) > 0,
+    hasFailures: status === 'failed' || (packageEntry.summary?.failed || 0) > 0,
   });
   return `
     <details class="package-group" ${filterAttrs}>
@@ -1321,6 +1333,10 @@ function renderThemePackageSection(moduleEntry, themeEntry, packageEntry, rootDi
 }
 
 function renderSuite(suite, rootDir, filterContext = {}) {
+  const status = deriveDisplayStatus({
+    summary: suite.summary,
+    reportedStatus: suite.status,
+  });
   const warnings = Array.isArray(suite.warnings) ? suite.warnings : [];
   const tests = Array.isArray(suite.tests) ? suite.tests : [];
   const rawArtifacts = Array.isArray(suite.rawArtifacts) ? suite.rawArtifacts : [];
@@ -1331,14 +1347,14 @@ function renderSuite(suite, rootDir, filterContext = {}) {
   const diagnosticsMarkup = renderDiagnosticsBlock(suite.diagnostics);
   const artifactMarkup = rawArtifacts.length > 0 ? renderRawArtifactBlock(rawArtifacts) : '';
   const testsMarkup = tests.length === 0
-    ? '<div class="test-row"><div class="test-row__summary"><span class="status-pill skip">skip</span><div class="test-row__name"><span class="test-row__title">No test results emitted</span></div></div></div>'
+    ? renderSuiteEmptyState(status)
     : tests.map((test) => renderTest(suite, test, rootDir, filterContext)).join('');
   const filterAttrs = renderFilterAttributes({
     nodeType: 'suite',
     moduleNames: filterContext.moduleNames || dedupe(tests.map((test) => test.module || 'uncategorized')),
     packageNames: filterContext.packageNames || [],
     frameworks: [suite.runtime],
-    hasFailures: (suite.summary?.failed || 0) > 0,
+    hasFailures: status === 'failed' || (suite.summary?.failed || 0) > 0,
     lineCoverage: suite.coverage?.lines?.pct,
   });
   return `
@@ -1348,7 +1364,7 @@ function renderSuite(suite, rootDir, filterContext = {}) {
           <div class="suite__label">${escapeHtml(suite.label)}</div>
           <div class="suite__runtime">${escapeHtml(suite.runtime || 'custom')} • ${escapeHtml(suite.command || '')}</div>
         </div>
-        <div class="suite__summary">${escapeHtml(formatSummary(suite.summary))} • ${escapeHtml(formatDuration(suite.durationMs || 0))}</div>
+        <div class="suite__summary">${renderStatusPill(status)} <span>${escapeHtml(formatSummary(suite.summary))} • ${escapeHtml(formatDuration(suite.durationMs || 0))}</span></div>
       </summary>
       <div class="suite__body">
         ${warningMarkup}
@@ -1359,6 +1375,17 @@ function renderSuite(suite, rootDir, filterContext = {}) {
       </div>
     </details>
   `;
+}
+
+function renderSuiteEmptyState(status) {
+  const statusClass = status === 'failed' ? 'fail' : status === 'passed' ? 'pass' : 'skip';
+  const title = status === 'failed'
+    ? 'Suite failed before emitting test results'
+    : status === 'passed'
+      ? 'Suite passed without discrete test records'
+      : 'No test results emitted';
+
+  return `<div class="test-row"><div class="test-row__summary"><span class="status-pill ${statusClass}">${escapeHtml(status)}</span><div class="test-row__name"><span class="test-row__title">${escapeHtml(title)}</span></div></div></div>`;
 }
 
 function renderRawArtifactBlock(rawArtifacts) {
@@ -1390,6 +1417,25 @@ function renderRawArtifactItem(artifact) {
 function capitalize(value) {
   const normalized = String(value || '');
   return normalized.length > 0 ? normalized[0].toUpperCase() + normalized.slice(1) : normalized;
+}
+
+function deriveDisplayStatus({ summary, reportedStatus = null, suites = [] } = {}) {
+  const normalizedReportedStatus = normalizeOptionalStatus(reportedStatus);
+  const suiteStatuses = (Array.isArray(suites) ? suites : []).map((suite) => normalizeOptionalStatus(suite?.status));
+
+  if (suiteStatuses.includes('failed') || normalizedReportedStatus === 'failed') {
+    return 'failed';
+  }
+
+  if (summary && summary.total > 0) {
+    return deriveStatusFromSummary(summary);
+  }
+
+  if (suiteStatuses.includes('passed') || normalizedReportedStatus === 'passed') {
+    return 'passed';
+  }
+
+  return 'skipped';
 }
 
 function renderTest(suite, test, rootDir, filterContext = {}) {
@@ -1590,6 +1636,13 @@ function deriveStatusFromSummary(summary) {
   if (summary.failed > 0) return 'failed';
   if (summary.skipped === summary.total) return 'skipped';
   return 'passed';
+}
+
+function normalizeOptionalStatus(status) {
+  if (status === 'failed' || status === 'skipped' || status === 'passed') {
+    return status;
+  }
+  return null;
 }
 
 function formatSummary(summary = {}) {

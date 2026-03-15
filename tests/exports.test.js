@@ -307,6 +307,40 @@ function createSampleReport() {
   };
 }
 
+function createZeroTestSuiteFailureReport() {
+  const report = JSON.parse(JSON.stringify(createSampleReport()));
+  report.summary.failedTests = 0;
+  report.summary.passedTests = 0;
+  report.summary.totalTests = 0;
+  report.summary.failedSuites = 1;
+  report.packages[0].status = 'skipped';
+  report.packages[0].summary = { total: 0, passed: 0, failed: 0, skipped: 0 };
+  report.packages[0].suites = [
+    {
+      id: 'prompt-terminal-e2e',
+      label: 'Prompt terminal e2e',
+      runtime: 'playwright',
+      command: 'yarn test:e2e e2e/prompt-terminal.spec.ts',
+      status: 'failed',
+      durationMs: 1446,
+      summary: { total: 0, passed: 0, failed: 0, skipped: 0 },
+      warnings: ['Error: Failed to launch: Error: spawn /bin/sh ENOENT'],
+      rawArtifacts: [
+        {
+          relativePath: 'web/prompt-terminal-e2e-playwright.json',
+          href: 'raw/web/prompt-terminal-e2e-playwright.json',
+          label: 'web-prompt-terminal-e2e-playwright.json',
+          kind: 'file',
+          mediaType: 'application/json',
+        },
+      ],
+      tests: [],
+    },
+  ];
+  report.modules = [];
+  return report;
+}
+
 test('core loads and summarizes the example config', async () => {
   const loaded = await loadConfig(exampleConfigPath);
   const summary = summarizeConfig(loaded.config);
@@ -363,6 +397,13 @@ test('renderer shows statement tooltip state and fixed-width file coverage metri
   assert.match(html, /title="Statements: 80\.0% \(8\/10\)"/);
   assert.match(html, /37\.0%/);
   assert.match(html, /80\.2%/);
+});
+
+test('renderer keeps zero-test failed suites visibly failed', () => {
+  const html = renderHtmlReport(createZeroTestSuiteFailureReport(), { title: 'example' });
+  assert.match(html, /class="module-card status-failed" data-open-target="package-core"/);
+  assert.match(html, /Suite failed before emitting test results/);
+  assert.match(html, /Error: Failed to launch: Error: spawn \/bin\/sh ENOENT/);
 });
 
 test('adapter and plugin scaffolds expose stable ids', () => {

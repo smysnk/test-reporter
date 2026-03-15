@@ -221,17 +221,24 @@ export function createGraphqlQueryService(options = {}) {
         return [];
       }
 
-      return (Array.isArray(run.rawReport?.packages) ? run.rawReport.packages : []).map((entry) => ({
-        name: entry.name,
-        location: entry.location || null,
-        status: entry.status || 'unknown',
-        durationMs: toInteger(entry.durationMs),
-        summary: entry.summary || {},
-        coverage: entry.coverage || null,
-        modules: Array.isArray(entry.modules) ? entry.modules : [],
-        frameworks: Array.isArray(entry.frameworks) ? entry.frameworks : [],
-        suiteCount: Array.isArray(entry.suites) ? entry.suites.length : 0,
-      }));
+      return (Array.isArray(run.rawReport?.packages) ? run.rawReport.packages : []).map((entry) => {
+        const suites = Array.isArray(entry.suites) ? entry.suites : [];
+        return {
+          name: entry.name,
+          location: entry.location || null,
+          status: deriveReportedCollectionStatus({
+            summary: entry.summary || {},
+            reportedStatus: entry.status,
+            suites,
+          }),
+          durationMs: toInteger(entry.durationMs),
+          summary: entry.summary || {},
+          coverage: entry.coverage || null,
+          modules: Array.isArray(entry.modules) ? entry.modules : [],
+          frameworks: Array.isArray(entry.frameworks) ? entry.frameworks : [],
+          suiteCount: suites.length,
+        };
+      });
     },
 
     async listRunModules({ runId, actor }) {
@@ -399,6 +406,38 @@ function filterDecoratedTest(test, filters) {
     && (!filters.packageName || test.packageName === filters.packageName)
     && (!filters.moduleName || test.moduleName === filters.moduleName)
     && (!filters.filePath || test.filePath === filters.filePath);
+}
+
+function deriveReportedCollectionStatus({ summary, reportedStatus = null, suites = [] } = {}) {
+  const normalizedReportedStatus = normalizeReportedStatus(reportedStatus);
+  const suiteStatuses = (Array.isArray(suites) ? suites : []).map((suite) => normalizeReportedStatus(suite?.status));
+
+  if (suiteStatuses.includes('failed') || normalizedReportedStatus === 'failed') {
+    return 'failed';
+  }
+
+  if (summary && Number.isFinite(summary.total) && summary.total > 0) {
+    if (summary.failed > 0) {
+      return 'failed';
+    }
+    if (summary.skipped === summary.total) {
+      return 'skipped';
+    }
+    return 'passed';
+  }
+
+  if (suiteStatuses.includes('passed') || normalizedReportedStatus === 'passed') {
+    return 'passed';
+  }
+
+  return 'skipped';
+}
+
+function normalizeReportedStatus(status) {
+  if (status === 'failed' || status === 'passed' || status === 'skipped') {
+    return status;
+  }
+  return null;
 }
 
 function ensureRunFile(files, filePath) {
