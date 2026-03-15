@@ -30,6 +30,7 @@ import { buildSignInRedirectUrl, isProtectedWebPath } from '../packages/web/lib/
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
 import { decorateEmbeddedRunnerReportHtml } from '../packages/web/lib/runReportTemplate.js';
 import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nextauth].js';
+import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
 import { RunBuildChip } from '../packages/web/components/WebBits.js';
@@ -341,6 +342,34 @@ test('web server URL ignores NEXT_PUBLIC_SERVER_URL and uses runtime SERVER_URL'
 
 test('web auth API resolves a callable NextAuth handler', () => {
   assert.equal(typeof resolveNextAuthHandler(), 'function');
+});
+
+test('web health endpoint returns a fast readiness payload', () => {
+  const headers = new Map();
+  const response = {
+    statusCode: null,
+    payload: null,
+    setHeader(name, value) {
+      headers.set(String(name).toLowerCase(), value);
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.payload = payload;
+      return this;
+    },
+  };
+
+  webHealthzHandler({}, response);
+
+  assert.equal(headers.get('cache-control'), 'no-store');
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.payload, {
+    status: 'ok',
+    service: 'test-station-web',
+  });
 });
 
 test('web GraphQL helpers forward actor headers and combine project activity data', async () => {

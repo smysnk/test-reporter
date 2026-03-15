@@ -75,11 +75,11 @@ web:
   tolerations: []
   affinity: {}
   livenessProbe:
-    path: /
+    path: /api/healthz
     initialDelaySeconds: 30
     periodSeconds: 20
   readinessProbe:
-    path: /
+    path: /api/healthz
     initialDelaySeconds: 10
     periodSeconds: 10
   ingress:
