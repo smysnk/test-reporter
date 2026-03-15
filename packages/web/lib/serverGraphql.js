@@ -106,6 +106,13 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
             buildNumber: entry.buildNumber,
           }
           : null,
+        summary: Number.isFinite(entry.totalTests) || Number.isFinite(entry.passedTests) || Number.isFinite(entry.failedTests)
+          ? {
+            totalTests: entry.totalTests,
+            passedTests: entry.passedTests,
+            failedTests: entry.failedTests,
+          }
+          : null,
         coverageSnapshot: Number.isFinite(entry.linesPct)
           ? { linesPct: entry.linesPct }
           : null,

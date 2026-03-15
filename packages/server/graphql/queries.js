@@ -173,6 +173,9 @@ export const queryTypeDefs = `#graphql
     versionKey: String
     buildNumber: Int
     linesPct: Float
+    totalTests: Int
+    passedTests: Int
+    failedTests: Int
   }
 
   type RunPackageSummary {

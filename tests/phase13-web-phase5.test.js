@@ -436,6 +436,9 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
             versionKey: 'commit:abc123',
             buildNumber: 88,
             linesPct: 80,
+            totalTests: 2,
+            passedTests: 1,
+            failedTests: 1,
             sourceRunId: '1001',
             sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
           }],
@@ -583,6 +586,7 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
   const home = await loadWebHomePage({ session, fetchImpl, requestId: 'req-home' });
   assert.equal(home.viewer.id, 'user-1');
   assert.equal(home.projects.length, 1);
+  assert.deepEqual(home.runs[0].summary, { totalTests: 2, passedTests: 1, failedTests: 1 });
   assert.equal(requests[0].headers['x-request-id'], 'req-home');
 
   const project = await loadProjectExplorerPage({ session, slug: 'workspace', fetchImpl, requestId: 'req-project' });

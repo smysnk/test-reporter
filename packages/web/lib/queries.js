@@ -32,6 +32,9 @@ export const WEB_HOME_QUERY = `
       versionKey
       buildNumber
       linesPct
+      totalTests
+      passedTests
+      failedTests
     }
   }
 `;

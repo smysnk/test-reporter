@@ -49,6 +49,27 @@ function formatLandingBuildLabel(run) {
   return formatRunBuildLabel(run);
 }
 
+function formatSidebarProjectTitle(project) {
+  const repositoryName = formatRepositoryName(project?.repositoryUrl);
+  if (repositoryName && repositoryName !== 'Repository unavailable') {
+    return repositoryName;
+  }
+
+  return project?.name || 'Unknown project';
+}
+
+function formatLandingRunSummary(run) {
+  const total = run?.summary?.totalTests;
+  const passed = run?.summary?.passedTests;
+  const failed = run?.summary?.failedTests;
+
+  if (!Number.isFinite(total) || !Number.isFinite(passed) || !Number.isFinite(failed)) {
+    return 'Test summary unavailable';
+  }
+
+  return `${passed} passed • ${failed} failed • ${total} total`;
+}
+
 function isInteractiveRowTarget(target) {
   return Boolean(target?.closest?.('a, button, input, select, textarea, summary'));
 }
@@ -89,12 +110,8 @@ function RunTable({ runs, selectedProject }) {
         'tbody',
         null,
         ...runs.map((run) => {
-          const primaryLabel = selectedProject
-            ? run.externalKey || run.project?.name || 'Run'
-            : run.project?.name || run.externalKey || 'Unknown project';
-          const metaLabel = selectedProject
-            ? formatRepositoryName(run.project?.repositoryUrl)
-            : run.externalKey || formatRepositoryName(run.project?.repositoryUrl);
+          const primaryLabel = run.project?.name || 'Unknown project';
+          const metaLabel = formatLandingRunSummary(run);
           const buildLabel = formatLandingBuildLabel(run);
           const runHref = `/runs/${run.id}`;
 
@@ -274,7 +291,7 @@ export default function WebIndexPage({ data }) {
           ...model.projects.map((project) => React.createElement(SidebarButton, {
             key: project.id,
             active: model.selectedProject?.slug === project.slug,
-            title: project.name,
+            title: formatSidebarProjectTitle(project),
             meta: `${project.recentRunCount} recent run${project.recentRunCount === 1 ? '' : 's'}`,
             status: project.latestRun?.status || null,
             onClick: () => selectOverviewProject(dispatch, project.slug),

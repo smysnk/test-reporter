@@ -89,15 +89,41 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-shell__nav {
     display: flex;
-    gap: 16px;
+    gap: 8px;
     flex-wrap: wrap;
-  }
-  .web-shell__nav a {
-    padding: 10px 14px;
-    border-radius: 999px;
-    background: ${(props) => props.theme.colors.accentSoft};
+    padding: 8px;
+    border-radius: 22px;
     border: 1px solid ${(props) => props.theme.colors.border};
+    background:
+      linear-gradient(180deg, rgba(15, 25, 43, 0.92), rgba(10, 18, 32, 0.88));
+    box-shadow: inset 0 1px 0 rgba(124, 160, 224, 0.08);
+  }
+  .web-shell__nav-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 18px;
+    border-radius: 16px;
+    border: 1px solid transparent;
+    color: ${(props) => props.theme.colors.muted};
     font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 160ms ease, border-color 160ms ease, color 160ms ease, transform 160ms ease;
+  }
+  .web-shell__nav-link:hover {
+    color: ${(props) => props.theme.colors.text};
+    background: rgba(107, 178, 255, 0.08);
+    border-color: rgba(124, 160, 224, 0.16);
+    transform: translateY(-1px);
+  }
+  .web-shell__nav-link--active {
+    color: ${(props) => props.theme.colors.text};
+    background:
+      radial-gradient(circle at top center, rgba(107, 178, 255, 0.16), transparent 70%),
+      linear-gradient(180deg, rgba(36, 60, 98, 0.92), rgba(21, 38, 67, 0.94));
+    border-color: ${(props) => props.theme.colors.borderStrong};
+    box-shadow: inset 0 1px 0 rgba(124, 160, 224, 0.12);
   }
   .web-shell__main {
     max-width: 1280px;
@@ -135,8 +161,10 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-shell__toolbar {
     display: grid;
-    gap: 16px;
-    justify-items: start;
+    gap: 12px;
+    justify-items: stretch;
+    align-content: start;
+    width: min(100%, 420px);
   }
   .web-meta {
     display: grid;
@@ -386,7 +414,11 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-explorer-table th,
   .web-explorer-table td {
-    padding-right: 16px;
+    padding-right: 18px;
+  }
+  .web-explorer-table th:not(:first-child),
+  .web-explorer-table td:not(:first-child) {
+    padding-right: 10px;
   }
   .web-explorer-table {
     table-layout: auto;
@@ -402,16 +434,6 @@ const GlobalStyle = createGlobalStyle`
   .web-explorer-table__row:hover td,
   .web-explorer-table__row:focus td {
     background: rgba(107, 178, 255, 0.08);
-  }
-  .web-explorer-table__row:hover td:first-child,
-  .web-explorer-table__row:focus td:first-child {
-    border-top-left-radius: 16px;
-    border-bottom-left-radius: 16px;
-  }
-  .web-explorer-table__row:hover td:last-child,
-  .web-explorer-table__row:focus td:last-child {
-    border-top-right-radius: 16px;
-    border-bottom-right-radius: 16px;
   }
   .web-explorer-table__row:hover .web-explorer-table__primary,
   .web-explorer-table__row:focus .web-explorer-table__primary {
@@ -560,15 +582,37 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-shell__identity {
     display: grid;
-    gap: 4px;
+    gap: 8px;
     justify-items: start;
+    padding: 16px 18px;
+    border-radius: 22px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    background:
+      radial-gradient(circle at top right, rgba(107, 178, 255, 0.12), transparent 32%),
+      linear-gradient(180deg, rgba(14, 23, 40, 0.94), rgba(9, 17, 31, 0.9));
+    box-shadow: inset 0 1px 0 rgba(124, 160, 224, 0.06);
+  }
+  .web-shell__identity-kicker {
+    color: ${(props) => props.theme.colors.muted};
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
   }
   .web-shell__identity-label {
     font-weight: 700;
+    font-size: 1.1rem;
   }
   .web-shell__identity-meta {
     color: ${(props) => props.theme.colors.muted};
     font-size: 0.9rem;
+  }
+  .web-shell__identity-action {
+    margin-top: 2px;
+    padding: 9px 14px;
+    border-radius: 14px;
+  }
+  .web-shell__identity--guest {
+    align-items: start;
   }
   .web-button {
     border: 1px solid ${(props) => props.theme.colors.accent};
@@ -804,6 +848,13 @@ const GlobalStyle = createGlobalStyle`
     }
     .web-shell__toolbar {
       justify-items: end;
+    }
+    .web-shell__nav {
+      justify-content: flex-end;
+    }
+    .web-shell__identity {
+      justify-items: end;
+      text-align: right;
     }
   }
   @media (min-width: 980px) {

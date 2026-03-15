@@ -59,6 +59,34 @@ export function WebShell({ children, viewer = null }) {
     : session
       ? `${session.role || 'member'} access`
       : 'guest access';
+  const navItems = [
+    {
+      href: '/',
+      label: 'Overview',
+      active: router.pathname === '/',
+    },
+    selectedProjectSlug
+      ? {
+        href: `/projects/${selectedProjectSlug}`,
+        label: 'Project',
+        active: router.pathname === '/projects/[slug]',
+      }
+      : null,
+    selectedRunId
+      ? {
+        href: `/runs/${selectedRunId}`,
+        label: 'Run',
+        active: router.pathname === '/runs/[id]',
+      }
+      : null,
+    isAdmin
+      ? {
+        href: '/admin',
+        label: 'Admin',
+        active: router.pathname === '/admin' || router.pathname.startsWith('/admin/'),
+      }
+      : null,
+  ].filter(Boolean);
 
   return React.createElement(
     'div',
@@ -83,34 +111,46 @@ export function WebShell({ children, viewer = null }) {
         React.createElement(
           'nav',
           { className: 'web-shell__nav', 'aria-label': 'Primary' },
-          React.createElement(Link, { href: '/' }, 'Overview'),
-          selectedProjectSlug ? React.createElement(Link, { href: `/projects/${selectedProjectSlug}` }, 'Current Project') : null,
-          selectedRunId ? React.createElement(Link, { href: `/runs/${selectedRunId}` }, 'Current Run') : null,
-          isAdmin ? React.createElement(Link, { href: '/admin' }, 'Admin') : null,
+          ...navItems.map((item) => React.createElement(
+            Link,
+            {
+              key: item.href,
+              href: item.href,
+              className: item.active ? 'web-shell__nav-link web-shell__nav-link--active' : 'web-shell__nav-link',
+            },
+            item.label,
+          )),
         ),
         session
           ? React.createElement(
             'div',
             { className: 'web-shell__identity' },
+            React.createElement('span', { className: 'web-shell__identity-kicker' }, 'Signed in as'),
             React.createElement('span', { className: 'web-shell__identity-label' }, session.user?.name || session.user?.email || session.userId || 'Operator'),
             React.createElement('span', { className: 'web-shell__identity-meta' }, accessLabel),
             React.createElement(
               'button',
               {
                 type: 'button',
-                className: 'web-button web-button--ghost',
+                className: 'web-button web-button--ghost web-shell__identity-action',
                 onClick: () => signOut({ callbackUrl: buildSignedOutRedirectUrl() }),
               },
               'Sign out',
             ),
           )
           : React.createElement(
-            Link,
-            {
-              href: buildSignInRedirectUrl(router.asPath || '/'),
-              className: 'web-button web-button--ghost',
-            },
-            'Sign in',
+            'div',
+            { className: 'web-shell__identity web-shell__identity--guest' },
+            React.createElement('span', { className: 'web-shell__identity-kicker' }, 'Session'),
+            React.createElement('span', { className: 'web-shell__identity-meta' }, accessLabel),
+            React.createElement(
+              Link,
+              {
+                href: buildSignInRedirectUrl(router.asPath || '/'),
+                className: 'web-button web-button--ghost web-shell__identity-action',
+              },
+              'Sign in',
+            ),
           ),
       ),
     ),

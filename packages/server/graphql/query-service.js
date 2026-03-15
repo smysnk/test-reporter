@@ -37,6 +37,7 @@ const RUN_LIST_ATTRIBUTES = [
   'durationMs',
   'status',
   'reportSchemaVersion',
+  'summary',
 ];
 
 export function createGraphqlQueryService(options = {}) {
@@ -154,6 +155,9 @@ export function createGraphqlQueryService(options = {}) {
         versionKey: run.projectVersion?.versionKey || null,
         buildNumber: toInteger(run.projectVersion?.buildNumber),
         linesPct: run.coverageSnapshot?.linesPct ?? null,
+        totalTests: toInteger(run.summary?.totalTests),
+        passedTests: toInteger(run.summary?.passedTests),
+        failedTests: toInteger(run.summary?.failedTests),
       }));
     },
 

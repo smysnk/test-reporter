@@ -1072,6 +1072,7 @@ test('listRuns queries the lightweight feed fields with DB-side limit and relate
               status: 'passed',
               completedAt: '2026-03-15T12:00:00.000Z',
               durationMs: 1000,
+              summary: { totalTests: 3, passedTests: 3, failedTests: 0 },
             },
             {
               id: 'run-1',
@@ -1081,6 +1082,7 @@ test('listRuns queries the lightweight feed fields with DB-side limit and relate
               status: 'failed',
               completedAt: '2026-03-14T12:00:00.000Z',
               durationMs: 1200,
+              summary: { totalTests: 2, passedTests: 1, failedTests: 1 },
             },
           ];
         },
@@ -1159,6 +1161,7 @@ test('listRuns queries the lightweight feed fields with DB-side limit and relate
     'durationMs',
     'status',
     'reportSchemaVersion',
+    'summary',
   ]);
   assert.deepEqual(versionFindAllOptions.where, {
     id: ['version-2', 'version-1'],
@@ -1166,6 +1169,7 @@ test('listRuns queries the lightweight feed fields with DB-side limit and relate
   assert.deepEqual(snapshotFindAllOptions.where, {
     runId: ['run-2', 'run-1'],
   });
+  assert.deepEqual(runs[0].summary, { totalTests: 3, passedTests: 3, failedTests: 0 });
 });
 
 function createGraphqlModels() {
