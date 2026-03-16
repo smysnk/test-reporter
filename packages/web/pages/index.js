@@ -97,17 +97,27 @@ function RunTable({ runs, selectedProject }) {
       'table',
       { className: 'web-table web-explorer-table' },
       React.createElement(
+        'colgroup',
+        null,
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--run' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--status' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--build' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--branch' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--duration' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--coverage' }),
+      ),
+      React.createElement(
         'thead',
         null,
         React.createElement(
           'tr',
           null,
           React.createElement('th', null, 'Run'),
-          React.createElement('th', null, 'Status'),
-          React.createElement('th', null, 'Build'),
-          React.createElement('th', null, 'Branch'),
-          React.createElement('th', null, 'Duration'),
-          React.createElement('th', null, 'Coverage'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Status'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Build'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Branch'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Duration'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Coverage'),
         ),
       ),
       React.createElement(
@@ -163,12 +173,12 @@ function RunTable({ runs, selectedProject }) {
             ),
             React.createElement(
               'td',
-              { className: 'web-explorer-table__cell web-explorer-table__cell--status' },
+              { className: 'web-explorer-table__cell web-explorer-table__cell--status web-explorer-table__cell--tight' },
               React.createElement(StatusPill, { status: run.status }),
             ),
             React.createElement(
               'td',
-              { className: 'web-explorer-table__cell' },
+              { className: 'web-explorer-table__cell web-explorer-table__cell--tight' },
               React.createElement(
                 'div',
                 { className: 'web-explorer-table__build' },
@@ -196,7 +206,7 @@ function RunTable({ runs, selectedProject }) {
             ),
             React.createElement(
               'td',
-              { className: 'web-explorer-table__cell' },
+              { className: 'web-explorer-table__cell web-explorer-table__cell--tight' },
               React.createElement(
                 'span',
                 {
@@ -209,12 +219,12 @@ function RunTable({ runs, selectedProject }) {
             ),
             React.createElement(
               'td',
-              { className: 'web-explorer-table__cell' },
+              { className: 'web-explorer-table__cell web-explorer-table__cell--tight' },
               formatDuration(run.durationMs),
             ),
             React.createElement(
               'td',
-              { className: 'web-explorer-table__cell' },
+              { className: 'web-explorer-table__cell web-explorer-table__cell--tight' },
               formatCoveragePct(run.coverageSnapshot?.linesPct),
             ),
           );
