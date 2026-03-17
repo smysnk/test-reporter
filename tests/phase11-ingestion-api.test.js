@@ -217,6 +217,45 @@ test('server ingest route enforces auth and returns actionable validation errors
   await closeServer(server);
 });
 
+test('server ingest route returns JSON when the payload exceeds the ingest body limit', async () => {
+  const server = await createServer({
+    port: 0,
+    corsOrigin: 'http://localhost:3001',
+    ingestSharedKeys: ['top-secret'],
+    ingestJsonLimit: '1b',
+    ingestionService: createIngestionService({
+      persistence: {
+        async persistRun() {
+          throw new Error('should not persist oversized payloads');
+        },
+      },
+    }),
+  });
+
+  await new Promise((resolve) => {
+    server.httpServer.listen(0, resolve);
+  });
+
+  const address = server.httpServer.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  const oversized = await fetch(`${baseUrl}/api/ingest`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: 'Bearer top-secret',
+    },
+    body: JSON.stringify(createSamplePayload()),
+  });
+
+  assert.equal(oversized.status, 413);
+  const oversizedPayload = await oversized.json();
+  assert.equal(oversizedPayload.error.code, 'INGEST_PAYLOAD_TOO_LARGE');
+  assert.match(oversizedPayload.error.message, /1b/);
+
+  await closeServer(server);
+});
+
 function createSamplePayload(overrides = {}) {
   const payload = {
     projectKey: 'workspace',

@@ -36,6 +36,7 @@ const theme = {
   shadow: '0 22px 80px rgba(2, 8, 20, 0.45)',
   radius: '28px',
   font: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  headingFont: '"Aptos Narrow", "Arial Narrow", "Roboto Condensed", "Helvetica Neue", sans-serif',
 };
 
 const GlobalStyle = createGlobalStyle`
@@ -317,6 +318,9 @@ const GlobalStyle = createGlobalStyle`
   .web-table th {
     color: ${(props) => props.theme.colors.muted};
     font-size: 0.78rem;
+    font-family: ${(props) => props.theme.headingFont};
+    font-weight: 300;
+    font-stretch: condensed;
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }

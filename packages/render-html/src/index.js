@@ -57,6 +57,7 @@ export function renderHtmlReport(report, options = {}) {
       --skip: #f7c55a;
       --accent: #6bb2ff;
       --shadow: 0 22px 80px rgba(2, 8, 20, 0.45);
+      --heading-font: "Aptos Narrow", "Arial Narrow", "Roboto Condensed", "Helvetica Neue", sans-serif;
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
     * { box-sizing: border-box; }
@@ -695,6 +696,9 @@ export function renderHtmlReport(report, options = {}) {
     .coverage-table th {
       color: var(--muted);
       font-size: 0.74rem;
+      font-family: var(--heading-font);
+      font-weight: 300;
+      font-stretch: condensed;
       text-transform: uppercase;
       letter-spacing: 0.08em;
     }

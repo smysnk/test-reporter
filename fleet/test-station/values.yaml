@@ -24,6 +24,8 @@ server:
   config:
     NODE_ENV: production
     SERVER_PORT: "4400"
+    SERVER_JSON_LIMIT: "50mb"
+    INGEST_JSON_LIMIT: "50mb"
     WEB_URL: ""
   secret:
     DATABASE_URL: postgres://test-station:change-me@postgresql.default.svc.cluster.local:5432/test_station
@@ -87,6 +89,9 @@ web:
     enabled: false
     className: ""
     annotations: {}
+    requestBodyLimit:
+      enabled: true
+      maxRequestBodyBytes: 52428800
     host: ""
     path: /
     pathType: Prefix

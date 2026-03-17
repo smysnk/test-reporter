@@ -9,6 +9,9 @@ helm:
     global:
       publicDomain: test-station.smysnk.com
     server:
+      config:
+        SERVER_JSON_LIMIT: "50mb"
+        INGEST_JSON_LIMIT: "50mb"
       existingSecret: test-station-runtime-secret
     web:
       existingSecret: test-station-runtime-secret

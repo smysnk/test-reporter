@@ -24,6 +24,7 @@ By default:
 - `https://test-station.smysnk.com/api/ingest` is routed through the shared ingress to the `server` service
 - `web.ingress.annotations.cert-manager.io/cluster-issuer` is `letsencrypt-prod`
 - `web.ingress.tls.enabled` is `true`
+- `/api/ingest` is configured for a `50 MB` request-body limit in both the server app config and the Traefik ingress middleware
 - generated ConfigMaps stay enabled unless you explicitly switch to `existingConfigMap`
 
 This Fleet cluster rejects `GitRepo.spec.helm`, so repo-specific Helm overrides live in `fleet.yaml` instead of `fleet/gitrepo.yml`.

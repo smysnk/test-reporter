@@ -26,6 +26,7 @@ test('fleet bundle files exist for unified web and server deployment', () => {
     'fleet/test-station/templates/web-deployment.yaml',
     'fleet/test-station/templates/web-service.yaml',
     'fleet/test-station/templates/web-ingress.yaml',
+    'fleet/test-station/templates/web-ingress-buffering-middleware.yaml',
   ];
 
   for (const relativePath of expectedFiles) {
@@ -59,12 +60,18 @@ test('fleet values and workflow use the unified image contract without stray ref
   assert.match(valuesYaml, /publicDomain:\s*""/);
   assert.match(valuesYaml, /ingressPaths:\s*\n\s*-\s*path:\s*\/api\/ingest/);
   assert.match(valuesYaml, /INGEST_SHARED_KEY:\s*change-me/);
+  assert.match(valuesYaml, /SERVER_JSON_LIMIT:\s*"50mb"/);
+  assert.match(valuesYaml, /INGEST_JSON_LIMIT:\s*"50mb"/);
+  assert.match(valuesYaml, /requestBodyLimit:\s*\n\s*enabled:\s*true/);
+  assert.match(valuesYaml, /maxRequestBodyBytes:\s*52428800/);
   assert.match(valuesYaml, /secretName:\s*""/);
   assert.match(valuesYaml, /repository:\s*ghcr\.io\/smysnk\/test-station/);
   assert.match(valuesYaml, /pullPolicy:\s*Always/);
   assert.match(valuesYaml, /livenessProbe:\s*\n\s*path:\s*\/api\/healthz/);
   assert.match(valuesYaml, /readinessProbe:\s*\n\s*path:\s*\/api\/healthz/);
   assert.match(webIngressYaml, /test-station\.publicDomain/);
+  assert.match(webIngressYaml, /router\.middlewares/);
+  assert.match(webIngressYaml, /webIngressBufferingMiddlewareName/);
   assert.match(webIngressYaml, /test-station\.defaultTlsSecretName/);
   assert.match(webIngressYaml, /test-station\.serverName/);
   assert.match(webIngressYaml, /kindIs "map"/);

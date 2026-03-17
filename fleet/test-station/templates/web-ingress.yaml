@@ -3,6 +3,19 @@
 {{- $host := .Values.web.ingress.host | default (include "test-station.publicDomain" . | trim) -}}
 {{- $serverPaths := default (list) .Values.server.ingressPaths -}}
 {{- $tls := default (dict) .Values.web.ingress.tls -}}
+{{- $annotations := dict -}}
+{{- range $key, $value := default (dict) .Values.web.ingress.annotations }}
+{{- $_ := set $annotations $key $value -}}
+{{- end }}
+{{- if and .Values.web.ingress.requestBodyLimit.enabled (eq (.Values.web.ingress.className | default "") "traefik") }}
+{{- $middlewareRef := printf "%s-%s@kubernetescrd" .Release.Namespace (include "test-station.webIngressBufferingMiddlewareName" .) -}}
+{{- $existing := printf "%v" (get $annotations "traefik.ingress.kubernetes.io/router.middlewares") -}}
+{{- if and $existing (ne $existing "<nil>") (ne $existing "") }}
+{{- $_ := set $annotations "traefik.ingress.kubernetes.io/router.middlewares" (printf "%s,%s" $existing $middlewareRef) -}}
+{{- else }}
+{{- $_ := set $annotations "traefik.ingress.kubernetes.io/router.middlewares" $middlewareRef -}}
+{{- end }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -10,9 +23,9 @@ metadata:
   labels:
     {{- include "test-station.labels" . | nindent 4 }}
     app.kubernetes.io/component: web
-  {{- with .Values.web.ingress.annotations }}
+  {{- if gt (len $annotations) 0 }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- toYaml $annotations | nindent 4 }}
   {{- end }}
 spec:
   {{- if .Values.web.ingress.className }}

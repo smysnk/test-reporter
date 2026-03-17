@@ -1,0 +1,12 @@
+{{- if and .Values.web.ingress.enabled .Values.web.ingress.requestBodyLimit.enabled (eq (.Values.web.ingress.className | default "") "traefik") }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "test-station.webIngressBufferingMiddlewareName" . }}
+  labels:
+    {{- include "test-station.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  buffering:
+    maxRequestBodyBytes: {{ .Values.web.ingress.requestBodyLimit.maxRequestBodyBytes }}
+{{- end }}

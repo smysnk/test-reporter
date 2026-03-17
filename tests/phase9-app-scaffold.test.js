@@ -4,7 +4,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { loadRepoEnv } from '../config/env.mjs';
-import { createServer, resolveCorsOrigin } from '../packages/server/index.js';
+import {
+  createServer,
+  resolveCorsOrigin,
+  resolveIngestJsonLimit,
+  resolveServerJsonLimit,
+} from '../packages/server/index.js';
 
 test('loadRepoEnv loads .env and lets .env.local override values', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'test-station-env-'));
@@ -91,6 +96,38 @@ test('server defaults WEB_URL to localhost using WEB_PORT when unset', () => {
       delete process.env.WEB_PORT;
     } else {
       process.env.WEB_PORT = originalWebPort;
+    }
+  }
+});
+
+test('server defaults JSON body limits to 50mb and lets ingest inherit the server limit', () => {
+  const originalServerJsonLimit = process.env.SERVER_JSON_LIMIT;
+  const originalIngestJsonLimit = process.env.INGEST_JSON_LIMIT;
+
+  try {
+    delete process.env.SERVER_JSON_LIMIT;
+    delete process.env.INGEST_JSON_LIMIT;
+
+    assert.equal(resolveServerJsonLimit(), '50mb');
+    assert.equal(resolveIngestJsonLimit(), '50mb');
+
+    process.env.SERVER_JSON_LIMIT = '32mb';
+    assert.equal(resolveServerJsonLimit(), '32mb');
+    assert.equal(resolveIngestJsonLimit(), '32mb');
+
+    process.env.INGEST_JSON_LIMIT = '64mb';
+    assert.equal(resolveIngestJsonLimit(), '64mb');
+  } finally {
+    if (originalServerJsonLimit === undefined) {
+      delete process.env.SERVER_JSON_LIMIT;
+    } else {
+      process.env.SERVER_JSON_LIMIT = originalServerJsonLimit;
+    }
+
+    if (originalIngestJsonLimit === undefined) {
+      delete process.env.INGEST_JSON_LIMIT;
+    } else {
+      process.env.INGEST_JSON_LIMIT = originalIngestJsonLimit;
     }
   }
 });

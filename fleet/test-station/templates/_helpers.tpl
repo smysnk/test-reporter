@@ -99,3 +99,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "tls-%s" ($domain | replace "." "-") -}}
 {{- end -}}
 {{- end -}}
+
+{{- define "test-station.webIngressBufferingMiddlewareName" -}}
+{{- printf "%s-web-buffering" (include "test-station.fullname" .) -}}
+{{- end -}}

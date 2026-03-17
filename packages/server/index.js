@@ -20,6 +20,8 @@ import './models/index.js';
 export async function createServer(options = {}) {
   const app = express();
   const httpServer = http.createServer(app);
+  const serverJsonLimit = resolveServerJsonLimit(options);
+  const ingestJsonLimit = resolveIngestJsonLimit(options);
   const graphqlServer = new ApolloServer({
     typeDefs,
     resolvers,
@@ -41,7 +43,6 @@ export async function createServer(options = {}) {
     applyTraceHeadersToNodeResponse(res, requestTrace);
     next();
   });
-  app.use(express.json({ limit: options.jsonLimit || '10mb' }));
 
   app.get('/healthz', (_req, res) => {
     res.status(200).json({
@@ -51,7 +52,29 @@ export async function createServer(options = {}) {
     });
   });
 
-  app.use('/api/ingest', createIngestRouter(options));
+  const ingestJsonParser = express.json({ limit: ingestJsonLimit });
+  app.use('/api/ingest', (req, res, next) => {
+    ingestJsonParser(req, res, (error) => {
+      if (!error) {
+        next();
+        return;
+      }
+
+      if (error?.type === 'entity.too.large' || error?.status === 413) {
+        res.status(413).json({
+          error: {
+            code: 'INGEST_PAYLOAD_TOO_LARGE',
+            message: `Ingest payload exceeds the configured ${ingestJsonLimit} limit.`,
+          },
+        });
+        return;
+      }
+
+      next(error);
+    });
+  }, createIngestRouter(options));
+
+  app.use(express.json({ limit: serverJsonLimit }));
 
   app.use('/graphql', expressMiddleware(graphqlServer, {
     context: async ({ req, res }) => buildGraphqlContext({
@@ -105,6 +128,16 @@ export function resolveCorsOrigin(options = {}) {
     return options.corsOrigin;
   }
   return resolveWebUrl();
+}
+
+export function resolveServerJsonLimit(options = {}) {
+  const configured = options.serverJsonLimit || options.jsonLimit || env.get('SERVER_JSON_LIMIT').default('50mb').asString().trim();
+  return configured || '50mb';
+}
+
+export function resolveIngestJsonLimit(options = {}) {
+  const configured = options.ingestJsonLimit || env.get('INGEST_JSON_LIMIT').default('').asString().trim();
+  return configured || resolveServerJsonLimit(options);
 }
 
 function isDirectInvocation(moduleUrl) {

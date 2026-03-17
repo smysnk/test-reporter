@@ -373,6 +373,12 @@ Shared-key auth:
 - the main release workflow reads the GitHub Actions secret `TEST_STATION_INGEST_SHARED_KEY`
 - set them to the same value
 
+Payload size:
+
+- the server defaults both `SERVER_JSON_LIMIT` and `INGEST_JSON_LIMIT` to `50mb`
+- Fleet also configures the Traefik ingress path for `/api/ingest` with a `50 MB` request-body cap
+- if your reports grow beyond that, raise both the app limit and ingress limit together
+
 Optional S3-backed artifact storage:
 
 - set `vars.S3_BUCKET` to enable `aws s3 sync` of the report directory
