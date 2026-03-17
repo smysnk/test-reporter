@@ -1,11 +1,22 @@
 {
   "name": "test-station",
+  "description": "Framework-agnostic test orchestration and reporting toolkit.",
   "type": "module",
   "bin": "./bin/test-station.mjs",
   "exports": {
     "./config": "./config.mjs",
     "./bin": "./bin/test-station.mjs"
   },
+  "keywords": [
+    "testing",
+    "test-reporting",
+    "coverage",
+    "playwright",
+    "vitest",
+    "jest",
+    "node-test",
+    "monorepo"
+  ],
   "packageManager": "yarn@4.13.0",
   "workspaces": [
     "packages/*"

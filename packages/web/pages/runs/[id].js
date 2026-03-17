@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { EmptyState, InlineList, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
+import { EmptyState, InlineList, MetricGrid, RunSourceLink, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, formatSignedDelta } from '../../lib/format.js';
 import { getWebSession } from '../../lib/auth.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../../lib/requestTrace.js';
@@ -25,17 +25,7 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
   }
 
   const runBuildLabel = formatRunBuildLabel(run);
-  const runBuildCopy = run.sourceUrl
-    ? React.createElement(
-      'a',
-      {
-        href: run.sourceUrl,
-        target: '_blank',
-        rel: 'noreferrer',
-      },
-      'Open GitHub Actions run',
-    )
-    : (run.sourceRunId || 'run link unavailable');
+  const runBuildCopy = run.sourceRunId ? `run ${run.sourceRunId}` : 'run link unavailable';
 
   React.useEffect(() => {
     recordClientPageMark('run-page-ready', {
@@ -73,10 +63,15 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
           ),
           React.createElement(StatusPill, { status: run.status }),
         ),
-        React.createElement(TemplateSwitch, {
-          runId: run.id,
-          activeTemplate: templateMode,
-        }),
+        React.createElement(
+          'div',
+          { className: 'web-run-detail__controls' },
+          React.createElement(RunSourceLink, { run }),
+          React.createElement(TemplateSwitch, {
+            runId: run.id,
+            activeTemplate: templateMode,
+          }),
+        ),
       ),
       React.createElement(MetricGrid, {
         items: [

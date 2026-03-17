@@ -79,3 +79,22 @@ export function RunBuildChip({ run }) {
 
   return React.createElement('span', { className: 'web-chip' }, label);
 }
+
+export function RunSourceLink({ run, label = 'Open GitHub Actions run' }) {
+  const href = typeof run?.sourceUrl === 'string' && run.sourceUrl.trim() ? run.sourceUrl.trim() : null;
+
+  if (!href) {
+    return null;
+  }
+
+  return React.createElement(
+    'a',
+    {
+      href,
+      target: '_blank',
+      rel: 'noreferrer',
+      className: 'web-button web-button--ghost',
+    },
+    label,
+  );
+}

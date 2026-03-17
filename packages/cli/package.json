@@ -1,8 +1,18 @@
 {
   "name": "@test-station/cli",
   "version": "0.2.0",
+  "description": "Framework-agnostic test orchestration and reporting toolkit.",
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smysnk/test-station.git",
+    "directory": "packages/cli"
+  },
+  "homepage": "https://github.com/smysnk/test-station/tree/main/packages/cli#readme",
+  "bugs": {
+    "url": "https://github.com/smysnk/test-station/issues"
   },
   "type": "module",
   "bin": {

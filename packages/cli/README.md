@@ -43,11 +43,11 @@ The HTML report supports:
 
 ### Report Overview
 
-![Report overview](../../docs/assets/report-overview.png)
+![Report overview](https://raw.githubusercontent.com/smysnk/test-station/main/docs/assets/report-overview.png)
 
 ### Drilldown View
 
-![Report drilldown](../../docs/assets/report-drilldown.png)
+![Report drilldown](https://raw.githubusercontent.com/smysnk/test-station/main/docs/assets/report-drilldown.png)
 
 ## Architecture
 
@@ -541,11 +541,11 @@ plugins: [
 ## Examples
 
 - Generic consumer example:
-  [`../../examples/generic-node-library/test-station.config.mjs`](../../examples/generic-node-library/test-station.config.mjs)
+  [`examples/generic-node-library/test-station.config.mjs`](https://github.com/smysnk/test-station/blob/main/examples/generic-node-library/test-station.config.mjs)
 - Mixed-framework example:
-  [`../../examples/mixed-framework-monorepo/test-station.config.mjs`](../../examples/mixed-framework-monorepo/test-station.config.mjs)
+  [`examples/mixed-framework-monorepo/test-station.config.mjs`](https://github.com/smysnk/test-station/blob/main/examples/mixed-framework-monorepo/test-station.config.mjs)
 - Integration guide:
-  [`../../docs/integrating-a-generic-project.md`](../../docs/integrating-a-generic-project.md)
+  [`docs/integrating-a-generic-project.md`](https://github.com/smysnk/test-station/blob/main/docs/integrating-a-generic-project.md)
 
 ## Development
 
@@ -572,5 +572,5 @@ All publishable `@test-station/*` packages currently move in lockstep at `0.2.0`
 
 For deeper release and compatibility details, see:
 
-- [`../../docs/integrating-a-generic-project.md`](../../docs/integrating-a-generic-project.md)
-- [`../../docs/versioning-and-release-strategy.md`](../../docs/versioning-and-release-strategy.md)
+- [`docs/integrating-a-generic-project.md`](https://github.com/smysnk/test-station/blob/main/docs/integrating-a-generic-project.md)
+- [`docs/versioning-and-release-strategy.md`](https://github.com/smysnk/test-station/blob/main/docs/versioning-and-release-strategy.md)

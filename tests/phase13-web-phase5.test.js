@@ -44,7 +44,7 @@ import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nexta
 import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
-import { RunBuildChip } from '../packages/web/components/WebBits.js';
+import { RunBuildChip, RunSourceLink } from '../packages/web/components/WebBits.js';
 import { buildHomeExplorerModel } from '../packages/web/lib/homeExplorer.js';
 
 test('web auth options expose the sign-in page and session actor metadata', async () => {
@@ -1276,6 +1276,18 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(RUN_DETAIL_QUERY, /sourceRunId/);
   assert.match(RUN_DETAIL_QUERY, /sourceUrl/);
   assert.match(RUN_DETAIL_QUERY, /buildNumber/);
+});
+
+test('run source link renders a direct action back to the GitHub Actions run', () => {
+  const html = renderToStaticMarkup(React.createElement(RunSourceLink, {
+    run: {
+      sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
+    },
+  }));
+
+  assert.match(html, /Open GitHub Actions run/);
+  assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
+  assert.match(html, /web-button/);
 });
 
 test('web home explorer model sorts sidebar projects by activity and filters the selected project feed', () => {

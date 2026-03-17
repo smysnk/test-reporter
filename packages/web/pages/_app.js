@@ -548,6 +548,13 @@ const GlobalStyle = createGlobalStyle`
     gap: 16px;
     margin-top: 18px;
   }
+  .web-run-detail__controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+  }
   .web-segmented-control {
     display: inline-flex;
     gap: 6px;
@@ -646,6 +653,9 @@ const GlobalStyle = createGlobalStyle`
     align-items: start;
   }
   .web-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: 1px solid ${(props) => props.theme.colors.accent};
     background: ${(props) => props.theme.colors.accent};
     color: #07111f;
@@ -654,6 +664,7 @@ const GlobalStyle = createGlobalStyle`
     font: inherit;
     font-weight: 600;
     cursor: pointer;
+    text-decoration: none;
   }
   .web-button--primary {
     display: inline-flex;
