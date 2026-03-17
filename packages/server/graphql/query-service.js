@@ -397,19 +397,58 @@ export function createGraphqlQueryService(options = {}) {
     async listCoverageTrend({ actor, projectId = null, projectKey = null, packageName = null, moduleName = null, filePath = null, limit = DEFAULT_LIMIT }) {
       const projects = await this.listProjects({ actor });
       const projectMap = mapBy(projects, 'id');
-      const runs = mapBy(await loadAll(models.Run), 'id');
-      const versions = mapBy(await loadAll(models.ProjectVersion), 'id');
-      const scopeType = resolveCoverageTrendScope({ packageName, moduleName, filePath });
-      const points = await loadAll(models.CoverageTrendPoint);
+      const visibleProjectIds = Array.from(projectMap.keys());
+      if (visibleProjectIds.length === 0) {
+        return [];
+      }
 
-      return points
+      const scopeType = resolveCoverageTrendScope({ packageName, moduleName, filePath });
+      let points = await loadAll(models.CoverageTrendPoint, {
+        where: {
+          projectId: visibleProjectIds,
+          scopeType,
+          ...(packageName ? { packageName } : {}),
+          ...(moduleName ? { moduleName } : {}),
+          ...(filePath ? { filePath } : {}),
+        },
+        order: [
+          ['recordedAt', 'DESC'],
+          ['createdAt', 'DESC'],
+        ],
+        limit: normalizeLimit(limit),
+      });
+
+      points = points
         .filter((point) => projectMap.has(point.projectId))
         .filter((point) => (projectId ? point.projectId === projectId : true))
         .filter((point) => (projectKey ? projectMap.get(point.projectId)?.key === projectKey : true))
         .filter((point) => point.scopeType === scopeType)
         .filter((point) => (packageName ? point.packageName === packageName : true))
         .filter((point) => (moduleName ? point.moduleName === moduleName : true))
-        .filter((point) => (filePath ? point.filePath === filePath : true))
+        .filter((point) => (filePath ? point.filePath === filePath : true));
+
+      if (points.length === 0) {
+        return [];
+      }
+
+      const runIds = Array.from(new Set(points.map((point) => point.runId).filter(Boolean)));
+      const initialVersionIds = Array.from(new Set(points.map((point) => point.projectVersionId).filter(Boolean)));
+      const runs = mapBy(runIds.length > 0
+        ? await loadAll(models.Run, {
+          where: { id: runIds },
+        })
+        : [], 'id');
+      const versionIds = Array.from(new Set([
+        ...initialVersionIds,
+        ...runIds.map((runId) => runs.get(runId)?.projectVersionId).filter(Boolean),
+      ]));
+      const versions = mapBy(versionIds.length > 0
+        ? await loadAll(models.ProjectVersion, {
+          where: { id: versionIds },
+        })
+        : [], 'id');
+
+      return points
         .map((point) => decorateCoverageTrendPoint(point, {
           run: runs.get(point.runId) || null,
           projectVersion: versions.get(point.projectVersionId) || versions.get(runs.get(point.runId)?.projectVersionId) || null,

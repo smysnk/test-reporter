@@ -99,17 +99,6 @@ export const PROJECT_ACTIVITY_QUERY = `
 
 export const RUN_SCOPE_TREND_CATALOG_QUERY = `
   query WebRunScopeTrendCatalog($runId: ID!) {
-    runPackages(runId: $runId) {
-      name
-      durationMs
-      suiteCount
-      coverage
-    }
-    runModules(runId: $runId) {
-      module
-      owner
-      coverage
-    }
     runFiles(runId: $runId) {
       path
       packageName

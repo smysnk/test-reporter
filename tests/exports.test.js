@@ -365,6 +365,21 @@ test('renderer returns baseline html', () => {
   assert.match(html, /80\.0%/);
 });
 
+test('renderer splits a combined report title into a project headline and run key', () => {
+  const report = createSampleReport();
+  report.meta.projectName = 'Workspace';
+
+  const html = renderHtmlReport(report, {
+    title: 'Workspace Report - workspace:github-actions:1001',
+  });
+
+  assert.match(html, /class="hero__title">Workspace<\/h1>/);
+  assert.match(html, /class="hero__reportKey">workspace:github-actions:1001<\/div>/);
+  assert.match(html, /Structured Run Report/);
+  assert.doesNotMatch(html, /<h1[^>]*>Workspace Report - workspace:github-actions:1001<\/h1>/);
+  assert.match(html, /\.hero__title\s*\{[\s\S]*white-space:\s*nowrap;/);
+});
+
 test('renderer shows owner as thin header text above the module card title', () => {
   const html = renderHtmlReport(createSampleReport(), { title: 'example' });
   const moduleCard = html.match(/<button type="button" class="module-card status-failed"[\s\S]*?<\/button>/)?.[0] || '';

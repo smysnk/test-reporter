@@ -218,25 +218,40 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
     ...response?.meta,
   }));
   const activity = activityResult.data;
+  const overallTrend = Array.isArray(activity.coverageTrend) ? activity.coverageTrend : [];
+  const releaseNotes = Array.isArray(activity.releaseNotes) ? activity.releaseNotes : [];
+  let trendPanels;
 
-  return {
-    project: base.project,
-    runs: Array.isArray(activity.runs) ? activity.runs : [],
-    coverageTrend: Array.isArray(activity.coverageTrend) ? activity.coverageTrend : [],
-    releaseNotes: Array.isArray(activity.releaseNotes) ? activity.releaseNotes : [],
-    trendPanels: await measureProfileStep(profiler, 'project-trend-panels', () => loadProjectTrendPanels({
+  try {
+    trendPanels = await measureProfileStep(profiler, 'project-trend-panels', () => loadProjectTrendPanels({
       session,
       projectKey: base.project.key,
       latestRunId: Array.isArray(activity.runs) && activity.runs[0] ? activity.runs[0].id : null,
-      overallTrend: Array.isArray(activity.coverageTrend) ? activity.coverageTrend : [],
-      releaseNotes: Array.isArray(activity.releaseNotes) ? activity.releaseNotes : [],
+      overallTrend,
+      releaseNotes,
       fetchImpl,
       requestId,
       requestTrace,
       profiler,
     }), {
       latestRunId: Array.isArray(activity.runs) && activity.runs[0] ? activity.runs[0].id : null,
-    }),
+    });
+  } catch {
+    trendPanels = {
+      overall: overallTrend,
+      overlays: buildTrendOverlays(overallTrend, releaseNotes),
+      packageTrends: [],
+      moduleTrends: [],
+      fileTrends: [],
+    };
+  }
+
+  return {
+    project: base.project,
+    runs: Array.isArray(activity.runs) ? activity.runs : [],
+    coverageTrend: overallTrend,
+    releaseNotes,
+    trendPanels,
   };
 }
 
@@ -495,28 +510,35 @@ async function loadProjectTrendPanels({
     ...response?.meta,
   }));
   const scopeCatalog = scopeCatalogResult.data;
+  const runFiles = Array.isArray(scopeCatalog.runFiles) ? scopeCatalog.runFiles : [];
 
-  const packageSelections = (Array.isArray(scopeCatalog.runPackages) ? scopeCatalog.runPackages : [])
+  const packageSelections = rankTrendSelections(runFiles, (entry) => entry.packageName)
     .slice(0, 3)
     .map((entry) => ({
-      label: entry.name,
-      packageName: entry.name,
+      label: entry.label,
+      packageName: entry.label,
     }));
-  const moduleSelections = (Array.isArray(scopeCatalog.runModules) ? scopeCatalog.runModules : [])
+  const moduleSelections = rankTrendSelections(runFiles, (entry) => (
+    entry.moduleName && entry.moduleName !== 'uncategorized'
+      ? entry.moduleName
+      : null
+  ))
     .slice(0, 3)
     .map((entry) => ({
-      label: entry.module,
-      moduleName: entry.module,
+      label: entry.label,
+      moduleName: entry.label,
     }));
-  const fileSelections = (Array.isArray(scopeCatalog.runFiles) ? scopeCatalog.runFiles : [])
+  const fileSelections = runFiles
     .sort((left, right) => {
       const failedDelta = (right.failedTestCount || 0) - (left.failedTestCount || 0);
       if (failedDelta !== 0) {
         return failedDelta;
       }
-      const leftCoverage = Number.isFinite(left.coverage?.linesPct) ? left.coverage.linesPct : 101;
-      const rightCoverage = Number.isFinite(right.coverage?.linesPct) ? right.coverage.linesPct : 101;
-      return leftCoverage - rightCoverage;
+      const testDelta = (right.testCount || 0) - (left.testCount || 0);
+      if (testDelta !== 0) {
+        return testDelta;
+      }
+      return String(left.path || '').localeCompare(String(right.path || ''));
     })
     .slice(0, 3)
     .map((entry) => ({
@@ -594,6 +616,41 @@ async function loadScopedTrendPanels({ session, projectKey, selections, fetchImp
   }));
 
   return responses.filter((entry) => entry.points.length > 0);
+}
+
+function rankTrendSelections(files, selectLabel) {
+  const scores = new Map();
+
+  for (const entry of Array.isArray(files) ? files : []) {
+    const label = typeof selectLabel === 'function' ? selectLabel(entry) : null;
+    if (!label) {
+      continue;
+    }
+
+    const current = scores.get(label) || {
+      label,
+      failedTestCount: 0,
+      testCount: 0,
+    };
+
+    current.failedTestCount = Math.max(current.failedTestCount, entry.failedTestCount || 0);
+    current.testCount = Math.max(current.testCount, entry.testCount || 0);
+    scores.set(label, current);
+  }
+
+  return Array.from(scores.values()).sort((left, right) => {
+    const failedDelta = right.failedTestCount - left.failedTestCount;
+    if (failedDelta !== 0) {
+      return failedDelta;
+    }
+
+    const testDelta = right.testCount - left.testCount;
+    if (testDelta !== 0) {
+      return testDelta;
+    }
+
+    return left.label.localeCompare(right.label);
+  });
 }
 
 async function loadAdminViewer({ session, fetchImpl, requestId, requestTrace }) {

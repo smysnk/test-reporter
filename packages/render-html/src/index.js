@@ -12,6 +12,7 @@ export function renderHtmlReport(report, options = {}) {
   const generatedAt = typeof report?.generatedAt === 'string' ? report.generatedAt : 'unknown';
   const schemaVersion = report?.schemaVersion || '1';
   const projectName = report?.meta?.projectName || title;
+  const heroTitle = deriveHeroTitleParts({ title, projectName });
   const policySummary = summary?.policy || {};
   const moduleFilterOptions = Array.isArray(summary?.filterOptions?.modules) ? summary.filterOptions.modules : dedupe(modules.map((entry) => entry.module));
   const packageFilterOptions = Array.isArray(summary?.filterOptions?.packages) ? summary.filterOptions.packages : dedupe(packages.map((entry) => entry.name));
@@ -89,24 +90,92 @@ export function renderHtmlReport(report, options = {}) {
       backdrop-filter: blur(18px);
     }
     .hero {
-      padding: 28px;
+      padding: 30px;
       border-radius: 28px;
       margin-bottom: 22px;
       background:
-        radial-gradient(circle at top left, rgba(107, 178, 255, 0.24), transparent 35%),
-        linear-gradient(135deg, rgba(29, 45, 72, 0.96), rgba(10, 18, 34, 0.92));
+        radial-gradient(circle at top left, rgba(107, 178, 255, 0.3), transparent 34%),
+        radial-gradient(circle at 88% 18%, rgba(78, 227, 139, 0.08), transparent 24%),
+        linear-gradient(145deg, rgba(29, 45, 72, 0.96), rgba(10, 18, 34, 0.92));
     }
-    h1 {
-      margin: 0 0 10px;
-      font-size: clamp(2.1rem, 5vw, 3.4rem);
-      line-height: 0.95;
-      letter-spacing: -0.05em;
+    .hero__topline {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
     }
-    .hero p {
+    .hero__eyebrow {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(8, 15, 28, 0.42);
+      color: color-mix(in srgb, var(--text) 82%, var(--accent));
+      font-size: 0.76rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+    }
+    .hero__meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+    .hero__metaBadge {
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(8, 15, 28, 0.42);
+      color: var(--muted);
+      font-size: 0.8rem;
+      letter-spacing: 0.01em;
+    }
+    .hero__headline {
+      display: grid;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .hero__titleGroup {
+      display: grid;
+      gap: 12px;
+    }
+    .hero__title {
+      margin: 0;
+      font-family: var(--heading-font);
+      font-size: clamp(2.4rem, 6vw, 4.8rem);
+      font-weight: 700;
+      line-height: 0.92;
+      letter-spacing: -0.065em;
+      white-space: nowrap;
+      overflow-wrap: normal;
+    }
+    .hero__reportKey {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      max-width: min(100%, 38rem);
+      padding: 12px 16px;
+      border-radius: 18px;
+      border: 1px solid rgba(124, 160, 224, 0.22);
+      background: rgba(7, 14, 27, 0.58);
+      color: color-mix(in srgb, var(--text) 88%, var(--accent));
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: clamp(0.9rem, 1.6vw, 1.05rem);
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .hero__description {
       margin: 0;
       max-width: 72ch;
       color: var(--muted);
-      font-size: 1rem;
+      font-size: 1.02rem;
       line-height: 1.6;
     }
     .summary-grid {
@@ -146,6 +215,7 @@ export function renderHtmlReport(report, options = {}) {
     .toolbar__meta {
       color: var(--muted);
       font-size: 0.95rem;
+      max-width: 56ch;
     }
     .toolbar__controls {
       display: flex;
@@ -794,6 +864,7 @@ export function renderHtmlReport(report, options = {}) {
     }
     @media (max-width: 920px) {
       main { width: min(100vw - 24px, 1400px); }
+      .hero__meta { justify-content: flex-start; }
       .toolbar { align-items: flex-start; }
       .toolbar__controls { justify-content: flex-start; }
       .toolbar__filters { justify-content: flex-start; }
@@ -809,8 +880,20 @@ export function renderHtmlReport(report, options = {}) {
 <body>
   <main>
     <section class="hero">
-      <h1>${escapeHtml(title)}</h1>
-      <p>Structured test results grouped by logical module first, with package drilldowns, suite-level coverage, and test detail views that can be expanded globally or per test. The renderer consumes only the normalized report data and explicit render options.</p>
+      <div class="hero__topline">
+        <span class="hero__eyebrow">${heroTitle.detail ? 'Structured Run Report' : 'Structured Test Report'}</span>
+        <div class="hero__meta">
+          <span class="hero__metaBadge">Schema v${escapeHtml(schemaVersion)}</span>
+          <span class="hero__metaBadge">Generated ${escapeHtml(generatedAt)}</span>
+        </div>
+      </div>
+      <div class="hero__headline">
+        <div class="hero__titleGroup">
+          <h1 class="hero__title">${escapeHtml(heroTitle.primary)}</h1>
+          ${heroTitle.detail ? `<div class="hero__reportKey">${escapeHtml(heroTitle.detail)}</div>` : ''}
+        </div>
+        <p class="hero__description">Structured test results grouped by logical module first, with package drilldowns, suite-level coverage, and test detail views that can be expanded globally or per test. The renderer consumes only the normalized report data and explicit render options.</p>
+      </div>
       <div class="summary-grid">
         ${renderSummaryCard('Modules', summary.totalModules || 0)}
         ${renderSummaryCard('Packages', summary.totalPackages || 0)}
@@ -831,7 +914,7 @@ export function renderHtmlReport(report, options = {}) {
     </section>
 
     <section class="panel toolbar">
-      <div class="toolbar__meta">Project ${escapeHtml(projectName)} • Schema v${escapeHtml(schemaVersion)} • Generated ${escapeHtml(generatedAt)}</div>
+      <div class="toolbar__meta">Switch between module-first and package-first layouts, then focus the report by module, package, framework, or coverage threshold.</div>
       <div class="toolbar__controls">
         <div class="view-toggle" role="tablist" aria-label="Report view">
           <button type="button" class="view-toggle__button" data-view-button="module">Group by Module</button>
@@ -1691,6 +1774,68 @@ function formatCoverageAttribution(file) {
     parts.push(trimForReport(file.attributionReason, 80));
   }
   return parts.join(' • ') || 'n/a';
+}
+
+function deriveHeroTitleParts({ title, projectName }) {
+  const normalizedTitle = typeof title === 'string' ? title.trim() : '';
+  const normalizedProjectName = typeof projectName === 'string' ? projectName.trim() : '';
+
+  if (!normalizedTitle && !normalizedProjectName) {
+    return {
+      primary: 'Test Station',
+      detail: null,
+    };
+  }
+
+  if (!normalizedTitle) {
+    return {
+      primary: normalizedProjectName || 'Test Station',
+      detail: null,
+    };
+  }
+
+  if (!normalizedProjectName) {
+    const reportSeparatorIndex = normalizedTitle.indexOf(' Report - ');
+    if (reportSeparatorIndex > 0) {
+      return {
+        primary: normalizedTitle.slice(0, reportSeparatorIndex).trim(),
+        detail: normalizedTitle.slice(reportSeparatorIndex + ' Report - '.length).trim() || null,
+      };
+    }
+
+    return {
+      primary: normalizedTitle,
+      detail: null,
+    };
+  }
+
+  if (normalizedTitle === normalizedProjectName) {
+    return {
+      primary: normalizedProjectName,
+      detail: null,
+    };
+  }
+
+  const explicitProjectPrefix = `${normalizedProjectName} Report - `;
+  if (normalizedTitle.startsWith(explicitProjectPrefix)) {
+    return {
+      primary: normalizedProjectName,
+      detail: normalizedTitle.slice(explicitProjectPrefix.length).trim() || null,
+    };
+  }
+
+  const genericReportSeparatorIndex = normalizedTitle.indexOf(' Report - ');
+  if (genericReportSeparatorIndex > 0) {
+    return {
+      primary: normalizedTitle.slice(0, genericReportSeparatorIndex).trim(),
+      detail: normalizedTitle.slice(genericReportSeparatorIndex + ' Report - '.length).trim() || null,
+    };
+  }
+
+  return {
+    primary: normalizedTitle,
+    detail: null,
+  };
 }
 
 function deriveStatusFromSummary(summary) {

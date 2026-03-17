@@ -617,6 +617,95 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
   assert.equal(requests[6].body.variables.filePath, '/repo/packages/core/src/index.js');
 });
 
+test('web project loader falls back to the base trend view when scoped trend panels fail', async () => {
+  const session = {
+    userId: 'user-1',
+    user: {
+      email: 'user@example.com',
+      name: 'Web User',
+    },
+    role: 'member',
+  };
+
+  const fetchImpl = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    const query = request.query;
+
+    if (query.includes('WebProjectBySlug')) {
+      return new Response(JSON.stringify({
+        data: {
+          project: {
+            id: 'project-1',
+            key: 'workspace',
+            slug: 'workspace',
+            name: 'Workspace',
+            defaultBranch: 'main',
+            repositoryUrl: 'https://github.com/example/test-station.git',
+            metadata: {},
+          },
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    if (query.includes('WebProjectActivity')) {
+      return new Response(JSON.stringify({
+        data: {
+          runs: [{
+            id: 'run-1',
+            externalKey: 'workspace:github-actions:1001',
+            status: 'passed',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            durationMs: 3000,
+            projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
+            coverageSnapshot: { linesPct: 80 },
+          }],
+          coverageTrend: [{
+            runId: 'run-1',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            recordedAt: '2026-03-09T15:00:00.000Z',
+            versionKey: 'commit:abc123',
+            linesPct: 80,
+          }],
+          releaseNotes: [{
+            id: 'note-1',
+            title: 'Release',
+            body: 'details',
+            publishedAt: '2026-03-09T16:00:00.000Z',
+          }],
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    if (query.includes('WebRunScopeTrendCatalog')) {
+      throw new Error('catalog timeout');
+    }
+
+    throw new Error(`Unexpected web GraphQL request: ${query}`);
+  };
+
+  const project = await loadProjectExplorerPage({
+    session,
+    slug: 'workspace',
+    fetchImpl,
+    requestId: 'req-project-fallback',
+  });
+
+  assert.equal(project.project.key, 'workspace');
+  assert.equal(project.coverageTrend.length, 1);
+  assert.equal(project.releaseNotes.length, 1);
+  assert.equal(project.trendPanels.overall.length, 1);
+  assert.equal(project.trendPanels.overlays.length, 2);
+  assert.deepEqual(project.trendPanels.packageTrends, []);
+  assert.deepEqual(project.trendPanels.moduleTrends, []);
+  assert.deepEqual(project.trendPanels.fileTrends, []);
+});
+
 test('web GraphQL helpers and proxy allow anonymous public reads without actor headers', async () => {
   const requests = [];
   const fetchImpl = async (_url, options) => {
