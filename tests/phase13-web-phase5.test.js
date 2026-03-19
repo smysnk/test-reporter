@@ -1498,10 +1498,13 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(html, /build #88/);
   assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
   assert.match(WEB_HOME_QUERY, /viewer/);
-  assert.match(WEB_HOME_QUERY, /runFeed\(limit:\s*24\)/);
+  assert.match(WEB_HOME_QUERY, /runFeed\s*\{/);
+  assert.doesNotMatch(WEB_HOME_QUERY, /runFeed\(limit:/);
   assert.match(WEB_HOME_QUERY, /sourceRunId/);
   assert.match(WEB_HOME_QUERY, /sourceUrl/);
   assert.match(WEB_HOME_QUERY, /buildNumber/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /runs\(projectKey: \$projectKey\)\s*\{/);
+  assert.doesNotMatch(PROJECT_ACTIVITY_QUERY, /runs\(projectKey: \$projectKey,\s*limit:/);
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceRunId/);
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceUrl/);
   assert.match(PROJECT_ACTIVITY_QUERY, /buildNumber/);

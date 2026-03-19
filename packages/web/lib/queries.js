@@ -14,7 +14,7 @@ export const WEB_HOME_QUERY = `
       defaultBranch
       repositoryUrl
     }
-    runFeed(limit: 24) {
+    runFeed {
       id
       externalKey
       status
@@ -55,7 +55,7 @@ export const PROJECT_BY_SLUG_QUERY = `
 
 export const PROJECT_ACTIVITY_QUERY = `
   query WebProjectActivity($projectKey: String!) {
-    runs(projectKey: $projectKey, limit: 12) {
+    runs(projectKey: $projectKey) {
       id
       externalKey
       status

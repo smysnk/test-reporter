@@ -1461,6 +1461,97 @@ test('listRuns queries the lightweight feed fields with DB-side limit and relate
   assert.deepEqual(runs[0].summary, { totalTests: 3, passedTests: 3, failedTests: 0 });
 });
 
+test('listRuns returns the full visible run set when no limit is provided', async () => {
+  let runFindAllOptions = null;
+
+  const queryService = createGraphqlQueryService({
+    accessService: {
+      async filterProjects({ projects }) {
+        return projects;
+      },
+    },
+    models: {
+      Project: createFindAllModel([
+        {
+          id: 'project-1',
+          key: 'workspace',
+          slug: 'workspace',
+          name: 'Workspace',
+          isPublic: true,
+        },
+      ]),
+      Run: {
+        async findAll(options = {}) {
+          runFindAllOptions = options;
+          return [
+            {
+              id: 'run-3',
+              projectId: 'project-1',
+              projectVersionId: null,
+              externalKey: 'workspace:github-actions:1003',
+              status: 'passed',
+              completedAt: '2026-03-16T12:00:00.000Z',
+              durationMs: 900,
+              summary: { totalTests: 4, passedTests: 4, failedTests: 0 },
+            },
+            {
+              id: 'run-2',
+              projectId: 'project-1',
+              projectVersionId: null,
+              externalKey: 'workspace:github-actions:1002',
+              status: 'passed',
+              completedAt: '2026-03-15T12:00:00.000Z',
+              durationMs: 1000,
+              summary: { totalTests: 3, passedTests: 3, failedTests: 0 },
+            },
+            {
+              id: 'run-1',
+              projectId: 'project-1',
+              projectVersionId: null,
+              externalKey: 'workspace:github-actions:1001',
+              status: 'failed',
+              completedAt: '2026-03-14T12:00:00.000Z',
+              durationMs: 1200,
+              summary: { totalTests: 2, passedTests: 1, failedTests: 1 },
+            },
+          ];
+        },
+      },
+      ProjectVersion: createFindAllModel([]),
+      CoverageSnapshot: createFindAllModel([]),
+      Group: createFindAllModel([]),
+      ProjectFile: createFindAllModel([]),
+      ProjectGroupAccess: createFindAllModel([]),
+      ProjectModule: createFindAllModel([]),
+      ProjectPackage: createFindAllModel([]),
+      ProjectRoleAccess: createFindAllModel([]),
+      ReleaseNote: createFindAllModel([]),
+      Role: createFindAllModel([]),
+      SuiteRun: createFindAllModel([]),
+      TestExecution: createFindAllModel([]),
+      Artifact: createFindAllModel([]),
+    },
+  });
+
+  const runs = await queryService.listRuns({
+    actor: {
+      id: 'guest',
+      userId: null,
+      email: null,
+      name: 'Guest',
+      role: 'guest',
+      isAdmin: false,
+      isGuest: true,
+      roleKeys: [],
+      groupKeys: [],
+    },
+  });
+
+  assert.equal(runs.length, 3);
+  assert.equal(runs[0].externalKey, 'workspace:github-actions:1003');
+  assert.equal(runFindAllOptions.limit, undefined);
+});
+
 test('listPerformanceTrend applies visibility, metadata filters, and post-filter limits', async () => {
   const queryService = createGraphqlQueryService({
     models: createGraphqlModels(),

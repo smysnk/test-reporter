@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Sequelize } from 'sequelize';
 import * as accessControlMigration from '../packages/server/migrations/20260314_0003_access_control.js';
+import * as benchmarkIndexesMigration from '../packages/server/migrations/20260319_0004_benchmark_indexes.js';
 import * as coverageTrendMigration from '../packages/server/migrations/20260309_0002_coverage_trend_points.js';
 import * as initialMigration from '../packages/server/migrations/20260309_0001_initial_reporting_schema.js';
 import { loadMigrations, runMigrations } from '../packages/server/migrations/runMigrations.js';
@@ -35,9 +36,15 @@ test('loadMigrations includes the initial reporting schema migration', async () 
   assert.ok(migrations.some((migration) => migration.id === initialMigration.id));
   assert.ok(migrations.some((migration) => migration.id === coverageTrendMigration.id));
   assert.ok(migrations.some((migration) => migration.id === accessControlMigration.id));
+  assert.ok(migrations.some((migration) => migration.id === benchmarkIndexesMigration.id));
   assert.deepEqual(
     migrations.map((migration) => migration.id),
-    [initialMigration.id, coverageTrendMigration.id, accessControlMigration.id],
+    [
+      initialMigration.id,
+      coverageTrendMigration.id,
+      accessControlMigration.id,
+      benchmarkIndexesMigration.id,
+    ],
   );
 });
 
@@ -45,7 +52,12 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
   const state = createFakeMigrationState();
 
   await runMigrations(state.sequelize, {
-    migrations: [initialMigration, coverageTrendMigration, accessControlMigration],
+    migrations: [
+      initialMigration,
+      coverageTrendMigration,
+      accessControlMigration,
+      benchmarkIndexesMigration,
+    ],
   });
 
   assert.equal(state.createdTables.length, 22);
@@ -72,14 +84,31 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
   assert.ok(state.indexes.some((entry) => entry.options?.name === 'user_groups_user_id_group_id_unique'));
   assert.ok(state.indexes.some((entry) => entry.options?.name === 'project_role_access_project_id_role_id_unique'));
   assert.ok(state.indexes.some((entry) => entry.options?.name === 'project_group_access_project_id_group_id_unique'));
-  assert.deepEqual(state.insertedMigrations, [initialMigration.id, coverageTrendMigration.id, accessControlMigration.id]);
-  assert.equal(state.transactions.length, 3);
+  assert.ok(state.indexes.some((entry) => entry.options?.name === 'performance_stats_stat_group_stat_name_idx'));
+  assert.ok(state.indexes.some((entry) => entry.options?.name === 'runs_project_id_completed_at_idx'));
+  assert.deepEqual(state.insertedMigrations, [
+    initialMigration.id,
+    coverageTrendMigration.id,
+    accessControlMigration.id,
+    benchmarkIndexesMigration.id,
+  ]);
+  assert.equal(state.transactions.length, 4);
   assert.equal(state.transactions.every((entry) => entry.committed === true), true);
   assert.equal(state.transactions.every((entry) => entry.rolledBack === false), true);
 
-  const rerunState = createFakeMigrationState([initialMigration.id, coverageTrendMigration.id, accessControlMigration.id]);
+  const rerunState = createFakeMigrationState([
+    initialMigration.id,
+    coverageTrendMigration.id,
+    accessControlMigration.id,
+    benchmarkIndexesMigration.id,
+  ]);
   await runMigrations(rerunState.sequelize, {
-    migrations: [initialMigration, coverageTrendMigration, accessControlMigration],
+    migrations: [
+      initialMigration,
+      coverageTrendMigration,
+      accessControlMigration,
+      benchmarkIndexesMigration,
+    ],
   });
   assert.equal(rerunState.createdTables.length, 0);
   assert.equal(rerunState.addedColumns.length, 0);
@@ -205,6 +234,7 @@ function createFakeMigrationState(appliedMigrationIds = []) {
     async addIndex(tableName, fields, options) {
       indexes.push({ tableName, fields, options });
     },
+    async removeIndex() {},
     async dropTable() {},
     async removeColumn() {},
   };

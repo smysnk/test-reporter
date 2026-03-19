@@ -79,7 +79,7 @@ export function createGraphqlQueryService(options = {}) {
       )) || null;
     },
 
-    async listRuns({ actor, projectId = null, projectKey = null, status = null, limit = DEFAULT_LIMIT }) {
+    async listRuns({ actor, projectId = null, projectKey = null, status = null, limit = null }) {
       const projects = await this.listProjects({ actor });
       const scopedProjects = projects.filter((project) => (
         (projectId ? project.id === projectId : true)
@@ -90,6 +90,7 @@ export function createGraphqlQueryService(options = {}) {
       }
 
       const projectMap = mapBy(scopedProjects, 'id');
+      const requestedLimit = normalizeRunLimit(limit);
       let runs = await loadAll(models.Run, {
         where: {
           projectId: Array.from(projectMap.keys()),
@@ -100,7 +101,7 @@ export function createGraphqlQueryService(options = {}) {
           ['startedAt', 'DESC'],
           ['createdAt', 'DESC'],
         ],
-        limit: normalizeLimit(limit),
+        ...(requestedLimit ? { limit: requestedLimit } : {}),
         attributes: RUN_LIST_ATTRIBUTES,
       });
       runs = runs.filter((run) => (
@@ -133,10 +134,10 @@ export function createGraphqlQueryService(options = {}) {
           coverageSnapshot: coverageSnapshotMap.get(run.id) || null,
         }))
         .sort(compareRunsNewestFirst)
-        .slice(0, normalizeLimit(limit));
+        .slice(0, requestedLimit || runs.length);
     },
 
-    async listRunFeed({ actor, limit = DEFAULT_LIMIT }) {
+    async listRunFeed({ actor, limit = null }) {
       const runs = await this.listRuns({ actor, limit });
 
       return runs.map((run) => ({
@@ -910,6 +911,14 @@ function normalizeLimit(value) {
     return DEFAULT_LIMIT;
   }
   return Math.min(parsed, MAX_LIMIT);
+}
+
+function normalizeRunLimit(value) {
+  const parsed = toInteger(value);
+  if (!parsed || parsed < 1) {
+    return null;
+  }
+  return parsed;
 }
 
 function resolveCoverageTrendScope({ packageName, moduleName, filePath }) {
