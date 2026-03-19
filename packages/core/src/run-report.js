@@ -237,6 +237,7 @@ function createDryRunSuiteResult(suite) {
     warnings: ['Dry run: suite was not executed.'],
     output: { stdout: '', stderr: '' },
     rawArtifacts: [],
+    performanceStats: [],
     packageName: suite.packageName,
   };
 }

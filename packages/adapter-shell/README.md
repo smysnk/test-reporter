@@ -15,6 +15,7 @@ npm install --save-dev @test-station/adapter-shell
 - runs arbitrary command-backed suites
 - synthesizes normalized results from exit status and shell output
 - supports the `single-check-json-v1` result format for structured single-check suites
+- supports the `suite-json-v1` result format for full structured suite payloads, including custom benchmark metrics
 - writes raw shell logs under `raw/`
 
 ## Structured Single-Check JSON
@@ -42,6 +43,31 @@ Use `resultFormat: 'single-check-json-v1'` when the command prints a single JSON
 ```
 
 The adapter stores the JSON payload as a raw artifact, maps configured warning fields into human-readable warnings, and surfaces the selected fields under `test.rawDetails`.
+
+## Structured Suite JSON
+
+Use `resultFormat: 'suite-json-v1'` when the command prints a full suite result object to stdout and you want the shell adapter to preserve richer fields like `tests`, `rawArtifacts`, and `performanceStats`.
+
+```js
+{
+  adapter: 'shell',
+  command: [process.execPath, './scripts/run-benchmarks.mjs'],
+  resultFormat: 'suite-json-v1',
+}
+```
+
+The stdout JSON payload can include:
+
+- `status`
+- `durationMs`
+- `summary`
+- `coverage`
+- `tests`
+- `warnings`
+- `rawArtifacts`
+- `performanceStats`
+
+This is the recommended format for benchmark suites that need to publish namespaced metric rows into `report.json` without writing a custom adapter.
 
 ## Direct Use
 

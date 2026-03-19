@@ -14,6 +14,7 @@ export function createAdapter() {
           stdout: fixture.stdout || `executed ${suite.id}`,
           stderr: fixture.stderr || '',
         },
+        performanceStats: fixture.performanceStats || [],
         rawArtifacts: [
           {
             relativePath: `${suite.id}.txt`,

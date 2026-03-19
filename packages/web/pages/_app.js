@@ -576,9 +576,31 @@ const GlobalStyle = createGlobalStyle`
     font-size: 0.92rem;
     white-space: nowrap;
   }
+  .web-segmented-control__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 14px;
+    border-radius: 999px;
+    color: ${(props) => props.theme.colors.muted};
+    font-size: 0.92rem;
+    white-space: nowrap;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    cursor: pointer;
+  }
   .web-segmented-control__link--active {
     background: ${(props) => props.theme.colors.accent};
     color: #07111f;
+  }
+  .web-segmented-control__button--active {
+    background: ${(props) => props.theme.colors.accent};
+    color: #07111f;
+  }
+  .web-segmented-control__button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
   }
   .web-runner-frame {
     width: 100%;
@@ -773,6 +795,78 @@ const GlobalStyle = createGlobalStyle`
     fill: #07111f;
     stroke: ${(props) => props.theme.colors.accent};
     stroke-width: 2;
+  }
+  .web-benchmark-toolbar {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    margin-top: 8px;
+  }
+  .web-benchmark-series-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .web-benchmark-series-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    background: ${(props) => props.theme.colors.panelSoft};
+    color: ${(props) => props.theme.colors.muted};
+    font: inherit;
+    cursor: pointer;
+  }
+  .web-benchmark-series-toggle--active {
+    color: ${(props) => props.theme.colors.text};
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.accent} 35%, ${(props) => props.theme.colors.border});
+    background: color-mix(in srgb, ${(props) => props.theme.colors.accent} 10%, ${(props) => props.theme.colors.panelSoft});
+  }
+  .web-benchmark-series-toggle__swatch,
+  .web-benchmark-legend__swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    flex: 0 0 auto;
+  }
+  .web-benchmark-chart__axis {
+    fill: none;
+    stroke: rgba(124, 160, 224, 0.24);
+    stroke-width: 1;
+  }
+  .web-benchmark-chart__line {
+    fill: none;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .web-benchmark-chart__dot {
+    stroke: #07111f;
+    stroke-width: 2;
+  }
+  .web-benchmark-legend {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+  .web-benchmark-legend__item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    background: ${(props) => props.theme.colors.panelSoft};
+  }
+  .web-benchmark-group {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    background: ${(props) => props.theme.colors.panelSoft};
   }
   .web-chip--release {
     background: rgba(107, 178, 255, 0.12);

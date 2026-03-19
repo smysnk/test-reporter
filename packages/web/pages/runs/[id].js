@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { RunBenchmarkSummary } from '../../components/BenchmarkBits.js';
 import { EmptyState, InlineList, MetricGrid, RunSourceLink, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, formatSignedDelta } from '../../lib/format.js';
 import { getWebSession } from '../../lib/auth.js';
@@ -98,6 +99,7 @@ function OperationsRunDetail({ data }) {
   const runModules = Array.isArray(data?.runModules) ? data.runModules : [];
   const runFiles = Array.isArray(data?.runFiles) ? data.runFiles : [];
   const failedTests = Array.isArray(data?.failedTests) ? data.failedTests : [];
+  const runPerformanceStats = Array.isArray(data?.runPerformanceStats) ? data.runPerformanceStats : [];
   const coverageComparison = data?.coverageComparison || null;
 
   React.useEffect(() => {
@@ -106,9 +108,10 @@ function OperationsRunDetail({ data }) {
       moduleCount: runModules.length,
       fileCount: runFiles.length,
       failedTestCount: failedTests.length,
+      benchmarkStatCount: runPerformanceStats.length,
       hasCoverageComparison: coverageComparison !== null,
     });
-  }, [coverageComparison, failedTests.length, runFiles.length, runModules.length, runPackages.length]);
+  }, [coverageComparison, failedTests.length, runFiles.length, runModules.length, runPackages.length, runPerformanceStats.length]);
 
   return React.createElement(
     React.Fragment,
@@ -156,6 +159,18 @@ function OperationsRunDetail({ data }) {
             title: 'No comparison baseline',
             copy: 'A previous run is required before the web can compute a coverage delta.',
           }),
+      ),
+      React.createElement(
+        SectionCard,
+        {
+          eyebrow: 'Benchmarks',
+          title: 'Recorded benchmark stats',
+          copy: 'Namespaced benchmark rows from the run are grouped here so the operator can inspect the exact values behind the trend charts.',
+          compact: true,
+        },
+        React.createElement(RunBenchmarkSummary, {
+          stats: runPerformanceStats,
+        }),
       ),
       React.createElement(
         SectionCard,
@@ -534,6 +549,7 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
     runId,
     templateMode,
     failedTestCount: Array.isArray(data?.failedTests) ? data.failedTests.length : 0,
+    benchmarkStatCount: Array.isArray(data?.runPerformanceStats) ? data.runPerformanceStats.length : 0,
     artifactCount: Array.isArray(data?.run?.artifacts) ? data.run.artifacts.length : 0,
   });
   const serverTimingHeader = buildServerTimingHeader(pageProfile);

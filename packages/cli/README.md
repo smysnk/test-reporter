@@ -258,6 +258,7 @@ If a suite runs and the underlying framework reports zero tests, the suite is no
 - `node-test` coverage works for direct `node --test ...` commands and package scripts that resolve directly to a single `node --test ...` invocation
 - `playwright` can collect browser Istanbul coverage when `suite.coverage.strategy` is `browser-istanbul`
 - `shell` supports `resultFormat: 'single-check-json-v1'` for structured single-check outputs with mapped warnings and raw details
+- `shell` supports `resultFormat: 'suite-json-v1'` for full structured suite payloads, including custom `performanceStats` for benchmark reporting
 
 ### Playwright In CI
 

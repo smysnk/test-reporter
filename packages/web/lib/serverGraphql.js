@@ -12,6 +12,7 @@ import {
   ADMIN_PROJECTS_QUERY,
   ADMIN_ROLES_QUERY,
   ADMIN_USERS_QUERY,
+  PERFORMANCE_TREND_QUERY,
   WEB_HOME_QUERY,
   PROJECT_ACTIVITY_QUERY,
   PROJECT_BY_SLUG_QUERY,
@@ -220,7 +221,9 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
   const activity = activityResult.data;
   const overallTrend = Array.isArray(activity.coverageTrend) ? activity.coverageTrend : [];
   const releaseNotes = Array.isArray(activity.releaseNotes) ? activity.releaseNotes : [];
+  const benchmarkCatalog = Array.isArray(activity.benchmarkCatalog) ? activity.benchmarkCatalog : [];
   let trendPanels;
+  let benchmarkPanels;
 
   try {
     trendPanels = await measureProfileStep(profiler, 'project-trend-panels', () => loadProjectTrendPanels({
@@ -246,11 +249,28 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
     };
   }
 
+  try {
+    benchmarkPanels = await measureProfileStep(profiler, 'project-benchmark-panels', () => loadProjectBenchmarkPanels({
+      session,
+      projectKey: base.project.key,
+      benchmarkCatalog,
+      fetchImpl,
+      requestId,
+      requestTrace,
+    }), {
+      namespaceCount: benchmarkCatalog.length,
+    });
+  } catch {
+    benchmarkPanels = [];
+  }
+
   return {
     project: base.project,
     runs: Array.isArray(activity.runs) ? activity.runs : [],
     coverageTrend: overallTrend,
     releaseNotes,
+    benchmarkCatalog,
+    benchmarkPanels,
     trendPanels,
   };
 }
@@ -290,6 +310,7 @@ export async function loadRunExplorerPage({
     runModules: useOperationsQuery && Array.isArray(data.runModules) ? data.runModules : [],
     runFiles: useOperationsQuery && Array.isArray(data.runFiles) ? data.runFiles : [],
     failedTests: useOperationsQuery && Array.isArray(data.tests) ? data.tests : [],
+    runPerformanceStats: useOperationsQuery && Array.isArray(data.runPerformanceStats) ? data.runPerformanceStats : [],
     coverageComparison: useOperationsQuery ? (data.runCoverageComparison || null) : null,
   };
 }
@@ -591,6 +612,75 @@ async function loadProjectTrendPanels({
   };
 }
 
+async function loadProjectBenchmarkPanels({
+  session,
+  projectKey,
+  benchmarkCatalog,
+  fetchImpl,
+  requestId,
+  requestTrace,
+}) {
+  const catalogEntries = normalizeBenchmarkCatalogEntries(benchmarkCatalog);
+  if (catalogEntries.length === 0) {
+    return [];
+  }
+
+  const metricResponses = await Promise.all(catalogEntries.flatMap((entry) => (
+    entry.statNames.map(async (statName) => {
+      const result = await executeWebGraphqlRequest({
+        session,
+        query: PERFORMANCE_TREND_QUERY,
+        variables: {
+          projectKey,
+          statGroup: entry.statGroup,
+          statName,
+          limit: 18,
+        },
+        fetchImpl,
+        requestId,
+        requestTrace,
+      });
+
+      return {
+        statGroup: entry.statGroup,
+        statName,
+        points: Array.isArray(result.data.performanceTrend) ? result.data.performanceTrend : [],
+      };
+    })
+  )));
+
+  const panelMap = new Map(catalogEntries.map((entry) => [entry.statGroup, {
+    ...entry,
+    metrics: [],
+  }]));
+
+  for (const response of metricResponses) {
+    const panel = panelMap.get(response.statGroup);
+    if (!panel) {
+      continue;
+    }
+
+    panel.metrics.push({
+      statName: response.statName,
+      points: response.points,
+      unit: response.points[0]?.unit || panel.units[0] || null,
+      seriesIds: uniqueStrings(response.points.map((point) => point.seriesId)),
+      runnerKeys: uniqueStrings(response.points.map((point) => point.runnerKey)),
+      branches: uniqueStrings(response.points.map((point) => point.branch)),
+    });
+  }
+
+  return Array.from(panelMap.values())
+    .map((panel) => ({
+      ...panel,
+      metrics: panel.metrics
+        .filter((metric) => metric.points.length > 0)
+        .sort((left, right) => left.statName.localeCompare(right.statName)),
+    }))
+    .filter((panel) => panel.metrics.length > 0)
+    .sort(compareBenchmarkPanelsNewestFirst);
+}
+
 async function loadScopedTrendPanels({ session, projectKey, selections, fetchImpl, requestId, requestTrace }) {
   const resolvedSelections = Array.isArray(selections) ? selections.filter(Boolean) : [];
   const responses = await Promise.all(resolvedSelections.map(async (selection) => {
@@ -653,6 +743,21 @@ function rankTrendSelections(files, selectLabel) {
   });
 }
 
+function normalizeBenchmarkCatalogEntries(entries) {
+  return (Array.isArray(entries) ? entries : [])
+    .filter((entry) => entry && typeof entry.statGroup === 'string' && entry.statGroup.trim() !== '')
+    .map((entry) => ({
+      projectKey: entry.projectKey || null,
+      statGroup: entry.statGroup,
+      statNames: uniqueStrings(entry.statNames),
+      units: uniqueStrings(entry.units),
+      seriesIds: uniqueStrings(entry.seriesIds),
+      runnerKeys: uniqueStrings(entry.runnerKeys),
+      latestCompletedAt: entry.latestCompletedAt || null,
+      pointCount: Number.isFinite(entry.pointCount) ? entry.pointCount : 0,
+    }));
+}
+
 async function loadAdminViewer({ session, fetchImpl, requestId, requestTrace }) {
   const data = await executeWebGraphql({
     session,
@@ -697,4 +802,22 @@ function buildTrendOverlays(points, releaseNotes) {
     .filter((overlay) => overlay.recordedAt)
     .sort((left, right) => new Date(right.recordedAt).valueOf() - new Date(left.recordedAt).valueOf())
     .slice(0, 8);
+}
+
+function uniqueStrings(values) {
+  return Array.from(new Set((Array.isArray(values) ? values : [])
+    .filter((value) => typeof value === 'string' && value.trim() !== '')
+    .map((value) => value.trim())))
+    .sort((left, right) => left.localeCompare(right));
+}
+
+function compareBenchmarkPanelsNewestFirst(left, right) {
+  return compareNullableIsoDates(right.latestCompletedAt, left.latestCompletedAt)
+    || left.statGroup.localeCompare(right.statGroup);
+}
+
+function compareNullableIsoDates(left, right) {
+  const leftValue = left ? new Date(left).valueOf() : 0;
+  const rightValue = right ? new Date(right).valueOf() : 0;
+  return leftValue - rightValue;
 }

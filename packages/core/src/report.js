@@ -70,6 +70,7 @@ export function normalizeSuiteResult(rawResult, suite, packageName) {
   const summary = rawResult?.summary || summarizeTests(tests);
   const coverage = normalizeCoverageSummary(rawResult?.coverage, packageName);
   const rawArtifacts = normalizeRawArtifacts(rawResult?.rawArtifacts, suite);
+  const performanceStats = normalizePerformanceStats(rawResult?.performanceStats);
   return {
     id: suite.id,
     label: suite.label,
@@ -90,6 +91,7 @@ export function normalizeSuiteResult(rawResult, suite, packageName) {
       stderr: typeof rawResult?.output?.stderr === 'string' ? rawResult.output.stderr : '',
     },
     rawArtifacts,
+    performanceStats,
     packageName,
   };
 }
@@ -157,6 +159,7 @@ export function buildReportFromSuiteResults(context, suiteResults, durationMs) {
   const modules = thresholdEvaluation.modules;
   const overallCoverage = mergeCoverageSummaries(packages.map((pkg) => pkg.coverage).filter(Boolean));
   const diagnosticsSummary = summarizeDiagnostics(packages);
+  const performanceStats = flattenReportPerformanceStats(suiteResults);
 
   return {
     schemaVersion: '1',
@@ -193,6 +196,7 @@ export function buildReportFromSuiteResults(context, suiteResults, durationMs) {
     },
     packages,
     modules,
+    performanceStats,
     policy: {
       thresholds: thresholdEvaluation.summary,
       diagnostics: diagnosticsSummary,
@@ -254,6 +258,7 @@ function buildModulesFromPackages(packages, coverageFiles, policy) {
             coverage: null,
             diagnostics: suite.diagnostics || null,
             rawArtifacts: suite.rawArtifacts,
+            performanceStats: suite.performanceStats || [],
             tests: [],
             summary: createSummary(),
             durationMs: suite.durationMs,
@@ -430,6 +435,63 @@ function normalizeRawArtifacts(rawArtifacts, suite) {
     .filter(Boolean);
 }
 
+function normalizePerformanceStats(performanceStats) {
+  return (Array.isArray(performanceStats) ? performanceStats : [])
+    .map((entry) => normalizePerformanceStat(entry))
+    .filter(Boolean);
+}
+
+function normalizePerformanceStat(entry) {
+  if (!entry || typeof entry !== 'object') {
+    return null;
+  }
+
+  const statGroup = normalizeNonEmptyString(entry.statGroup);
+  const statName = normalizeNonEmptyString(entry.statName);
+  if (!statGroup || !statName) {
+    return null;
+  }
+
+  const numericValue = Number.isFinite(entry.numericValue) ? entry.numericValue : null;
+  const textValue = typeof entry.textValue === 'string' ? entry.textValue : null;
+  const unit = normalizeNonEmptyString(entry.unit);
+  const metadata = entry.metadata && typeof entry.metadata === 'object' && !Array.isArray(entry.metadata)
+    ? entry.metadata
+    : {};
+
+  return {
+    scope: normalizeNonEmptyString(entry.scope) || 'suite',
+    testIdentifier: normalizeNonEmptyString(entry.testIdentifier),
+    statGroup,
+    statName,
+    unit,
+    numericValue,
+    textValue,
+    metadata,
+  };
+}
+
+function flattenReportPerformanceStats(suiteResults) {
+  return (Array.isArray(suiteResults) ? suiteResults : []).flatMap((suite) =>
+    (Array.isArray(suite?.performanceStats) ? suite.performanceStats : []).map((entry) => ({
+      scope: entry.scope || 'suite',
+      suiteIdentifier: suite.id,
+      testIdentifier: entry.testIdentifier || null,
+      statGroup: entry.statGroup,
+      statName: entry.statName,
+      unit: entry.unit ?? null,
+      numericValue: Number.isFinite(entry.numericValue) ? entry.numericValue : null,
+      textValue: typeof entry.textValue === 'string' ? entry.textValue : null,
+      metadata: {
+        packageName: suite.packageName || null,
+        suiteLabel: suite.label,
+        runtime: suite.runtime,
+        ...(entry.metadata || {}),
+      },
+    }))
+  );
+}
+
 function normalizeRawArtifact(artifact, suite) {
   if (!artifact || typeof artifact !== 'object') {
     return null;
@@ -598,4 +660,8 @@ function summarizeClassification(tests) {
 
 function dedupe(values) {
   return Array.from(new Set((values || []).filter(Boolean)));
+}
+
+function normalizeNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }

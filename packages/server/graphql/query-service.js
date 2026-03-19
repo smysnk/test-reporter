@@ -4,6 +4,7 @@ import {
   CoverageSnapshot,
   CoverageTrendPoint,
   Group,
+  PerformanceStat,
   Project,
   ProjectFile,
   ProjectGroupAccess,
@@ -47,6 +48,7 @@ export function createGraphqlQueryService(options = {}) {
     CoverageSnapshot,
     CoverageTrendPoint,
     Group,
+    PerformanceStat,
     Project,
     ProjectFile,
     ProjectGroupAccess,
@@ -457,6 +459,172 @@ export function createGraphqlQueryService(options = {}) {
         .slice(0, normalizeLimit(limit));
     },
 
+    async listRunPerformanceStats({ runId, actor, statGroupPrefix = null, statNames = null, seriesIds = null }) {
+      const run = await this.findRun({ id: runId, actor });
+      if (!run) {
+        return [];
+      }
+
+      const stats = await loadAll(models.PerformanceStat, {
+        where: { runId },
+        order: [
+          ['createdAt', 'DESC'],
+          ['id', 'DESC'],
+        ],
+      });
+
+      return stats
+        .filter((stat) => stat.runId === runId)
+        .filter((stat) => filterPerformanceStat(stat, { statGroupPrefix, statNames, seriesIds }))
+        .map((stat) => decoratePerformanceStat(stat, {
+          project: run.project || null,
+          run,
+          projectVersion: run.projectVersion || null,
+        }))
+        .sort(comparePerformanceStatsNewestFirst);
+    },
+
+    async listPerformanceTrend({ actor, projectId = null, projectKey = null, statGroup, statName, seriesIds = null, runnerKey = null, limit = DEFAULT_LIMIT }) {
+      const projects = await this.listProjects({ actor });
+      const scopedProjects = projects.filter((project) => (
+        (projectId ? project.id === projectId : true)
+        && (projectKey ? project.key === projectKey : true)
+      ));
+      if (scopedProjects.length === 0) {
+        return [];
+      }
+
+      const projectMap = mapBy(scopedProjects, 'id');
+      const runs = (await loadAll(models.Run, {
+        where: {
+          projectId: Array.from(projectMap.keys()),
+        },
+      })).filter((run) => projectMap.has(run.projectId));
+      if (runs.length === 0) {
+        return [];
+      }
+
+      const runMap = mapBy(runs, 'id');
+      const versionIds = Array.from(new Set(runs.map((run) => run.projectVersionId).filter(Boolean)));
+      const versionMap = mapBy(versionIds.length > 0
+        ? await loadAll(models.ProjectVersion, {
+          where: { id: versionIds },
+        })
+        : [], 'id');
+      const stats = await loadAll(models.PerformanceStat, {
+        where: {
+          runId: Array.from(runMap.keys()),
+          statGroup,
+          statName,
+        },
+        order: [
+          ['createdAt', 'DESC'],
+          ['id', 'DESC'],
+        ],
+      });
+
+      return stats
+        .filter((stat) => runMap.has(stat.runId))
+        .filter((stat) => filterPerformanceStat(stat, { statGroup, statName, seriesIds, runnerKey }))
+        .map((stat) => {
+          const run = runMap.get(stat.runId) || null;
+          return decoratePerformanceStat(stat, {
+            project: projectMap.get(run?.projectId) || null,
+            run,
+            projectVersion: versionMap.get(run?.projectVersionId) || null,
+          });
+        })
+        .sort(comparePerformanceStatsNewestFirst)
+        .slice(0, normalizeLimit(limit));
+    },
+
+    async listBenchmarkCatalog({ actor, projectId = null, projectKey = null }) {
+      const projects = await this.listProjects({ actor });
+      const scopedProjects = projects.filter((project) => (
+        (projectId ? project.id === projectId : true)
+        && (projectKey ? project.key === projectKey : true)
+      ));
+      if (scopedProjects.length === 0) {
+        return [];
+      }
+
+      const projectMap = mapBy(scopedProjects, 'id');
+      const runs = (await loadAll(models.Run, {
+        where: {
+          projectId: Array.from(projectMap.keys()),
+        },
+      })).filter((run) => projectMap.has(run.projectId));
+      if (runs.length === 0) {
+        return [];
+      }
+
+      const runMap = mapBy(runs, 'id');
+      const stats = await loadAll(models.PerformanceStat, {
+        where: {
+          runId: Array.from(runMap.keys()),
+        },
+      });
+      const entries = new Map();
+
+      for (const stat of stats) {
+        const run = runMap.get(stat.runId) || null;
+        if (!run) {
+          continue;
+        }
+
+        const project = projectMap.get(run.projectId) || null;
+        if (!project) {
+          continue;
+        }
+
+        const metadata = normalizeMetadata(stat.metadata);
+        const entryKey = `${project.id}:${stat.statGroup}`;
+        if (!entries.has(entryKey)) {
+          entries.set(entryKey, {
+            projectId: project.id,
+            projectKey: project.key,
+            statGroup: stat.statGroup,
+            statNames: new Set(),
+            units: new Set(),
+            seriesIds: new Set(),
+            runnerKeys: new Set(),
+            latestCompletedAt: run.completedAt || null,
+            pointCount: 0,
+          });
+        }
+
+        const entry = entries.get(entryKey);
+        entry.statNames.add(stat.statName);
+        if (stat.unit) {
+          entry.units.add(stat.unit);
+        }
+        if (metadata.seriesId) {
+          entry.seriesIds.add(metadata.seriesId);
+        }
+        if (metadata.runnerKey) {
+          entry.runnerKeys.add(metadata.runnerKey);
+        }
+        entry.pointCount += 1;
+        if (compareIsoDates(run.completedAt, entry.latestCompletedAt) > 0) {
+          entry.latestCompletedAt = run.completedAt || null;
+        }
+      }
+
+      return Array.from(entries.values())
+        .map((entry) => ({
+          projectId: entry.projectId,
+          projectKey: entry.projectKey,
+          statGroup: entry.statGroup,
+          statNames: Array.from(entry.statNames).sort(),
+          units: Array.from(entry.units).sort(),
+          seriesIds: Array.from(entry.seriesIds).sort(),
+          runnerKeys: Array.from(entry.runnerKeys).sort(),
+          latestCompletedAt: entry.latestCompletedAt,
+          pointCount: entry.pointCount,
+        }))
+        .sort(compareBenchmarkCatalogEntries);
+    },
+
     async getRunCoverageComparison({ actor, runId }) {
       const currentRun = await this.findRun({ id: runId, actor });
       if (!currentRun) {
@@ -523,11 +691,53 @@ function decorateCoverageTrendPoint(point, related) {
   };
 }
 
+function decoratePerformanceStat(stat, related) {
+  const metadata = normalizeMetadata(stat.metadata);
+
+  return {
+    ...stat,
+    metadata,
+    projectId: related.project?.id || related.run?.projectId || null,
+    projectKey: related.project?.key || null,
+    externalKey: related.run?.externalKey || null,
+    versionKey: related.projectVersion?.versionKey || null,
+    completedAt: related.run?.completedAt || null,
+    branch: related.run?.branch || null,
+    commitSha: related.run?.commitSha || null,
+    buildNumber: toInteger(related.projectVersion?.buildNumber),
+    seriesId: metadata.seriesId || null,
+    runnerKey: metadata.runnerKey || null,
+  };
+}
+
 function filterDecoratedTest(test, filters) {
   return (!filters.status || test.status === filters.status)
     && (!filters.packageName || test.packageName === filters.packageName)
     && (!filters.moduleName || test.moduleName === filters.moduleName)
     && (!filters.filePath || test.filePath === filters.filePath);
+}
+
+function filterPerformanceStat(stat, filters) {
+  const metadata = normalizeMetadata(stat.metadata);
+  const statNames = Array.isArray(filters.statNames) && filters.statNames.length > 0
+    ? new Set(filters.statNames)
+    : null;
+  const seriesIds = Array.isArray(filters.seriesIds) && filters.seriesIds.length > 0
+    ? new Set(filters.seriesIds)
+    : null;
+
+  return (!filters.statGroup || stat.statGroup === filters.statGroup)
+    && (!filters.statName || stat.statName === filters.statName)
+    && (!filters.statGroupPrefix || String(stat.statGroup || '').startsWith(filters.statGroupPrefix))
+    && (!statNames || statNames.has(stat.statName))
+    && (!seriesIds || seriesIds.has(metadata.seriesId))
+    && (!filters.runnerKey || metadata.runnerKey === filters.runnerKey);
+}
+
+function normalizeMetadata(value) {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value
+    : {};
 }
 
 function deriveReportedCollectionStatus({ summary, reportedStatus = null, suites = [] } = {}) {
@@ -773,6 +983,19 @@ function compareRunsNewestFirst(left, right) {
 function compareCoveragePointsNewestFirst(left, right) {
   return compareIsoDates(right.completedAt || right.recordedAt || right.startedAt, left.completedAt || left.recordedAt || left.startedAt)
     || String(left.externalKey || left.runId).localeCompare(String(right.externalKey || right.runId));
+}
+
+function comparePerformanceStatsNewestFirst(left, right) {
+  return compareIsoDates(right.completedAt, left.completedAt)
+    || String(left.statGroup || '').localeCompare(String(right.statGroup || ''))
+    || String(left.statName || '').localeCompare(String(right.statName || ''))
+    || String(left.seriesId || '').localeCompare(String(right.seriesId || ''))
+    || String(left.id || '').localeCompare(String(right.id || ''));
+}
+
+function compareBenchmarkCatalogEntries(left, right) {
+  return String(left.projectKey || '').localeCompare(String(right.projectKey || ''))
+    || String(left.statGroup || '').localeCompare(String(right.statGroup || ''));
 }
 
 function compareCoverageChanges(left, right) {

@@ -257,6 +257,47 @@ test('shell adapter supports single-check-json-v1 result parsing', async () => {
   assert.match(result.rawArtifacts[0].relativePath, /shell\.json$/);
 });
 
+test('shell adapter supports suite-json-v1 structured suite parsing', async () => {
+  const project = createProject();
+  const cwd = path.join(fixtureRoot, 'shell-suite-json');
+  const adapter = createShellAdapter();
+  const result = await adapter.run({
+    project,
+    suite: {
+      id: 'shell-suite-json-fixture',
+      label: 'Engine Benchmark Payload',
+      packageName: 'fixtures',
+      cwd,
+      command: [process.execPath, './suite.mjs'],
+      resultFormat: 'suite-json-v1',
+    },
+    execution: { coverage: false },
+  });
+
+  assert.equal(result.status, 'passed');
+  assert.equal(result.durationMs, 321);
+  assert.deepEqual(result.summary, { total: 2, passed: 2, failed: 0, skipped: 0 });
+  assert.equal(result.tests.length, 2);
+  assert.deepEqual(result.warnings, ['benchmark sample count is below the long-run target']);
+  assert.equal(result.performanceStats.length, 2);
+  assert.deepEqual(result.performanceStats[0], {
+    statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+    statName: 'elapsed_ms',
+    unit: 'ms',
+    numericValue: 12.34,
+    metadata: {
+      seriesId: 'interpreter',
+      engineId: 'interpreter',
+      statistic: 'median',
+    },
+  });
+  assert.equal(
+    result.rawArtifacts.some((artifact) => artifact.relativePath === 'benchmarks/engine-battery.json'),
+    true,
+  );
+  assert.match(result.rawArtifacts[result.rawArtifacts.length - 1].relativePath, /shell\.json$/);
+});
+
 test('jest adapter executes and parses json report plus coverage', async () => {
   const project = createProject();
   const cwd = path.join(fixtureRoot, 'jest');

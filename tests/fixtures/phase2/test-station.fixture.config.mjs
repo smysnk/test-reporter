@@ -63,7 +63,20 @@ export default {
               statements: { covered: 8, total: 10, pct: 80 }
             }
           ]
-        }
+        },
+        performanceStats: [
+          {
+            statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+            statName: 'elapsed_ms',
+            unit: 'ms',
+            numericValue: 12.34,
+            metadata: {
+              seriesId: 'interpreter',
+              engineId: 'interpreter',
+              statistic: 'median'
+            }
+          }
+        ]
       }
     },
     {

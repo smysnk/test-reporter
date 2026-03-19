@@ -27,6 +27,7 @@ export function writeReportArtifacts(context, report, suiteResults) {
       warnings: suite.warnings,
       diagnostics: suite.diagnostics || null,
       rawArtifacts: suite.rawArtifacts,
+      performanceStats: suite.performanceStats || [],
       output: suite.output,
       tests: suite.tests,
     };

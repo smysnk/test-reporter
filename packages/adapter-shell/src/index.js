@@ -14,6 +14,9 @@ export function createShellAdapter() {
         cwd: suite.cwd || project.rootDir,
         env: resolveSuiteEnv(suite.env),
       });
+      if (suite.resultFormat === 'suite-json-v1') {
+        return buildSuiteJsonResult(suite, execution);
+      }
       if (suite.resultFormat === 'single-check-json-v1') {
         return buildSingleCheckJsonResult(project, suite, execution);
       }
@@ -69,6 +72,37 @@ export function createShellAdapter() {
   };
 }
 
+function buildSuiteJsonResult(suite, execution) {
+  const payload = parseJsonObject(execution.stdout);
+  const syntheticStatus = execution.exitCode === 0 ? 'passed' : 'failed';
+  const status = normalizeResultStatus(payload?.status) || syntheticStatus;
+  const tests = Array.isArray(payload?.tests) ? payload.tests : [];
+  const summary = normalizeSummary(payload?.summary) || synthesizeSummaryFromTests(tests, status);
+  const warnings = normalizeStringArray(payload?.warnings);
+  const rawArtifacts = [
+    ...normalizeSuiteJsonRawArtifacts(payload?.rawArtifacts),
+    {
+      relativePath: `${slugify(suite.packageName || 'default')}-${slugify(suite.id)}-shell.json`,
+      content: execution.stdout || '{}\n',
+    },
+  ];
+
+  return {
+    status,
+    durationMs: Number.isFinite(payload?.durationMs) ? payload.durationMs : execution.durationMs,
+    summary,
+    coverage: payload?.coverage || null,
+    tests,
+    warnings,
+    output: {
+      stdout: execution.stdout,
+      stderr: execution.stderr,
+    },
+    rawArtifacts,
+    performanceStats: Array.isArray(payload?.performanceStats) ? payload.performanceStats : [],
+  };
+}
+
 function buildSingleCheckJsonResult(project, suite, execution) {
   const payload = parseJsonSafe(execution.stdout);
   const options = suite.resultFormatOptions || {};
@@ -121,6 +155,11 @@ function buildSingleCheckJsonResult(project, suite, execution) {
       },
     ],
   };
+}
+
+function normalizeSuiteJsonRawArtifacts(rawArtifacts) {
+  return (Array.isArray(rawArtifacts) ? rawArtifacts : [])
+    .filter((artifact) => artifact && typeof artifact === 'object' && typeof artifact.relativePath === 'string');
 }
 
 function parseCommandSpec(command) {
@@ -304,6 +343,15 @@ function selectRawDetails(payload, options) {
   return selected;
 }
 
+function parseJsonObject(value) {
+  try {
+    const parsed = JSON.parse(String(value || '{}'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 function parseJsonSafe(value) {
   try {
     return JSON.parse(String(value || '{}'));
@@ -320,6 +368,53 @@ function normalizeStringArray(values) {
 
 function normalizeNumber(value) {
   return Number.isFinite(value) ? value : null;
+}
+
+function normalizeResultStatus(status) {
+  if (status === 'failed' || status === 'skipped' || status === 'passed') {
+    return status;
+  }
+  return null;
+}
+
+function normalizeSummary(summary) {
+  if (!summary || typeof summary !== 'object') {
+    return null;
+  }
+
+  const total = Number.isFinite(summary.total) ? summary.total : null;
+  const passed = Number.isFinite(summary.passed) ? summary.passed : null;
+  const failed = Number.isFinite(summary.failed) ? summary.failed : null;
+  const skipped = Number.isFinite(summary.skipped) ? summary.skipped : null;
+
+  if (total === null || passed === null || failed === null || skipped === null) {
+    return null;
+  }
+
+  return { total, passed, failed, skipped };
+}
+
+function synthesizeSummaryFromTests(tests, status) {
+  if (tests.length > 0) {
+    return tests.reduce((summary, test) => {
+      summary.total += 1;
+      if (test?.status === 'failed') {
+        summary.failed += 1;
+      } else if (test?.status === 'skipped') {
+        summary.skipped += 1;
+      } else {
+        summary.passed += 1;
+      }
+      return summary;
+    }, { total: 0, passed: 0, failed: 0, skipped: 0 });
+  }
+
+  return {
+    total: status === 'skipped' ? 0 : 1,
+    passed: status === 'passed' ? 1 : 0,
+    failed: status === 'failed' ? 1 : 0,
+    skipped: status === 'skipped' ? 0 : 0,
+  };
 }
 
 function trimForReport(value, limit) {

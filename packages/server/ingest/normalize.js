@@ -331,6 +331,11 @@ export function normalizeIngestPayload(payload, options = {}) {
     });
   }
 
+  const customPerformanceStats = normalizeReportPerformanceStats(report.performanceStats, {
+    suites,
+    tests,
+  });
+
   const runStatus = deriveRunStatus(report);
   const runDurationMs = normalizeInteger(report.durationMs);
   if (runDurationMs !== null) {
@@ -348,6 +353,8 @@ export function normalizeIngestPayload(payload, options = {}) {
       },
     });
   }
+
+  performanceStats.push(...customPerformanceStats);
 
   const normalizedPackages = Array.from(packageCatalog.values());
   const normalizedModules = Array.from(moduleCatalog.values());
@@ -710,6 +717,107 @@ function requireNonEmptyString(value, field) {
 
 function normalizeJsonObject(value) {
   return isPlainObject(value) ? value : {};
+}
+
+function normalizeReportPerformanceStats(entries, context) {
+  return (Array.isArray(entries) ? entries : []).map((entry, index) =>
+    normalizeReportPerformanceStat(entry, index, context)
+  );
+}
+
+function normalizeReportPerformanceStat(entry, index, context) {
+  const baseField = `report.performanceStats[${index}]`;
+  if (!isPlainObject(entry)) {
+    throw new ValidationError(`\`${baseField}\` must be an object.`, {
+      field: baseField,
+    });
+  }
+
+  const scope = normalizePerformanceStatScope(entry.scope, entry, baseField);
+  const suiteIdentifier = normalizeOptionalString(entry.suiteIdentifier);
+  const testIdentifier = normalizeOptionalString(entry.testIdentifier);
+
+  if (scope === 'suite') {
+    if (!suiteIdentifier) {
+      throw new ValidationError(`\`${baseField}.suiteIdentifier\` is required when scope is \`suite\`.`, {
+        field: `${baseField}.suiteIdentifier`,
+      });
+    }
+    if (!context.suites.some((suite) => suite.suiteIdentifier === suiteIdentifier)) {
+      throw new ValidationError(`\`${baseField}.suiteIdentifier\` must match an ingested suite identifier.`, {
+        field: `${baseField}.suiteIdentifier`,
+      });
+    }
+  }
+
+  if (scope === 'test') {
+    if (!suiteIdentifier) {
+      throw new ValidationError(`\`${baseField}.suiteIdentifier\` is required when scope is \`test\`.`, {
+        field: `${baseField}.suiteIdentifier`,
+      });
+    }
+    if (!testIdentifier) {
+      throw new ValidationError(`\`${baseField}.testIdentifier\` is required when scope is \`test\`.`, {
+        field: `${baseField}.testIdentifier`,
+      });
+    }
+
+    const matchingTest = context.tests.find((test) => test.testIdentifier === testIdentifier);
+    if (!matchingTest) {
+      throw new ValidationError(`\`${baseField}.testIdentifier\` must match an ingested test identifier.`, {
+        field: `${baseField}.testIdentifier`,
+      });
+    }
+    if (matchingTest.suiteIdentifier !== suiteIdentifier) {
+      throw new ValidationError(`\`${baseField}\` references a test that does not belong to the supplied suiteIdentifier.`, {
+        field: baseField,
+      });
+    }
+  }
+
+  const statGroup = requireNonEmptyString(entry.statGroup, `${baseField}.statGroup`);
+  const statName = requireNonEmptyString(entry.statName, `${baseField}.statName`);
+  const unit = normalizeOptionalString(entry.unit);
+  const numericValue = normalizeNumber(entry.numericValue);
+  const textValue = normalizeOptionalString(entry.textValue);
+  if (numericValue === null && textValue === null) {
+    throw new ValidationError(`\`${baseField}\` must include \`numericValue\` or \`textValue\`.`, {
+      field: baseField,
+    });
+  }
+
+  if (entry.metadata != null && !isPlainObject(entry.metadata)) {
+    throw new ValidationError(`\`${baseField}.metadata\` must be an object when provided.`, {
+      field: `${baseField}.metadata`,
+    });
+  }
+
+  return {
+    scope,
+    suiteIdentifier: scope === 'run' ? null : suiteIdentifier,
+    testIdentifier: scope === 'test' ? testIdentifier : null,
+    statGroup,
+    statName,
+    unit,
+    numericValue,
+    textValue,
+    metadata: normalizeJsonObject(entry.metadata),
+  };
+}
+
+function normalizePerformanceStatScope(scope, entry, baseField) {
+  const normalizedScope = normalizeOptionalString(scope)
+    || (normalizeOptionalString(entry.testIdentifier) ? 'test' : null)
+    || (normalizeOptionalString(entry.suiteIdentifier) ? 'suite' : null)
+    || 'run';
+
+  if (normalizedScope === 'run' || normalizedScope === 'suite' || normalizedScope === 'test') {
+    return normalizedScope;
+  }
+
+  throw new ValidationError(`\`${baseField}.scope\` must be one of \`run\`, \`suite\`, or \`test\`.`, {
+    field: `${baseField}.scope`,
+  });
 }
 
 function mergeJson(left, right) {

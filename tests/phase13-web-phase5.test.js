@@ -12,7 +12,17 @@ import {
 } from '../packages/web/lib/auth.js';
 import { buildSignedOutRedirectUrl } from '../packages/web/lib/authRoutes.js';
 import { ensureNextAuthUrl } from '../packages/web/lib/nextAuthEnv.js';
-import { formatBuildNumber, formatCommitSha, formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../packages/web/lib/format.js';
+import {
+  formatBenchmarkMetricLabel,
+  formatBenchmarkNamespace,
+  formatBenchmarkValue,
+  formatBuildNumber,
+  formatCommitSha,
+  formatCoveragePct,
+  formatDuration,
+  formatRepositoryName,
+  formatRunBuildLabel,
+} from '../packages/web/lib/format.js';
 import {
   beginClientRouteProfile,
   buildServerTimingHeader,
@@ -23,7 +33,7 @@ import {
   setClientServerPageProfile,
 } from '../packages/web/lib/pageProfiling.js';
 import { buildAdminPageResult, buildOverviewPageResult, buildProjectPageResult, buildRunPageResult } from '../packages/web/lib/pageProps.js';
-import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, RUN_DETAIL_QUERY, RUN_HEADER_QUERY } from '../packages/web/lib/queries.js';
+import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, PERFORMANCE_TREND_QUERY, RUN_DETAIL_QUERY, RUN_HEADER_QUERY } from '../packages/web/lib/queries.js';
 import { resolvePublicRuntimeConfig } from '../packages/web/lib/runtimeConfig.js';
 import {
   ADMIN_PAGE_UNAUTHORIZED,
@@ -44,6 +54,7 @@ import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nexta
 import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
+import { BenchmarkExplorer, RunBenchmarkSummary } from '../packages/web/components/BenchmarkBits.js';
 import { RunBuildChip, RunSourceLink } from '../packages/web/components/WebBits.js';
 import { buildHomeExplorerModel } from '../packages/web/lib/homeExplorer.js';
 
@@ -515,6 +526,16 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
             publishedAt: '2026-03-09T16:00:00.000Z',
             projectVersion: { versionKey: 'commit:abc123' },
           }],
+          benchmarkCatalog: [{
+            projectKey: 'workspace',
+            statGroup: 'benchmark.node.engine.nibbles.intro',
+            statNames: ['elapsed_ms'],
+            units: ['ms'],
+            seriesIds: ['interpreter', 'interpreter-redux'],
+            runnerKeys: ['gha-ubuntu-latest-node20'],
+            latestCompletedAt: '2026-03-09T15:00:00.000Z',
+            pointCount: 3,
+          }],
         },
       }), {
         status: 200,
@@ -590,6 +611,84 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
       });
     }
 
+    if (query.includes('WebPerformanceTrend')) {
+      return new Response(JSON.stringify({
+        data: {
+          performanceTrend: [
+            {
+              id: 'perf-run-1-redux',
+              runId: 'run-1',
+              suiteRunId: null,
+              testExecutionId: null,
+              projectId: 'project-1',
+              projectKey: 'workspace',
+              externalKey: 'workspace:github-actions:1001',
+              versionKey: 'commit:abc123',
+              completedAt: '2026-03-09T15:00:00.000Z',
+              branch: 'release',
+              commitSha: 'abc123',
+              buildNumber: 88,
+              statGroup: 'benchmark.node.engine.nibbles.intro',
+              statName: 'elapsed_ms',
+              numericValue: 57.54,
+              textValue: null,
+              unit: 'ms',
+              seriesId: 'interpreter-redux',
+              runnerKey: 'gha-ubuntu-latest-node20',
+              metadata: {},
+            },
+            {
+              id: 'perf-run-1',
+              runId: 'run-1',
+              suiteRunId: null,
+              testExecutionId: null,
+              projectId: 'project-1',
+              projectKey: 'workspace',
+              externalKey: 'workspace:github-actions:1001',
+              versionKey: 'commit:abc123',
+              completedAt: '2026-03-09T15:00:00.000Z',
+              branch: 'release',
+              commitSha: 'abc123',
+              buildNumber: 88,
+              statGroup: 'benchmark.node.engine.nibbles.intro',
+              statName: 'elapsed_ms',
+              numericValue: 62.4,
+              textValue: null,
+              unit: 'ms',
+              seriesId: 'interpreter',
+              runnerKey: 'gha-ubuntu-latest-node20',
+              metadata: {},
+            },
+            {
+              id: 'perf-run-0',
+              runId: 'run-0',
+              suiteRunId: null,
+              testExecutionId: null,
+              projectId: 'project-1',
+              projectKey: 'workspace',
+              externalKey: 'workspace:github-actions:1000',
+              versionKey: 'commit:zzz999',
+              completedAt: '2026-03-08T15:00:00.000Z',
+              branch: 'release',
+              commitSha: 'zzz999',
+              buildNumber: 87,
+              statGroup: 'benchmark.node.engine.nibbles.intro',
+              statName: 'elapsed_ms',
+              numericValue: 74.2,
+              textValue: null,
+              unit: 'ms',
+              seriesId: 'interpreter',
+              runnerKey: 'gha-ubuntu-latest-node20',
+              metadata: {},
+            },
+          ],
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
     throw new Error(`Unexpected web GraphQL request: ${query}`);
   };
 
@@ -604,6 +703,10 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
   assert.equal(project.runs.length, 1);
   assert.equal(project.coverageTrend.length, 2);
   assert.equal(project.releaseNotes.length, 1);
+  assert.equal(project.benchmarkCatalog.length, 1);
+  assert.equal(project.benchmarkPanels.length, 1);
+  assert.equal(project.benchmarkPanels[0].statGroup, 'benchmark.node.engine.nibbles.intro');
+  assert.equal(project.benchmarkPanels[0].metrics[0].points.length, 3);
   assert.equal(project.trendPanels.overlays.length, 3);
   assert.equal(project.trendPanels.packageTrends.length, 1);
   assert.equal(project.trendPanels.packageTrends[0].label, 'workspace');
@@ -615,6 +718,9 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
   assert.equal(requests[4].body.variables.packageName, 'workspace');
   assert.equal(requests[5].body.variables.moduleName, 'runtime');
   assert.equal(requests[6].body.variables.filePath, '/repo/packages/core/src/index.js');
+  assert.equal(requests[7].body.variables.projectKey, 'workspace');
+  assert.equal(requests[7].body.variables.statGroup, 'benchmark.node.engine.nibbles.intro');
+  assert.equal(requests[7].body.variables.statName, 'elapsed_ms');
 });
 
 test('web project loader falls back to the base trend view when scoped trend panels fail', async () => {
@@ -675,6 +781,16 @@ test('web project loader falls back to the base trend view when scoped trend pan
             body: 'details',
             publishedAt: '2026-03-09T16:00:00.000Z',
           }],
+          benchmarkCatalog: [{
+            projectKey: 'workspace',
+            statGroup: 'benchmark.node.engine.nibbles.intro',
+            statNames: ['elapsed_ms'],
+            units: ['ms'],
+            seriesIds: ['interpreter'],
+            runnerKeys: ['gha-ubuntu-latest-node20'],
+            latestCompletedAt: '2026-03-09T15:00:00.000Z',
+            pointCount: 1,
+          }],
         },
       }), {
         status: 200,
@@ -701,6 +817,7 @@ test('web project loader falls back to the base trend view when scoped trend pan
   assert.equal(project.releaseNotes.length, 1);
   assert.equal(project.trendPanels.overall.length, 1);
   assert.equal(project.trendPanels.overlays.length, 2);
+  assert.deepEqual(project.benchmarkPanels, []);
   assert.deepEqual(project.trendPanels.packageTrends, []);
   assert.deepEqual(project.trendPanels.moduleTrends, []);
   assert.deepEqual(project.trendPanels.fileTrends, []);
@@ -1263,6 +1380,28 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
         runModules: [{ module: 'runtime' }],
         runFiles: [{ path: '/repo/packages/core/src/index.js' }],
         tests: [{ id: 'test-1', fullName: 'workspace fails', failureMessages: ['expected'] }],
+        runPerformanceStats: [{
+          id: 'perf-run-1-redux',
+          runId: 'run-1',
+          suiteRunId: null,
+          testExecutionId: null,
+          projectId: 'project-1',
+          projectKey: 'workspace',
+          externalKey: 'workspace:github-actions:1001',
+          versionKey: 'commit:abc123',
+          completedAt: '2026-03-09T15:00:00.000Z',
+          branch: 'release',
+          commitSha: 'abc123',
+          buildNumber: 88,
+          statGroup: 'benchmark.node.engine.nibbles.intro',
+          statName: 'elapsed_ms',
+          numericValue: 57.54,
+          textValue: null,
+          unit: 'ms',
+          seriesId: 'interpreter-redux',
+          runnerKey: 'gha-ubuntu-latest-node20',
+          metadata: {},
+        }],
         runCoverageComparison: {
           runId: 'run-1',
           previousRunId: 'run-0',
@@ -1314,6 +1453,8 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(operationsView.run.id, 'run-1');
   assert.equal(operationsView.failedTests.length, 1);
   assert.equal(operationsView.runModules[0].module, 'runtime');
+  assert.equal(operationsView.runPerformanceStats.length, 1);
+  assert.equal(operationsView.runPerformanceStats[0].statGroup, 'benchmark.node.engine.nibbles.intro');
   assert.equal(operationsView.coverageComparison.deltaLinesPct, 6);
   assert.equal(operationsView.coverageComparison.fileChanges[0].filePath, '/repo/packages/core/src/index.js');
 
@@ -1333,9 +1474,14 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(formatRepositoryName('https://github.com/smysnk/test-station.git'), 'smysnk/test-station');
   assert.equal(formatRunBuildLabel({ projectVersion: { buildNumber: 88 } }), 'build #88');
   assert.equal(formatRunBuildLabel({ sourceRunId: '1001' }), 'run 1001');
+  assert.equal(formatBenchmarkValue(57.54, 'ms'), '57.5 ms');
+  assert.equal(formatBenchmarkValue(2048, 'bytes'), '2 KiB');
+  assert.equal(formatBenchmarkMetricLabel('steps_per_second'), 'Steps Per Second');
+  assert.equal(formatBenchmarkNamespace('benchmark.node.engine.nibbles.intro'), 'Node / Engine / Nibbles / Intro');
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader')), true);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader') && query.includes('runPackages(runId: $runId)')), false);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPackages(runId: $runId)')), true);
+  assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPerformanceStats(runId: $runId)')), true);
 });
 
 test('web run build chip and GraphQL queries include build metadata and source links', () => {
@@ -1359,12 +1505,15 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceRunId/);
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceUrl/);
   assert.match(PROJECT_ACTIVITY_QUERY, /buildNumber/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /benchmarkCatalog\(projectKey: \$projectKey\)/);
+  assert.match(PERFORMANCE_TREND_QUERY, /performanceTrend\(projectKey: \$projectKey, statGroup: \$statGroup, statName: \$statName, limit: \$limit\)/);
   assert.match(RUN_HEADER_QUERY, /sourceRunId/);
   assert.match(RUN_HEADER_QUERY, /sourceUrl/);
   assert.match(RUN_HEADER_QUERY, /buildNumber/);
   assert.match(RUN_DETAIL_QUERY, /sourceRunId/);
   assert.match(RUN_DETAIL_QUERY, /sourceUrl/);
   assert.match(RUN_DETAIL_QUERY, /buildNumber/);
+  assert.match(RUN_DETAIL_QUERY, /runPerformanceStats\(runId: \$runId\)/);
 });
 
 test('run source link renders a direct action back to the GitHub Actions run', () => {
@@ -1377,6 +1526,108 @@ test('run source link renders a direct action back to the GitHub Actions run', (
   assert.match(html, /Open GitHub Actions run/);
   assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
   assert.match(html, /web-button/);
+});
+
+test('benchmark explorer renders namespace controls, series toggles, and chart content', () => {
+  const html = renderToStaticMarkup(React.createElement(BenchmarkExplorer, {
+    benchmarkPanels: [{
+      projectKey: 'workspace',
+      statGroup: 'benchmark.node.engine.nibbles.intro',
+      statNames: ['elapsed_ms'],
+      units: ['ms'],
+      seriesIds: ['interpreter', 'interpreter-redux'],
+      runnerKeys: ['gha-ubuntu-latest-node20'],
+      latestCompletedAt: '2026-03-09T15:00:00.000Z',
+      pointCount: 3,
+      metrics: [{
+        statName: 'elapsed_ms',
+        unit: 'ms',
+        points: [
+          {
+            id: 'perf-run-0',
+            runId: 'run-0',
+            completedAt: '2026-03-08T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'zzz999',
+            numericValue: 74.2,
+            unit: 'ms',
+            seriesId: 'interpreter',
+            runnerKey: 'gha-ubuntu-latest-node20',
+          },
+          {
+            id: 'perf-run-1',
+            runId: 'run-1',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'abc123',
+            numericValue: 62.4,
+            unit: 'ms',
+            seriesId: 'interpreter',
+            runnerKey: 'gha-ubuntu-latest-node20',
+          },
+          {
+            id: 'perf-run-1-redux',
+            runId: 'run-1',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'abc123',
+            numericValue: 57.54,
+            unit: 'ms',
+            seriesId: 'interpreter-redux',
+            runnerKey: 'gha-ubuntu-latest-node20',
+          },
+        ],
+      }],
+    }],
+  }));
+
+  assert.match(html, /Namespace/);
+  assert.match(html, /Metric/);
+  assert.match(html, /interpreter-redux/);
+  assert.match(html, /Node \/ Engine \/ Nibbles \/ Intro/);
+  assert.match(html, /Elapsed Ms/);
+  assert.match(html, /svg/);
+});
+
+test('run benchmark summary groups benchmark rows by namespace', () => {
+  const html = renderToStaticMarkup(React.createElement(RunBenchmarkSummary, {
+    stats: [
+      {
+        id: 'perf-run-1-redux',
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        statName: 'elapsed_ms',
+        numericValue: 57.54,
+        unit: 'ms',
+        seriesId: 'interpreter-redux',
+        runnerKey: 'gha-ubuntu-latest-node20',
+        completedAt: '2026-03-09T15:00:00.000Z',
+        branch: 'release',
+        commitSha: 'abc123',
+        suiteRunId: null,
+        testExecutionId: null,
+      },
+      {
+        id: 'perf-suite-1',
+        statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+        statName: 'steps_per_second',
+        numericValue: 404.55,
+        unit: 'ops_per_sec',
+        seriesId: 'interpreter-redux',
+        runnerKey: 'gha-ubuntu-latest-node20',
+        completedAt: '2026-03-09T15:00:00.000Z',
+        branch: 'release',
+        commitSha: 'abc123',
+        suiteRunId: 'suite-1',
+        testExecutionId: null,
+      },
+    ],
+  }));
+
+  assert.match(html, /Node \/ Engine \/ Nibbles \/ Intro/);
+  assert.match(html, /Shared \/ Tight Arithmetic Loop/);
+  assert.match(html, /57.5 ms/);
+  assert.match(html, /404.6 ops\/s/);
+  assert.match(html, /suite scope/);
 });
 
 test('web home explorer model sorts sidebar projects by activity and filters the selected project feed', () => {

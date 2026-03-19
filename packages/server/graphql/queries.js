@@ -247,6 +247,41 @@ export const queryTypeDefs = `#graphql
     deltaLinesPct: Float
   }
 
+  type PerformanceStatRecord {
+    id: ID!
+    runId: ID
+    suiteRunId: ID
+    testExecutionId: ID
+    projectId: ID
+    projectKey: String
+    externalKey: String
+    versionKey: String
+    completedAt: String
+    branch: String
+    commitSha: String
+    buildNumber: Int
+    statGroup: String!
+    statName: String!
+    numericValue: Float
+    textValue: String
+    unit: String
+    seriesId: String
+    runnerKey: String
+    metadata: JSON
+  }
+
+  type BenchmarkCatalogEntry {
+    projectId: ID!
+    projectKey: String!
+    statGroup: String!
+    statNames: [String!]!
+    units: [String!]!
+    seriesIds: [String!]!
+    runnerKeys: [String!]!
+    latestCompletedAt: String
+    pointCount: Int!
+  }
+
   type RunCoverageComparison {
     runId: ID!
     previousRunId: ID
@@ -314,6 +349,9 @@ export const queryTypeDefs = `#graphql
     runModules(runId: ID!): [RunModuleSummary!]!
     runFiles(runId: ID!, packageName: String, moduleName: String, status: String): [RunFile!]!
     tests(runId: ID!, status: String, packageName: String, moduleName: String, filePath: String): [TestExecution!]!
+    runPerformanceStats(runId: ID!, statGroupPrefix: String, statNames: [String!], seriesIds: [String!]): [PerformanceStatRecord!]!
+    performanceTrend(projectId: ID, projectKey: String, statGroup: String!, statName: String!, seriesIds: [String!], runnerKey: String, limit: Int): [PerformanceStatRecord!]!
+    benchmarkCatalog(projectId: ID, projectKey: String): [BenchmarkCatalogEntry!]!
     coverageTrend(projectId: ID, projectKey: String, packageName: String, moduleName: String, filePath: String, limit: Int): [CoverageTrendPoint!]!
     runCoverageComparison(runId: ID!): RunCoverageComparison
     artifacts(runId: ID, suiteRunId: ID, testExecutionId: ID): [Artifact!]!
@@ -342,6 +380,9 @@ export const queryResolvers = {
     runModules: (_root, args, context) => context.queryService.listRunModules({ ...args, actor: context.actor }),
     runFiles: (_root, args, context) => context.queryService.listRunFiles({ ...args, actor: context.actor }),
     tests: (_root, args, context) => context.queryService.listTestsForRun({ ...args, actor: context.actor }),
+    runPerformanceStats: (_root, args, context) => context.queryService.listRunPerformanceStats({ ...args, actor: context.actor }),
+    performanceTrend: (_root, args, context) => context.queryService.listPerformanceTrend({ ...args, actor: context.actor }),
+    benchmarkCatalog: (_root, args, context) => context.queryService.listBenchmarkCatalog({ ...args, actor: context.actor }),
     coverageTrend: (_root, args, context) => context.queryService.listCoverageTrend({ ...args, actor: context.actor }),
     runCoverageComparison: (_root, args, context) => context.queryService.getRunCoverageComparison({ ...args, actor: context.actor }),
     artifacts: (_root, args, context) => context.queryService.listArtifacts({ ...args, actor: context.actor }),

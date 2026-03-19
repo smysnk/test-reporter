@@ -94,6 +94,43 @@ export const PROJECT_ACTIVITY_QUERY = `
         buildNumber
       }
     }
+    benchmarkCatalog(projectKey: $projectKey) {
+      projectKey
+      statGroup
+      statNames
+      units
+      seriesIds
+      runnerKeys
+      latestCompletedAt
+      pointCount
+    }
+  }
+`;
+
+export const PERFORMANCE_TREND_QUERY = `
+  query WebPerformanceTrend($projectKey: String!, $statGroup: String!, $statName: String!, $limit: Int) {
+    performanceTrend(projectKey: $projectKey, statGroup: $statGroup, statName: $statName, limit: $limit) {
+      id
+      runId
+      suiteRunId
+      testExecutionId
+      projectId
+      projectKey
+      externalKey
+      versionKey
+      completedAt
+      branch
+      commitSha
+      buildNumber
+      statGroup
+      statName
+      numericValue
+      textValue
+      unit
+      seriesId
+      runnerKey
+      metadata
+    }
   }
 `;
 
@@ -232,6 +269,28 @@ export const RUN_DETAIL_QUERY = `
       filePath
       line
       failureMessages
+    }
+    runPerformanceStats(runId: $runId) {
+      id
+      runId
+      suiteRunId
+      testExecutionId
+      projectId
+      projectKey
+      externalKey
+      versionKey
+      completedAt
+      branch
+      commitSha
+      buildNumber
+      statGroup
+      statName
+      numericValue
+      textValue
+      unit
+      seriesId
+      runnerKey
+      metadata
     }
     runCoverageComparison(runId: $runId) {
       runId

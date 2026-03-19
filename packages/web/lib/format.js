@@ -105,3 +105,76 @@ export function formatSignedDelta(value) {
   const rounded = Number(value).toFixed(value % 1 === 0 ? 0 : 1);
   return `${value > 0 ? '+' : ''}${rounded} pts`;
 }
+
+export function formatBenchmarkValue(value, unit = null) {
+  if (!Number.isFinite(value)) {
+    return 'N/A';
+  }
+
+  switch (unit) {
+    case 'ms':
+      return `${formatRoundedNumber(value)} ms`;
+    case 'us':
+      return `${formatRoundedNumber(value)} us`;
+    case 'bytes':
+      return formatBytes(value);
+    case 'ops_per_sec':
+      return `${formatRoundedNumber(value, Math.abs(value) >= 1000 ? 0 : 1)} ops/s`;
+    case 'count':
+      return formatRoundedNumber(value, 0);
+    default:
+      return unit ? `${formatRoundedNumber(value)} ${unit}` : formatRoundedNumber(value);
+  }
+}
+
+export function formatBenchmarkMetricLabel(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return 'Metric';
+  }
+
+  return value
+    .trim()
+    .split(/[_\-.]+/g)
+    .filter(Boolean)
+    .map((token) => token.toUpperCase() === token ? token : `${token[0].toUpperCase()}${token.slice(1)}`)
+    .join(' ');
+}
+
+export function formatBenchmarkNamespace(value) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return 'Benchmark';
+  }
+
+  return value
+    .trim()
+    .replace(/^benchmark\./, '')
+    .split('.')
+    .map((token) => formatBenchmarkMetricLabel(token))
+    .join(' / ');
+}
+
+function formatBytes(value) {
+  const absolute = Math.abs(value);
+  if (absolute >= 1024 * 1024) {
+    return `${formatRoundedNumber(value / (1024 * 1024))} MiB`;
+  }
+  if (absolute >= 1024) {
+    return `${formatRoundedNumber(value / 1024)} KiB`;
+  }
+  return `${formatRoundedNumber(value, 0)} B`;
+}
+
+function formatRoundedNumber(value, digits = null) {
+  const resolvedDigits = digits ?? (
+    Math.abs(value) >= 100
+      ? 0
+      : Math.abs(value) >= 10
+        ? 1
+        : 2
+  );
+
+  const rounded = Number(value).toFixed(resolvedDigits);
+  return resolvedDigits > 0
+    ? rounded.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1')
+    : rounded;
+}

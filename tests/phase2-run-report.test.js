@@ -36,6 +36,45 @@ test('runReport executes configured suites and writes artifacts', async () => {
 
   const storedReport = readJson(execution.artifactPaths.reportJsonPath);
   assert.equal(storedReport.summary.failedPackages, 1);
+  assert.equal(Array.isArray(storedReport.performanceStats), true);
+  assert.equal(storedReport.performanceStats.length, 1);
+  assert.deepEqual(storedReport.performanceStats[0], {
+    scope: 'suite',
+    suiteIdentifier: 'app-unit',
+    testIdentifier: null,
+    statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+    statName: 'elapsed_ms',
+    unit: 'ms',
+    numericValue: 12.34,
+    textValue: null,
+    metadata: {
+      packageName: 'app',
+      suiteLabel: 'App Unit',
+      runtime: 'custom',
+      seriesId: 'interpreter',
+      engineId: 'interpreter',
+      statistic: 'median',
+    },
+  });
+
+  const rawSuitePath = execution.artifactPaths.rawSuitePaths.find((entry) => entry.endsWith('app-app-unit.json'));
+  assert.equal(typeof rawSuitePath, 'string');
+  const rawSuite = readJson(rawSuitePath);
+  assert.equal(Array.isArray(rawSuite.performanceStats), true);
+  assert.deepEqual(rawSuite.performanceStats[0], {
+    scope: 'suite',
+    testIdentifier: null,
+    statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+    statName: 'elapsed_ms',
+    unit: 'ms',
+    numericValue: 12.34,
+    textValue: null,
+    metadata: {
+      seriesId: 'interpreter',
+      engineId: 'interpreter',
+      statistic: 'median',
+    },
+  });
 
   const consoleSummary = formatConsoleSummary(execution.report, execution.artifactPaths);
   assert.match(consoleSummary, /Workspace Test Report/);

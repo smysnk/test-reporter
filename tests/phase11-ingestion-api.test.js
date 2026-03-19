@@ -25,6 +25,46 @@ test('normalizeIngestPayload validates the report contract and derives run ident
   assert.equal(normalized.coverageFiles.length, 1);
   assert.equal(normalized.errors.length, 2);
   assert.equal(normalized.artifacts.length, 2);
+  assert.equal(normalized.performanceStats.length, 5);
+  assert.deepEqual(
+    normalized.performanceStats.find((entry) => entry.statGroup === 'benchmark.node.engine.nibbles.intro'),
+    {
+      scope: 'suite',
+      suiteIdentifier: 'repo-node',
+      testIdentifier: null,
+      statGroup: 'benchmark.node.engine.nibbles.intro',
+      statName: 'elapsed_ms',
+      unit: 'ms',
+      numericValue: 57.54,
+      textValue: null,
+      metadata: {
+        seriesId: 'interpreter-redux',
+        engineId: 'interpreter-redux',
+        statistic: 'median',
+      },
+    },
+  );
+});
+
+test('normalizeIngestPayload rejects malformed custom performance stats clearly', () => {
+  assert.throws(
+    () =>
+      normalizeIngestPayload(createSamplePayload({
+        report: {
+          performanceStats: [
+            {
+              scope: 'suite',
+              suiteIdentifier: 'missing-suite',
+              statGroup: 'benchmark.node.engine.nibbles.intro',
+              statName: 'elapsed_ms',
+              unit: 'ms',
+              numericValue: 1,
+            },
+          ],
+        },
+      })),
+    /suiteIdentifier.*must match an ingested suite identifier/,
+  );
 });
 
 test('ingestion persistence upserts duplicate runs and replaces prior facts', async () => {
@@ -140,11 +180,15 @@ test('ingestion persistence upserts duplicate runs and replaces prior facts', as
   assert.deepEqual(models.CoverageTrendPoint.rows.map((row) => row.scopeType).sort(), ['file', 'module', 'package', 'project']);
   assert.equal(models.ErrorOccurrence.rows.length, 0);
   assert.equal(models.Artifact.rows.length, 0);
-  assert.equal(models.PerformanceStat.rows.length, 3);
+  assert.equal(models.PerformanceStat.rows.length, 4);
   assert.equal(models.Run.rows[0].status, 'passed');
   assert.equal(models.Run.rows[0].summary.totalTests, 1);
   assert.equal(models.CoverageTrendPoint.rows.find((row) => row.scopeType === 'project')?.linesPct, 90);
   assert.equal(models.CoverageTrendPoint.rows.find((row) => row.scopeType === 'file')?.linesPct, 90);
+  assert.equal(
+    models.PerformanceStat.rows.some((row) => row.statGroup === 'benchmark.node.engine.nibbles.intro' && row.statName === 'elapsed_ms'),
+    true,
+  );
 });
 
 test('server ingest route enforces auth and returns actionable validation errors', async () => {
@@ -414,6 +458,21 @@ function createSamplePayload(overrides = {}) {
           packages: ['workspace'],
           frameworks: ['node-test'],
           owner: 'platform',
+        },
+      ],
+      performanceStats: [
+        {
+          scope: 'suite',
+          suiteIdentifier: 'repo-node',
+          statGroup: 'benchmark.node.engine.nibbles.intro',
+          statName: 'elapsed_ms',
+          unit: 'ms',
+          numericValue: 57.54,
+          metadata: {
+            seriesId: 'interpreter-redux',
+            engineId: 'interpreter-redux',
+            statistic: 'median',
+          },
         },
       ],
       meta: {

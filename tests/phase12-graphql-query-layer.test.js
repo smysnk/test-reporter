@@ -86,6 +86,55 @@ test('GraphQL exposes guest-safe public reads and hides private resources', asyn
           status
           packageName
         }
+        runPerformanceStats(runId: "run-public-1") {
+          runId
+          statGroup
+          statName
+          numericValue
+          unit
+          seriesId
+          branch
+          buildNumber
+          commitSha
+        }
+        privateRunPerformanceStats: runPerformanceStats(runId: "run-1") {
+          statGroup
+        }
+        performanceTrend(
+          projectKey: "public-site"
+          statGroup: "benchmark.browser.gameplay.nibbles.intro"
+          statName: "time_to_waiting_for_input_ms"
+        ) {
+          runId
+          statGroup
+          statName
+          numericValue
+          unit
+          seriesId
+          branch
+          buildNumber
+          commitSha
+        }
+        privatePerformanceTrend: performanceTrend(
+          projectKey: "workspace"
+          statGroup: "benchmark.node.engine.nibbles.intro"
+          statName: "elapsed_ms"
+        ) {
+          runId
+        }
+        benchmarkCatalog(projectKey: "public-site") {
+          projectKey
+          statGroup
+          statNames
+          units
+          seriesIds
+          runnerKeys
+          pointCount
+          latestCompletedAt
+        }
+        privateBenchmarkCatalog: benchmarkCatalog(projectKey: "workspace") {
+          statGroup
+        }
         coverageTrend(projectKey: "public-site") {
           runId
           externalKey
@@ -170,6 +219,58 @@ test('GraphQL exposes guest-safe public reads and hides private resources', asyn
       packageName: 'public-site',
     },
   ]);
+  assert.deepEqual(response.payload.data.runPerformanceStats, [
+    {
+      runId: 'run-public-1',
+      statGroup: 'benchmark.browser.gameplay.nibbles.intro',
+      statName: 'time_to_first_terminal_byte_ms',
+      numericValue: 3200,
+      unit: 'ms',
+      seriesId: 'chromium-headless',
+      branch: 'main',
+      buildNumber: 2001,
+      commitSha: 'public111',
+    },
+    {
+      runId: 'run-public-1',
+      statGroup: 'benchmark.browser.gameplay.nibbles.intro',
+      statName: 'time_to_waiting_for_input_ms',
+      numericValue: 11900,
+      unit: 'ms',
+      seriesId: 'chromium-headless',
+      branch: 'main',
+      buildNumber: 2001,
+      commitSha: 'public111',
+    },
+  ]);
+  assert.deepEqual(response.payload.data.privateRunPerformanceStats, []);
+  assert.deepEqual(response.payload.data.performanceTrend, [
+    {
+      runId: 'run-public-1',
+      statGroup: 'benchmark.browser.gameplay.nibbles.intro',
+      statName: 'time_to_waiting_for_input_ms',
+      numericValue: 11900,
+      unit: 'ms',
+      seriesId: 'chromium-headless',
+      branch: 'main',
+      buildNumber: 2001,
+      commitSha: 'public111',
+    },
+  ]);
+  assert.deepEqual(response.payload.data.privatePerformanceTrend, []);
+  assert.deepEqual(response.payload.data.benchmarkCatalog, [
+    {
+      projectKey: 'public-site',
+      statGroup: 'benchmark.browser.gameplay.nibbles.intro',
+      statNames: ['time_to_first_terminal_byte_ms', 'time_to_waiting_for_input_ms'],
+      units: ['ms'],
+      seriesIds: ['chromium-headless'],
+      runnerKeys: ['gha-ubuntu-latest-node20-chromium-headless'],
+      pointCount: 2,
+      latestCompletedAt: '2026-03-10T15:00:00.000Z',
+    },
+  ]);
+  assert.deepEqual(response.payload.data.privateBenchmarkCatalog, []);
   assert.deepEqual(response.payload.data.coverageTrend, [
     {
       runId: 'run-public-1',
@@ -336,6 +437,54 @@ test('GraphQL exposes project, run, file, test, artifact, trend, and release-not
           suiteIdentifier
           packageName
         }
+        runPerformanceStats(
+          runId: "run-1"
+          statGroupPrefix: "benchmark.node.engine"
+          seriesIds: ["interpreter-redux"]
+        ) {
+          runId
+          suiteRunId
+          testExecutionId
+          statGroup
+          statName
+          numericValue
+          unit
+          seriesId
+          runnerKey
+          branch
+          buildNumber
+          versionKey
+        }
+        performanceTrend(
+          projectKey: "workspace"
+          statGroup: "benchmark.node.engine.nibbles.intro"
+          statName: "elapsed_ms"
+          seriesIds: ["interpreter", "interpreter-redux"]
+          runnerKey: "gha-ubuntu-latest-node20"
+          limit: 4
+        ) {
+          runId
+          statGroup
+          statName
+          numericValue
+          unit
+          seriesId
+          branch
+          buildNumber
+          commitSha
+          versionKey
+          completedAt
+        }
+        benchmarkCatalog(projectKey: "workspace") {
+          projectKey
+          statGroup
+          statNames
+          units
+          seriesIds
+          runnerKeys
+          pointCount
+          latestCompletedAt
+        }
         coverageTrend(projectKey: "workspace") {
           runId
           externalKey
@@ -447,6 +596,113 @@ test('GraphQL exposes project, run, file, test, artifact, trend, and release-not
   assert.equal(response.payload.data.runFiles[0].failedTestCount, 1);
   assert.equal(response.payload.data.tests.length, 1);
   assert.equal(response.payload.data.tests[0].fullName, 'workspace fails');
+  assert.deepEqual(response.payload.data.runPerformanceStats, [
+    {
+      runId: 'run-1',
+      suiteRunId: null,
+      testExecutionId: null,
+      statGroup: 'benchmark.node.engine.nibbles.intro',
+      statName: 'elapsed_ms',
+      numericValue: 57.54,
+      unit: 'ms',
+      seriesId: 'interpreter-redux',
+      runnerKey: 'gha-ubuntu-latest-node20',
+      branch: 'release',
+      buildNumber: 1001,
+      versionKey: 'commit:abc123',
+    },
+    {
+      runId: 'run-1',
+      suiteRunId: null,
+      testExecutionId: 'test-2',
+      statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+      statName: 'heap_delta_bytes',
+      numericValue: 2048,
+      unit: 'bytes',
+      seriesId: 'interpreter-redux',
+      runnerKey: 'gha-ubuntu-latest-node20',
+      branch: 'release',
+      buildNumber: 1001,
+      versionKey: 'commit:abc123',
+    },
+    {
+      runId: 'run-1',
+      suiteRunId: 'suite-1',
+      testExecutionId: null,
+      statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+      statName: 'steps_per_second',
+      numericValue: 404.55,
+      unit: 'ops_per_sec',
+      seriesId: 'interpreter-redux',
+      runnerKey: 'gha-ubuntu-latest-node20',
+      branch: 'release',
+      buildNumber: 1001,
+      versionKey: 'commit:abc123',
+    },
+  ]);
+  assert.deepEqual(response.payload.data.performanceTrend, [
+    {
+      runId: 'run-1',
+      statGroup: 'benchmark.node.engine.nibbles.intro',
+      statName: 'elapsed_ms',
+      numericValue: 62.4,
+      unit: 'ms',
+      seriesId: 'interpreter',
+      branch: 'release',
+      buildNumber: 1001,
+      commitSha: 'abc123',
+      versionKey: 'commit:abc123',
+      completedAt: '2026-03-09T15:00:00.000Z',
+    },
+    {
+      runId: 'run-1',
+      statGroup: 'benchmark.node.engine.nibbles.intro',
+      statName: 'elapsed_ms',
+      numericValue: 57.54,
+      unit: 'ms',
+      seriesId: 'interpreter-redux',
+      branch: 'release',
+      buildNumber: 1001,
+      commitSha: 'abc123',
+      versionKey: 'commit:abc123',
+      completedAt: '2026-03-09T15:00:00.000Z',
+    },
+    {
+      runId: 'run-0',
+      statGroup: 'benchmark.node.engine.nibbles.intro',
+      statName: 'elapsed_ms',
+      numericValue: 74.2,
+      unit: 'ms',
+      seriesId: 'interpreter',
+      branch: 'release',
+      buildNumber: 1000,
+      commitSha: 'zzz999',
+      versionKey: 'commit:zzz999',
+      completedAt: '2026-03-08T15:00:00.000Z',
+    },
+  ]);
+  assert.deepEqual(response.payload.data.benchmarkCatalog, [
+    {
+      projectKey: 'workspace',
+      statGroup: 'benchmark.node.engine.nibbles.intro',
+      statNames: ['elapsed_ms'],
+      units: ['ms'],
+      seriesIds: ['interpreter', 'interpreter-redux'],
+      runnerKeys: ['gha-ubuntu-latest-node20'],
+      pointCount: 3,
+      latestCompletedAt: '2026-03-09T15:00:00.000Z',
+    },
+    {
+      projectKey: 'workspace',
+      statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+      statNames: ['heap_delta_bytes', 'steps_per_second'],
+      units: ['bytes', 'ops_per_sec'],
+      seriesIds: ['interpreter-redux'],
+      runnerKeys: ['gha-ubuntu-latest-node20'],
+      pointCount: 2,
+      latestCompletedAt: '2026-03-09T15:00:00.000Z',
+    },
+  ]);
   assert.equal(response.payload.data.coverageTrend.length, 2);
   assert.equal(response.payload.data.coverageTrend[0].scopeType, 'project');
   assert.equal(response.payload.data.coverageTrend[0].versionKey, 'commit:abc123');
@@ -1205,6 +1461,73 @@ test('listRuns queries the lightweight feed fields with DB-side limit and relate
   assert.deepEqual(runs[0].summary, { totalTests: 3, passedTests: 3, failedTests: 0 });
 });
 
+test('listPerformanceTrend applies visibility, metadata filters, and post-filter limits', async () => {
+  const queryService = createGraphqlQueryService({
+    models: createGraphqlModels(),
+  });
+
+  const memberActor = {
+    id: 'user-1',
+    userId: 'user-1',
+    email: 'user-1@example.com',
+    name: 'User One',
+    role: 'member',
+    isAdmin: false,
+    isGuest: false,
+    roleKeys: ['release-manager'],
+    groupKeys: ['qa'],
+  };
+  const guestActor = {
+    id: 'guest',
+    userId: null,
+    email: null,
+    name: 'Guest',
+    role: 'guest',
+    isAdmin: false,
+    isGuest: true,
+    roleKeys: [],
+    groupKeys: [],
+  };
+
+  const memberPoints = await queryService.listPerformanceTrend({
+    actor: memberActor,
+    projectKey: 'workspace',
+    statGroup: 'benchmark.node.engine.nibbles.intro',
+    statName: 'elapsed_ms',
+    seriesIds: ['interpreter'],
+    runnerKey: 'gha-ubuntu-latest-node20',
+    limit: 1,
+  });
+
+  assert.deepEqual(memberPoints.map((point) => ({
+    runId: point.runId,
+    statName: point.statName,
+    numericValue: point.numericValue,
+    seriesId: point.seriesId,
+    buildNumber: point.buildNumber,
+    projectKey: point.projectKey,
+  })), [
+    {
+      runId: 'run-1',
+      statName: 'elapsed_ms',
+      numericValue: 62.4,
+      seriesId: 'interpreter',
+      buildNumber: 1001,
+      projectKey: 'workspace',
+    },
+  ]);
+
+  const guestPoints = await queryService.listPerformanceTrend({
+    actor: guestActor,
+    projectKey: 'workspace',
+    statGroup: 'benchmark.node.engine.nibbles.intro',
+    statName: 'elapsed_ms',
+    limit: 5,
+  });
+
+  assert.deepEqual(guestPoints, []);
+});
+
 function createGraphqlModels() {
   const report = createRunReport();
   const publicReport = createPublicRunReport();
@@ -1920,6 +2243,145 @@ function createGraphqlModels() {
         functionsPct: 100,
         statementsPct: 91,
         metadata: {},
+      },
+    ]),
+    PerformanceStat: createFindAllModel([
+      {
+        id: 'perf-run-0-interpreter-intro',
+        runId: 'run-0',
+        suiteRunId: null,
+        testExecutionId: null,
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        statName: 'elapsed_ms',
+        unit: 'ms',
+        numericValue: 74.2,
+        textValue: null,
+        metadata: {
+          seriesId: 'interpreter',
+          engineId: 'interpreter',
+          runnerKey: 'gha-ubuntu-latest-node20',
+          scenarioId: 'nibbles-intro-screen',
+          surface: 'node-engine',
+          statistic: 'median',
+        },
+      },
+      {
+        id: 'perf-run-1-interpreter-intro',
+        runId: 'run-1',
+        suiteRunId: null,
+        testExecutionId: null,
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        statName: 'elapsed_ms',
+        unit: 'ms',
+        numericValue: 62.4,
+        textValue: null,
+        metadata: {
+          seriesId: 'interpreter',
+          engineId: 'interpreter',
+          runnerKey: 'gha-ubuntu-latest-node20',
+          scenarioId: 'nibbles-intro-screen',
+          surface: 'node-engine',
+          statistic: 'median',
+        },
+      },
+      {
+        id: 'perf-run-1-redux-intro',
+        runId: 'run-1',
+        suiteRunId: null,
+        testExecutionId: null,
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        statName: 'elapsed_ms',
+        unit: 'ms',
+        numericValue: 57.54,
+        textValue: null,
+        metadata: {
+          seriesId: 'interpreter-redux',
+          engineId: 'interpreter-redux',
+          runnerKey: 'gha-ubuntu-latest-node20',
+          scenarioId: 'nibbles-intro-screen',
+          surface: 'node-engine',
+          statistic: 'median',
+        },
+      },
+      {
+        id: 'perf-suite-1-redux-tight-sps',
+        runId: 'run-1',
+        suiteRunId: 'suite-1',
+        testExecutionId: null,
+        statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+        statName: 'steps_per_second',
+        unit: 'ops_per_sec',
+        numericValue: 404.55,
+        textValue: null,
+        metadata: {
+          seriesId: 'interpreter-redux',
+          engineId: 'interpreter-redux',
+          runnerKey: 'gha-ubuntu-latest-node20',
+          scenarioId: 'tight-arithmetic-loop',
+          surface: 'node-engine',
+          statistic: 'median',
+        },
+      },
+      {
+        id: 'perf-test-2-redux-tight-heap',
+        runId: 'run-1',
+        suiteRunId: null,
+        testExecutionId: 'test-2',
+        statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+        statName: 'heap_delta_bytes',
+        unit: 'bytes',
+        numericValue: 2048,
+        textValue: null,
+        metadata: {
+          seriesId: 'interpreter-redux',
+          engineId: 'interpreter-redux',
+          runnerKey: 'gha-ubuntu-latest-node20',
+          scenarioId: 'tight-arithmetic-loop',
+          surface: 'node-engine',
+          statistic: 'median',
+        },
+      },
+      {
+        id: 'perf-run-public-intro-terminal',
+        runId: 'run-public-1',
+        suiteRunId: null,
+        testExecutionId: null,
+        statGroup: 'benchmark.browser.gameplay.nibbles.intro',
+        statName: 'time_to_first_terminal_byte_ms',
+        unit: 'ms',
+        numericValue: 3200,
+        textValue: null,
+        metadata: {
+          seriesId: 'chromium-headless',
+          runnerKey: 'gha-ubuntu-latest-node20-chromium-headless',
+          scenarioId: 'nibbles-browser-intro',
+          surface: 'browser-gameplay',
+          statistic: 'single',
+          browserName: 'chromium',
+          headless: true,
+          viewport: '1280x900',
+        },
+      },
+      {
+        id: 'perf-run-public-intro-wait',
+        runId: 'run-public-1',
+        suiteRunId: null,
+        testExecutionId: null,
+        statGroup: 'benchmark.browser.gameplay.nibbles.intro',
+        statName: 'time_to_waiting_for_input_ms',
+        unit: 'ms',
+        numericValue: 11900,
+        textValue: null,
+        metadata: {
+          seriesId: 'chromium-headless',
+          runnerKey: 'gha-ubuntu-latest-node20-chromium-headless',
+          scenarioId: 'nibbles-browser-intro',
+          surface: 'browser-gameplay',
+          statistic: 'single',
+          browserName: 'chromium',
+          headless: true,
+          viewport: '1280x900',
+        },
       },
     ]),
     Artifact: createFindAllModel([
