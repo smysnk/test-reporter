@@ -363,6 +363,11 @@ test('renderer returns baseline html', () => {
   assert.match(html, /coverage-table__metricBar/);
   assert.match(html, /coverage-table__statementIcon/);
   assert.match(html, /80\.0%/);
+  assert.match(html, /Jump straight to the breakage/);
+  assert.match(html, /Open in suite/);
+  assert.match(html, /core • Core Node Tests • packages\/core\/src\/index\.js:24:4/);
+  assert.match(html, /data-view-target="package"/);
+  assert.match(html, /id="test-package-core-core-node-core-node-tests-core-fails-.*packages-core-src-index-js-24-1"/);
 });
 
 test('renderer splits a combined report title into a project headline and run key', () => {

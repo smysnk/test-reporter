@@ -22,6 +22,7 @@ export function renderHtmlReport(report, options = {}) {
         ...packages.flatMap((entry) => entry.frameworks || []),
         ...modules.flatMap((entry) => entry.frameworks || []),
       ]);
+  const failedTestEntries = collectFailedTests(packages, rootDir);
 
   const moduleCards = modules.map((entry) => renderModuleCard(entry)).join('');
   const moduleSections = modules.map((entry) => renderModuleSection(entry, rootDir)).join('');
@@ -293,6 +294,87 @@ export function renderHtmlReport(report, options = {}) {
       font-size: 0.85rem;
       min-height: 20px;
       width: 100%;
+    }
+    .failure-focus {
+      display: grid;
+      gap: 18px;
+      margin-bottom: 18px;
+      padding: 20px 22px;
+      border-radius: 24px;
+    }
+    .failure-focus__header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .failure-focus__copy {
+      display: grid;
+      gap: 10px;
+      max-width: 72ch;
+    }
+    .failure-focus__title {
+      margin: 0;
+      font-family: var(--heading-font);
+      font-size: clamp(1.45rem, 2.4vw, 2rem);
+      font-weight: 650;
+      letter-spacing: -0.045em;
+    }
+    .failure-focus__description {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+    .failure-focus__list {
+      display: grid;
+      gap: 14px;
+    }
+    .failure-focus__card {
+      display: grid;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 18px;
+      border: 1px solid color-mix(in srgb, var(--fail) 24%, transparent);
+      background: linear-gradient(180deg, rgba(21, 12, 22, 0.82), rgba(10, 16, 30, 0.86));
+    }
+    .failure-focus__cardHeader {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .failure-focus__cardTitle {
+      margin: 0;
+      font-size: 1.02rem;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .failure-focus__cardMeta {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 0.84rem;
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .failure-focus__cardMessage {
+      margin: 0;
+      color: #ffd8e1;
+      line-height: 1.55;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .failure-focus__actions {
+      display: flex;
+      justify-content: flex-start;
+    }
+    .failure-focus__button {
+      cursor: pointer;
+      border-color: color-mix(in srgb, var(--fail) 26%, var(--border));
+      background: rgba(15, 24, 40, 0.86);
     }
     html[data-view="module"] .view-pane--package,
     html[data-view="package"] .view-pane--module {
@@ -913,6 +995,8 @@ export function renderHtmlReport(report, options = {}) {
       </div>
     </section>
 
+    ${failedTestEntries.length > 0 ? renderFailedTestsFocusSection(failedTestEntries) : ''}
+
     <section class="panel toolbar">
       <div class="toolbar__meta">Switch between module-first and package-first layouts, then focus the report by module, package, framework, or coverage threshold.</div>
       <div class="toolbar__controls">
@@ -995,21 +1079,53 @@ export function renderHtmlReport(report, options = {}) {
     });
     document.querySelectorAll('[data-open-target]').forEach((button) => {
       button.addEventListener('click', () => {
-        if (button.dataset.viewTarget) {
-          root.dataset.view = button.dataset.viewTarget;
-        }
-        const target = document.getElementById(button.dataset.openTarget || '');
-        if (!target) {
-          return;
-        }
-        if (typeof target.open === 'boolean') {
-          target.open = true;
-        }
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        openTargetById(button.dataset.openTarget || '', button.dataset.viewTarget || '');
       });
     });
 
     const filterNodes = Array.from(document.querySelectorAll('[data-filter-node]'));
+
+    function revealDetailPath(target) {
+      let current = target;
+      while (current) {
+        if (typeof current.open === 'boolean') {
+          current.open = true;
+        }
+        current = current.parentElement;
+      }
+    }
+
+    function openTargetById(targetId, viewTarget) {
+      const target = document.getElementById(targetId);
+      if (!target) {
+        return;
+      }
+      const resolvedView = viewTarget || target.dataset.anchorView || '';
+      if (resolvedView) {
+        root.dataset.view = resolvedView;
+      }
+      revealDetailPath(target);
+      if (window.location.hash !== '#' + targetId) {
+        history.replaceState(null, '', '#' + targetId);
+      }
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function openHashTarget() {
+      const targetId = decodeURIComponent((window.location.hash || '').replace(/^#/, ''));
+      if (!targetId) {
+        return;
+      }
+      const target = document.getElementById(targetId);
+      if (!target) {
+        return;
+      }
+      const resolvedView = target.dataset.anchorView || '';
+      if (resolvedView) {
+        root.dataset.view = resolvedView;
+      }
+      revealDetailPath(target);
+    }
 
     function parseFilterTokens(value) {
       return new Set(String(value || '').split('|').map((item) => item.trim().toLowerCase()).filter(Boolean));
@@ -1099,6 +1215,8 @@ export function renderHtmlReport(report, options = {}) {
     });
 
     applyFilters();
+    openHashTarget();
+    window.addEventListener('hashchange', openHashTarget);
   </script>
 </body>
 </html>`;
@@ -1261,6 +1379,102 @@ function renderFilterAttributes({ nodeType, moduleNames = [], packageNames = [],
   return attributes.map(([key, value]) => `${key}="${escapeHtml(value)}"`).join(' ');
 }
 
+function collectFailedTests(packages, rootDir) {
+  return (packages || []).flatMap((pkg) => {
+    const anchorScope = buildReportAnchorScope({ view: 'package', packageName: pkg?.name });
+    return (Array.isArray(pkg?.suites) ? pkg.suites : []).flatMap((suite) => (
+      (Array.isArray(suite?.tests) ? suite.tests : [])
+        .map((test, index) => ({ test, index }))
+        .filter(({ test }) => normalizeOptionalStatus(test?.status) === 'failed')
+        .map(({ test, index }) => ({
+          title: test.fullName || test.name || 'Unnamed test',
+          packageName: pkg?.name || 'Unknown package',
+          suiteLabel: suite?.label || suite?.id || 'Unnamed suite',
+          location: formatTestLocation(test, rootDir),
+          failureSummary: trimForReport(firstFailureMessage(test), 240),
+          targetId: buildTestAnchorId(anchorScope, suite, test, index),
+          targetView: 'package',
+        }))
+    ));
+  });
+}
+
+function renderFailedTestsFocusSection(entries) {
+  const countLabel = `${entries.length} failed test${entries.length === 1 ? '' : 's'}`;
+
+  return `
+    <section class="panel failure-focus">
+      <div class="failure-focus__header">
+        <div class="failure-focus__copy">
+          <span class="hero__eyebrow">Failed Tests</span>
+          <h2 class="failure-focus__title">Jump straight to the breakage</h2>
+          <p class="failure-focus__description">These failed test cases are surfaced first so you can scan the highest-signal evidence, then jump directly into the matching suite entry in the report below.</p>
+        </div>
+        <span class="hero__metaBadge">${escapeHtml(countLabel)}</span>
+      </div>
+      <div class="failure-focus__list">
+        ${entries.map((entry) => renderFailedTestFocusCard(entry)).join('')}
+      </div>
+    </section>
+  `;
+}
+
+function renderFailedTestFocusCard(entry) {
+  return `
+    <article class="failure-focus__card">
+      <div class="failure-focus__cardHeader">
+        <div>
+          <h3 class="failure-focus__cardTitle">${escapeHtml(entry.title)}</h3>
+          <div class="failure-focus__cardMeta">${escapeHtml(`${entry.packageName} • ${entry.suiteLabel} • ${entry.location}`)}</div>
+        </div>
+        ${renderStatusPill('failed')}
+      </div>
+      ${entry.failureSummary ? `<p class="failure-focus__cardMessage">${escapeHtml(entry.failureSummary)}</p>` : ''}
+      <div class="failure-focus__actions">
+        <button
+          type="button"
+          class="toolbar__button failure-focus__button"
+          data-open-target="${escapeHtml(entry.targetId)}"
+          data-view-target="${escapeHtml(entry.targetView)}"
+        >Open in suite</button>
+      </div>
+    </article>
+  `;
+}
+
+function buildReportAnchorScope({ view = 'module', moduleName = '', themeName = '', packageName = '' } = {}) {
+  return [view, moduleName, themeName, packageName].filter(Boolean).join('-');
+}
+
+function buildSuiteAnchorId(scope, suite) {
+  return `suite-${slugify([
+    scope,
+    suite?.id || '',
+    suite?.label || '',
+    suite?.runtime || '',
+  ].filter(Boolean).join('-'))}`;
+}
+
+function buildTestAnchorId(scope, suite, test, index = 0) {
+  return `test-${slugify([
+    scope,
+    suite?.id || '',
+    suite?.label || '',
+    test?.id || '',
+    test?.fullName || test?.name || '',
+    test?.file || '',
+    Number.isFinite(test?.line) ? test.line : '',
+    index,
+  ].filter(Boolean).join('-'))}`;
+}
+
+function firstFailureMessage(test) {
+  if (!Array.isArray(test?.failureMessages) || test.failureMessages.length === 0) {
+    return '';
+  }
+  return String(test.failureMessages[0] || '').trim();
+}
+
 function renderModuleCard(moduleEntry) {
   const status = deriveStatusFromSummary(moduleEntry.summary);
   const targetId = `module-${slugify(moduleEntry.module)}`;
@@ -1379,7 +1593,11 @@ function renderPackageSection(pkg, rootDir) {
   const suites = Array.isArray(pkg.suites) ? pkg.suites : [];
   const suiteMarkup = suites.length === 0
     ? '<div class="suite"><div class="suite__summaryRow"><div><span class="suite__label">No test suites</span></div><div class="suite__summary">No package test script was found.</div></div></div>'
-    : suites.map((suite) => renderSuite(suite, rootDir, { packageNames: [pkg.name] })).join('');
+    : suites.map((suite) => renderSuite(suite, rootDir, {
+      packageNames: [pkg.name],
+      anchorScope: buildReportAnchorScope({ view: 'package', packageName: pkg.name }),
+      anchorView: 'package',
+    })).join('');
   const filterAttrs = renderFilterAttributes({
     nodeType: 'package-section',
     moduleNames: pkg.modules,
@@ -1451,7 +1669,17 @@ function renderThemePackageSection(moduleEntry, themeEntry, packageEntry, rootDi
   const suites = Array.isArray(packageEntry.suites) ? packageEntry.suites : [];
   const suiteMarkup = suites.length === 0
     ? '<div class="suite"><div class="suite__summaryRow"><div><span class="suite__label">No test suites</span></div><div class="suite__summary">No suite results were grouped under this package.</div></div></div>'
-    : suites.map((suite) => renderSuite(suite, rootDir, { packageNames: [packageEntry.name], moduleNames: [moduleEntry.module] })).join('');
+    : suites.map((suite) => renderSuite(suite, rootDir, {
+      packageNames: [packageEntry.name],
+      moduleNames: [moduleEntry.module],
+      anchorScope: buildReportAnchorScope({
+        view: 'module',
+        moduleName: moduleEntry.module,
+        themeName: themeEntry.theme,
+        packageName: packageEntry.name,
+      }),
+      anchorView: 'module',
+    })).join('');
   const filterAttrs = renderFilterAttributes({
     nodeType: 'theme-package',
     moduleNames: [moduleEntry.module],
@@ -1480,6 +1708,9 @@ function renderSuite(suite, rootDir, filterContext = {}) {
     summary: suite.summary,
     reportedStatus: suite.status,
   });
+  const anchorScope = filterContext.anchorScope || 'report';
+  const anchorView = filterContext.anchorView || 'module';
+  const suiteAnchorId = buildSuiteAnchorId(anchorScope, suite);
   const warnings = Array.isArray(suite.warnings) ? suite.warnings : [];
   const tests = Array.isArray(suite.tests) ? suite.tests : [];
   const rawArtifacts = Array.isArray(suite.rawArtifacts) ? suite.rawArtifacts : [];
@@ -1491,7 +1722,11 @@ function renderSuite(suite, rootDir, filterContext = {}) {
   const artifactMarkup = rawArtifacts.length > 0 ? renderRawArtifactBlock(rawArtifacts) : '';
   const testsMarkup = tests.length === 0
     ? renderSuiteEmptyState(status)
-    : tests.map((test) => renderTest(suite, test, rootDir, filterContext)).join('');
+    : tests.map((test, index) => renderTest(suite, test, rootDir, {
+      ...filterContext,
+      anchorScope,
+      anchorView,
+    }, index)).join('');
   const filterAttrs = renderFilterAttributes({
     nodeType: 'suite',
     moduleNames: filterContext.moduleNames || dedupe(tests.map((test) => test.module || 'uncategorized')),
@@ -1501,7 +1736,7 @@ function renderSuite(suite, rootDir, filterContext = {}) {
     lineCoverage: suite.coverage?.lines?.pct,
   });
   return `
-    <details class="suite" ${filterAttrs}>
+    <details class="suite" id="${escapeHtml(suiteAnchorId)}" data-anchor-view="${escapeHtml(anchorView)}" ${filterAttrs}>
       <summary class="suite__summaryRow">
         <div>
           <div class="suite__label">${escapeHtml(suite.label)}</div>
@@ -1581,8 +1816,11 @@ function deriveDisplayStatus({ summary, reportedStatus = null, suites = [] } = {
   return 'skipped';
 }
 
-function renderTest(suite, test, rootDir, filterContext = {}) {
+function renderTest(suite, test, rootDir, filterContext = {}, index = 0) {
   const statusClass = test.status === 'failed' ? 'fail' : test.status === 'skipped' ? 'skip' : 'pass';
+  const anchorScope = filterContext.anchorScope || 'report';
+  const anchorView = filterContext.anchorView || 'module';
+  const testAnchorId = buildTestAnchorId(anchorScope, suite, test, index);
   const assertions = Array.isArray(test.assertions) && test.assertions.length > 0
     ? `<div class="detail-card"><h4>Assertions</h4><ul>${test.assertions.map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join('')}</ul></div>`
     : '';
@@ -1609,7 +1847,7 @@ function renderTest(suite, test, rootDir, filterContext = {}) {
     hasFailures: test.status === 'failed',
   });
   return `
-    <details class="test-row" ${filterAttrs}>
+    <details class="test-row" id="${escapeHtml(testAnchorId)}" data-anchor-view="${escapeHtml(anchorView)}" ${filterAttrs}>
       <summary class="test-row__summary">
         <span class="status-pill ${statusClass}">${escapeHtml(test.status || 'passed')}</span>
         <div class="test-row__name">

@@ -1757,6 +1757,8 @@ test('web focused run view avoids nested scroll containers around the report', (
   assert.match(appStylesSource, /\.web-table-wrap\s*\{[\s\S]*overflow:\s*visible;/);
   assert.doesNotMatch(appStylesSource, /\.web-table-wrap\s*\{[\s\S]*overflow-x:\s*auto;/);
   assert.match(runPageSource, /scrolling:\s*'no'/);
+  assert.doesNotMatch(runPageSource, /Exact runner HTML report/);
+  assert.match(runPageSource, /function RunnerReportSection[\s\S]*return React\.createElement\(RunnerReportFrame/);
 });
 
 test('web run template routing defaults to the runner report and keeps the operations view addressable', () => {

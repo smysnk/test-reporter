@@ -429,18 +429,10 @@ function TemplateSwitch({ runId, activeTemplate }) {
 }
 
 function RunnerReportSection({ runId, externalKey }) {
-  return React.createElement(
-    SectionCard,
-    {
-      eyebrow: 'Runner Template',
-      title: 'Exact runner HTML report',
-      copy: 'This view loads the same HTML template emitted by the test runner. Artifact links open directly when the run carries public source URLs.',
-    },
-    React.createElement(RunnerReportFrame, {
-      runId,
-      title: `${externalKey} runner report`,
-    }),
-  );
+  return React.createElement(RunnerReportFrame, {
+    runId,
+    title: `${externalKey} runner report`,
+  });
 }
 
 function RunnerReportFrame({ runId, title }) {
