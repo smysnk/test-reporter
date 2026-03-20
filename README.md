@@ -1,9 +1,9 @@
 # test-station
 
 [![npm](https://img.shields.io/npm/v/%40test-station%2Fcli?label=npm)](https://www.npmjs.com/package/@test-station/cli)
-[![tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fsmysnk.github.io%2Ftest-station%2Fbadges%2Ftests.json)](https://smysnk.github.io/test-station/)
-[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fsmysnk.github.io%2Ftest-station%2Fbadges%2Fcoverage.json)](https://smysnk.github.io/test-station/)
-[![health](https://img.shields.io/endpoint?url=https%3A%2F%2Fsmysnk.github.io%2Ftest-station%2Fbadges%2Fhealth.json)](https://smysnk.github.io/test-station/)
+[![tests](https://img.shields.io/endpoint?url=https%3A%2F%2Ftest-station.smysnk.com%2Fapi%2Fbadges%2Ftests.json%3FprojectKey%3Dtest-station)](https://test-station.smysnk.com/)
+[![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Ftest-station.smysnk.com%2Fapi%2Fbadges%2Fcoverage.json%3FprojectKey%3Dtest-station)](https://test-station.smysnk.com/)
+[![health](https://img.shields.io/endpoint?url=https%3A%2F%2Ftest-station.smysnk.com%2Fapi%2Fbadges%2Fhealth.json%3FprojectKey%3Dtest-station)](https://test-station.smysnk.com/)
 
 Demo: [Latest self-test report](https://smysnk.github.io/test-station/) | [Latest `report.json`](https://smysnk.github.io/test-station/report.json)
 

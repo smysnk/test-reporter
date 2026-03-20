@@ -12,6 +12,7 @@ import {
   ADMIN_PROJECTS_QUERY,
   ADMIN_ROLES_QUERY,
   ADMIN_USERS_QUERY,
+  BADGE_RUN_QUERY,
   PERFORMANCE_TREND_QUERY,
   WEB_HOME_QUERY,
   PROJECT_ACTIVITY_QUERY,
@@ -184,6 +185,54 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
           : null,
       }))
       : [],
+  };
+}
+
+export async function loadProjectBadgeSummary({
+  session = null,
+  projectKey = 'test-station',
+  fetchImpl = fetch,
+  requestId = null,
+  requestTrace = null,
+}) {
+  const data = await executeWebGraphql({
+    session,
+    query: BADGE_RUN_QUERY,
+    variables: {
+      projectKey,
+      limit: 1,
+    },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+
+  const run = Array.isArray(data.runs) ? data.runs[0] || null : null;
+  if (!run) {
+    return {
+      totalTests: 0,
+      passedTests: 0,
+      failedTests: 0,
+      skippedTests: 0,
+      coverage: {
+        lines: {
+          pct: null,
+        },
+      },
+    };
+  }
+
+  return {
+    ...(run.summary || {}),
+    coverage: {
+      ...(run.summary?.coverage || {}),
+      lines: {
+        ...(run.summary?.coverage?.lines || {}),
+        pct: Number.isFinite(run.coverageSnapshot?.linesPct)
+          ? run.coverageSnapshot.linesPct
+          : null,
+      },
+    },
   };
 }
 

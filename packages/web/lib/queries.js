@@ -107,6 +107,19 @@ export const PROJECT_ACTIVITY_QUERY = `
   }
 `;
 
+export const BADGE_RUN_QUERY = `
+  query WebBadgeRun($projectKey: String!, $limit: Int) {
+    runs(projectKey: $projectKey, limit: $limit) {
+      id
+      status
+      summary
+      coverageSnapshot {
+        linesPct
+      }
+    }
+  }
+`;
+
 export const PERFORMANCE_TREND_QUERY = `
   query WebPerformanceTrend($projectKey: String!, $statGroup: String!, $statName: String!, $limit: Int) {
     performanceTrend(projectKey: $projectKey, statGroup: $statGroup, statName: $statName, limit: $limit) {

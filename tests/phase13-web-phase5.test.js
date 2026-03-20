@@ -51,6 +51,7 @@ import { buildSignInRedirectUrl, isProtectedWebPath } from '../packages/web/lib/
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
 import { decorateEmbeddedRunnerReportHtml } from '../packages/web/lib/runReportTemplate.js';
 import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nextauth].js';
+import { createBadgeHandler, resolveRequestedBadgeType } from '../packages/web/pages/api/badges/[badge].json.js';
 import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
@@ -420,6 +421,75 @@ test('web health endpoint returns a fast readiness payload', () => {
     status: 'ok',
     service: 'test-station-web',
   });
+});
+
+test('web badge endpoint resolves latest run badges from the reporting backend', async () => {
+  const responseState = createResponseRecorder();
+  const handler = createBadgeHandler({
+    fetchImpl: async (_url, options) => {
+      const request = JSON.parse(options.body);
+      assert.match(request.query, /query WebBadgeRun/);
+      assert.deepEqual(request.variables, {
+        projectKey: 'test-station',
+        limit: 1,
+      });
+
+      return new Response(JSON.stringify({
+        data: {
+          runs: [{
+            id: 'run-1',
+            status: 'passed',
+            summary: {
+              totalTests: 12,
+              passedTests: 12,
+              failedTests: 0,
+              skippedTests: 0,
+            },
+            coverageSnapshot: {
+              linesPct: 91.4,
+            },
+          }],
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    },
+  });
+
+  await handler({
+    method: 'GET',
+    query: {
+      badge: 'health',
+      projectKey: 'test-station',
+    },
+    headers: {},
+  }, responseState.res);
+
+  assert.equal(responseState.statusCode, 200);
+  assert.equal(responseState.headers['cache-control'], 'public, s-maxage=300, stale-while-revalidate=600');
+  assert.deepEqual(JSON.parse(responseState.bodyText), {
+    schemaVersion: 1,
+    label: 'health',
+    message: '91%',
+    color: 'brightgreen',
+  });
+});
+
+test('web badge endpoint rejects unknown badge types', async () => {
+  const responseState = createResponseRecorder();
+  const handler = createBadgeHandler();
+
+  await handler({
+    method: 'GET',
+    query: {
+      badge: 'missing',
+    },
+    headers: {},
+  }, responseState.res);
+
+  assert.equal(responseState.statusCode, 404);
+  assert.equal(resolveRequestedBadgeType('HeAlTh'), 'health');
 });
 
 test('web GraphQL helpers forward actor headers and combine project activity data', async () => {
