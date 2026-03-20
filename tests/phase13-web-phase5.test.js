@@ -40,6 +40,7 @@ import {
   executeWebGraphql,
   loadAdminOverviewPage,
   loadAdminProjectAccessPage,
+  loadProjectBadgeSummary,
   loadWebHomePage,
   loadProjectExplorerPage,
   loadRunExplorerPage,
@@ -51,7 +52,7 @@ import { buildSignInRedirectUrl, isProtectedWebPath } from '../packages/web/lib/
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
 import { decorateEmbeddedRunnerReportHtml } from '../packages/web/lib/runReportTemplate.js';
 import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nextauth].js';
-import { createBadgeHandler, resolveRequestedBadgeType } from '../packages/web/pages/api/badges/[badge].json.js';
+import { createBadgeHandler, resolveRequestedBadgeType, sanitizeBadgeSummary } from '../packages/web/pages/api/badges/[badge].json.js';
 import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
@@ -428,27 +429,20 @@ test('web badge endpoint resolves latest run badges from the reporting backend',
   const handler = createBadgeHandler({
     fetchImpl: async (_url, options) => {
       const request = JSON.parse(options.body);
-      assert.match(request.query, /query WebBadgeRun/);
+      assert.match(request.query, /query WebBadgeSummary/);
       assert.deepEqual(request.variables, {
         projectKey: 'test-station',
-        limit: 1,
       });
 
       return new Response(JSON.stringify({
         data: {
-          runs: [{
-            id: 'run-1',
-            status: 'passed',
-            summary: {
-              totalTests: 12,
-              passedTests: 12,
-              failedTests: 0,
-              skippedTests: 0,
-            },
-            coverageSnapshot: {
-              linesPct: 91.4,
-            },
-          }],
+          badgeSummary: {
+            totalTests: 12,
+            passedTests: 12,
+            failedTests: 0,
+            skippedTests: 0,
+            linesPct: 91.4,
+          },
         },
       }), {
         status: 200,
@@ -490,6 +484,102 @@ test('web badge endpoint rejects unknown badge types', async () => {
 
   assert.equal(responseState.statusCode, 404);
   assert.equal(resolveRequestedBadgeType('HeAlTh'), 'health');
+});
+
+test('web badge summary query returns a minimal public projection', async () => {
+  let capturedRequest = null;
+
+  const summary = await loadProjectBadgeSummary({
+    projectKey: 'private-project',
+    fetchImpl: async (_url, options) => {
+      capturedRequest = JSON.parse(options.body);
+
+      return new Response(JSON.stringify({
+        data: {
+          badgeSummary: {
+            totalTests: 7,
+            passedTests: 5,
+            failedTests: 2,
+            skippedTests: 1,
+            linesPct: 91.2,
+            branch: 'secret-branch',
+            commitSha: 'abcdef123456',
+          },
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    },
+  });
+
+  assert.match(capturedRequest.query, /badgeSummary/);
+  assert.doesNotMatch(capturedRequest.query, /runs\(/);
+  assert.deepEqual(summary, {
+    totalTests: 7,
+    passedTests: 5,
+    failedTests: 2,
+    skippedTests: 1,
+    coverage: {
+      lines: {
+        pct: 91.2,
+      },
+    },
+  });
+});
+
+test('web badge endpoint sanitizes summary payloads before returning badge JSON', async () => {
+  const responseState = createResponseRecorder();
+  const handler = createBadgeHandler({
+    loadBadgeSummary: async () => ({
+      totalTests: 10,
+      passedTests: 8,
+      failedTests: 2,
+      skippedTests: 0,
+      coverage: {
+        lines: {
+          pct: 83.6,
+        },
+      },
+      branch: 'secret-branch',
+      commitSha: 'abcdef123456',
+      metadata: {
+        internalOnly: true,
+      },
+    }),
+  });
+
+  await handler({
+    method: 'GET',
+    query: {
+      badge: 'coverage',
+      projectKey: 'private-project',
+    },
+    headers: {},
+  }, responseState.res);
+
+  assert.equal(responseState.statusCode, 200);
+  assert.deepEqual(sanitizeBadgeSummary({
+    totalTests: 10,
+    passedTests: 8,
+    failedTests: 2,
+    skippedTests: 0,
+    coverage: { lines: { pct: 83.6 } },
+    branch: 'secret-branch',
+    commitSha: 'abcdef123456',
+    metadata: { internalOnly: true },
+  }), {
+    totalTests: 10,
+    passedTests: 8,
+    failedTests: 2,
+    skippedTests: 0,
+    coverage: {
+      lines: {
+        pct: 83.6,
+      },
+    },
+  });
+  assert.deepEqual(Object.keys(JSON.parse(responseState.bodyText)).sort(), ['color', 'label', 'message', 'schemaVersion']);
 });
 
 test('web GraphQL helpers forward actor headers and combine project activity data', async () => {

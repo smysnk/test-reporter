@@ -12,7 +12,7 @@ import {
   ADMIN_PROJECTS_QUERY,
   ADMIN_ROLES_QUERY,
   ADMIN_USERS_QUERY,
-  BADGE_RUN_QUERY,
+  BADGE_SUMMARY_QUERY,
   PERFORMANCE_TREND_QUERY,
   WEB_HOME_QUERY,
   PROJECT_ACTIVITY_QUERY,
@@ -197,39 +197,24 @@ export async function loadProjectBadgeSummary({
 }) {
   const data = await executeWebGraphql({
     session,
-    query: BADGE_RUN_QUERY,
+    query: BADGE_SUMMARY_QUERY,
     variables: {
       projectKey,
-      limit: 1,
     },
     fetchImpl,
     requestId,
     requestTrace,
   });
 
-  const run = Array.isArray(data.runs) ? data.runs[0] || null : null;
-  if (!run) {
-    return {
-      totalTests: 0,
-      passedTests: 0,
-      failedTests: 0,
-      skippedTests: 0,
-      coverage: {
-        lines: {
-          pct: null,
-        },
-      },
-    };
-  }
-
   return {
-    ...(run.summary || {}),
+    totalTests: Number.isFinite(data.badgeSummary?.totalTests) ? data.badgeSummary.totalTests : 0,
+    passedTests: Number.isFinite(data.badgeSummary?.passedTests) ? data.badgeSummary.passedTests : 0,
+    failedTests: Number.isFinite(data.badgeSummary?.failedTests) ? data.badgeSummary.failedTests : 0,
+    skippedTests: Number.isFinite(data.badgeSummary?.skippedTests) ? data.badgeSummary.skippedTests : 0,
     coverage: {
-      ...(run.summary?.coverage || {}),
       lines: {
-        ...(run.summary?.coverage?.lines || {}),
-        pct: Number.isFinite(run.coverageSnapshot?.linesPct)
-          ? run.coverageSnapshot.linesPct
+        pct: Number.isFinite(data.badgeSummary?.linesPct)
+          ? data.badgeSummary.linesPct
           : null,
       },
     },

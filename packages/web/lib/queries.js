@@ -107,15 +107,14 @@ export const PROJECT_ACTIVITY_QUERY = `
   }
 `;
 
-export const BADGE_RUN_QUERY = `
-  query WebBadgeRun($projectKey: String!, $limit: Int) {
-    runs(projectKey: $projectKey, limit: $limit) {
-      id
-      status
-      summary
-      coverageSnapshot {
-        linesPct
-      }
+export const BADGE_SUMMARY_QUERY = `
+  query WebBadgeSummary($projectKey: String!) {
+    badgeSummary(projectKey: $projectKey) {
+      totalTests
+      passedTests
+      failedTests
+      skippedTests
+      linesPct
     }
   }
 `;

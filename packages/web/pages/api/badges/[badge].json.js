@@ -17,13 +17,27 @@ export function resolveRequestedBadgeType(value) {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
 }
 
+export function sanitizeBadgeSummary(summary = {}) {
+  return {
+    totalTests: Number.isFinite(summary?.totalTests) ? summary.totalTests : 0,
+    passedTests: Number.isFinite(summary?.passedTests) ? summary.passedTests : 0,
+    failedTests: Number.isFinite(summary?.failedTests) ? summary.failedTests : 0,
+    skippedTests: Number.isFinite(summary?.skippedTests) ? summary.skippedTests : 0,
+    coverage: {
+      lines: {
+        pct: Number.isFinite(summary?.coverage?.lines?.pct) ? summary.coverage.lines.pct : null,
+      },
+    },
+  };
+}
+
 function resolveProjectKey(value) {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim()
     : DEFAULT_PROJECT_KEY;
 }
 
-export function createBadgeHandler({ fetchImpl = fetch } = {}) {
+export function createBadgeHandler({ fetchImpl = fetch, loadBadgeSummary = loadProjectBadgeSummary } = {}) {
   return async function badgeHandler(req, res) {
     applyTraceHeadersToNextResponse(res, resolveWebRequestTrace(req));
 
@@ -51,7 +65,7 @@ export function createBadgeHandler({ fetchImpl = fetch } = {}) {
       return;
     }
 
-    const summary = await loadProjectBadgeSummary({
+    const summary = await loadBadgeSummary({
       session: null,
       projectKey: resolveProjectKey(req?.query?.projectKey),
       fetchImpl,
@@ -59,7 +73,7 @@ export function createBadgeHandler({ fetchImpl = fetch } = {}) {
     });
 
     res.setHeader('cache-control', 'public, s-maxage=300, stale-while-revalidate=600');
-    res.status(200).json(buildBadge(summary));
+    res.status(200).json(buildBadge(sanitizeBadgeSummary(summary)));
   };
 }
 

@@ -335,6 +335,14 @@ export const queryTypeDefs = `#graphql
     groups: [AdminGroup!]!
   }
 
+  type BadgeSummary {
+    totalTests: Int!
+    passedTests: Int!
+    failedTests: Int!
+    skippedTests: Int!
+    linesPct: Float
+  }
+
   type Query {
     schemaVersion: String!
     serviceStatus: String!
@@ -342,6 +350,7 @@ export const queryTypeDefs = `#graphql
     me: Actor
     projects: [Project!]!
     project(id: ID, key: String, slug: String): Project
+    badgeSummary(projectKey: String!): BadgeSummary!
     runFeed(limit: Int): [RunFeedEntry!]!
     runs(projectId: ID, projectKey: String, status: String, limit: Int): [Run!]!
     run(id: ID, externalKey: String): Run
@@ -373,6 +382,7 @@ export const queryResolvers = {
     me: (_root, _args, context) => resolveViewer(context),
     projects: (_root, _args, context) => context.queryService.listProjects({ actor: context.actor }),
     project: (_root, args, context) => context.queryService.findProject({ ...args, actor: context.actor }),
+    badgeSummary: (_root, args, context) => context.queryService.getPublicBadgeSummary(args),
     runFeed: (_root, args, context) => context.queryService.listRunFeed({ ...args, actor: context.actor }),
     runs: (_root, args, context) => context.queryService.listRuns({ ...args, actor: context.actor }),
     run: (_root, args, context) => context.queryService.findRun({ ...args, actor: context.actor }),

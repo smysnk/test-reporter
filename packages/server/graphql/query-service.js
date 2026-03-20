@@ -41,6 +41,14 @@ const RUN_LIST_ATTRIBUTES = [
   'summary',
 ];
 
+const BADGE_SUMMARY_DEFAULT = {
+  totalTests: 0,
+  passedTests: 0,
+  failedTests: 0,
+  skippedTests: 0,
+  linesPct: null,
+};
+
 export function createGraphqlQueryService(options = {}) {
   const models = options.models || {
     Artifact,
@@ -162,6 +170,48 @@ export function createGraphqlQueryService(options = {}) {
         passedTests: toInteger(run.summary?.passedTests),
         failedTests: toInteger(run.summary?.failedTests),
       }));
+    },
+
+    async getPublicBadgeSummary({ projectKey }) {
+      if (typeof projectKey !== 'string' || projectKey.trim().length === 0) {
+        return { ...BADGE_SUMMARY_DEFAULT };
+      }
+
+      const project = await loadOne(models.Project, {
+        where: { key: projectKey.trim() },
+        attributes: ['id'],
+      });
+
+      if (!project) {
+        return { ...BADGE_SUMMARY_DEFAULT };
+      }
+
+      const run = await loadOne(models.Run, {
+        where: { projectId: project.id },
+        order: [
+          ['completedAt', 'DESC'],
+          ['startedAt', 'DESC'],
+          ['createdAt', 'DESC'],
+        ],
+        attributes: ['id', 'summary'],
+      });
+
+      if (!run) {
+        return { ...BADGE_SUMMARY_DEFAULT };
+      }
+
+      const coverageSnapshot = await loadOne(models.CoverageSnapshot, {
+        where: { runId: run.id },
+        attributes: ['linesPct'],
+      });
+
+      return {
+        totalTests: toInteger(run.summary?.totalTests) ?? 0,
+        passedTests: toInteger(run.summary?.passedTests) ?? 0,
+        failedTests: toInteger(run.summary?.failedTests) ?? 0,
+        skippedTests: toInteger(run.summary?.skippedTests) ?? 0,
+        linesPct: Number.isFinite(coverageSnapshot?.linesPct) ? coverageSnapshot.linesPct : null,
+      };
     },
 
     async findRun({ id = null, externalKey = null, actor }) {
