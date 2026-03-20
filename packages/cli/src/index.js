@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { loadConfig, summarizeConfig, runReport, readJson, formatConsoleSummary, createConsoleProgressReporter } from '@test-station/core';
-import { writeHtmlReport } from '@test-station/render-html';
+import { writeHtmlReport, buildPagesSite } from '@test-station/render-html';
 
 export function parseCliArgs(argv) {
   const parsed = {
@@ -65,6 +65,7 @@ export function renderHelp() {
     '  test-station inspect --config ./test-station.config.mjs',
     '  test-station run --config ./test-station.config.mjs [--dry-run] [--coverage|--no-coverage] [--workspace <name>|--package <name>] [--output-dir <path>]',
     '  test-station render --input ./artifacts/workspace-tests/report.json --output ./artifacts/workspace-tests',
+    '  test-station pages --input ./artifacts/workspace-tests/report.json --output ./artifacts/workspace-tests-pages',
   ].join('\n');
 }
 
@@ -134,6 +135,17 @@ export async function runCli(argv = process.argv.slice(2)) {
       includeDetailedAnalysisToggle: report?.meta?.render?.includeDetailedAnalysisToggle,
     });
     process.stdout.write(`${JSON.stringify({ input: inputPath, output: reportPath }, null, 2)}\n`);
+    return 0;
+  }
+
+  if (args.command === 'pages') {
+    const inputPath = args.input || path.resolve(process.cwd(), 'artifacts/workspace-tests/report.json');
+    const outputDir = args.output || args.outputDir || path.dirname(inputPath);
+    const result = buildPagesSite({
+      input: inputPath,
+      outputDir,
+    });
+    process.stdout.write(`${JSON.stringify({ input: inputPath, output: result.outputDir, badges: { tests: result.testsBadgePath, coverage: result.coverageBadgePath, health: result.healthBadgePath } }, null, 2)}\n`);
     return 0;
   }
 

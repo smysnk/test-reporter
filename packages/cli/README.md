@@ -3,6 +3,7 @@
 [![npm](https://img.shields.io/npm/v/%40test-station%2Fcli?label=npm)](https://www.npmjs.com/package/@test-station/cli)
 [![tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fsmysnk.github.io%2Ftest-station%2Fbadges%2Ftests.json)](https://smysnk.github.io/test-station/)
 [![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fsmysnk.github.io%2Ftest-station%2Fbadges%2Fcoverage.json)](https://smysnk.github.io/test-station/)
+[![health](https://img.shields.io/endpoint?url=https%3A%2F%2Fsmysnk.github.io%2Ftest-station%2Fbadges%2Fhealth.json)](https://smysnk.github.io/test-station/)
 
 Demo: [Latest self-test report](https://smysnk.github.io/test-station/) | [Latest `report.json`](https://smysnk.github.io/test-station/report.json)
 
@@ -218,6 +219,7 @@ The public CLI surface is:
 npx test-station inspect --config ./test-station.config.mjs
 npx test-station run --config ./test-station.config.mjs --coverage --workspace app --output-dir ./artifacts/app-report
 npx test-station render --input ./artifacts/test-report/report.json --output ./artifacts/test-report
+npx test-station pages --input ./artifacts/test-report/report.json --output ./artifacts/test-pages
 ```
 
 Useful overrides:

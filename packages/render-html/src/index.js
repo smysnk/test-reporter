@@ -1231,6 +1231,104 @@ export function writeHtmlReport(report, outputDir, options = {}) {
   return reportPath;
 }
 
+export function buildPagesSite(options = {}) {
+  const { inputDir, reportPath } = resolvePagesInput(
+    options.input || path.resolve(process.cwd(), 'artifacts', 'test-report', 'report.json')
+  );
+  const outputDir = path.resolve(options.outputDir || options.output || inputDir);
+  const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+
+  fs.rmSync(outputDir, { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(outputDir), { recursive: true });
+  fs.cpSync(inputDir, outputDir, { recursive: true });
+  fs.writeFileSync(path.join(outputDir, '.nojekyll'), '');
+
+  const htmlPath = path.join(outputDir, 'index.html');
+  if (!fs.existsSync(htmlPath)) {
+    writeHtmlReport(report, outputDir, {
+      title: options.title || report?.meta?.projectName || 'Test Station',
+      projectRootDir: options.projectRootDir || report?.meta?.projectRootDir || process.cwd(),
+      defaultView: options.defaultView || report?.meta?.render?.defaultView,
+      includeDetailedAnalysisToggle:
+        options.includeDetailedAnalysisToggle ?? report?.meta?.render?.includeDetailedAnalysisToggle,
+    });
+  }
+
+  const badgesDir = path.join(outputDir, 'badges');
+  fs.mkdirSync(badgesDir, { recursive: true });
+
+  const testsBadge = createTestsBadgePayload(report.summary);
+  const coverageBadge = createCoverageBadgePayload(report.summary);
+  const healthBadge = createHealthBadgePayload(report.summary);
+  const summaryPayload = createPagesSummary(report);
+
+  writeJson(path.join(badgesDir, 'tests.json'), testsBadge);
+  writeJson(path.join(badgesDir, 'coverage.json'), coverageBadge);
+  writeJson(path.join(badgesDir, 'health.json'), healthBadge);
+  writeJson(path.join(outputDir, 'summary.json'), summaryPayload);
+
+  return {
+    inputDir,
+    outputDir,
+    reportPath: path.join(outputDir, 'report.json'),
+    htmlPath,
+    testsBadgePath: path.join(badgesDir, 'tests.json'),
+    coverageBadgePath: path.join(badgesDir, 'coverage.json'),
+    healthBadgePath: path.join(badgesDir, 'health.json'),
+    summaryPath: path.join(outputDir, 'summary.json'),
+  };
+}
+
+export function createTestsBadgePayload(summary = {}) {
+  const total = Number(summary.totalTests || 0);
+  const passed = Number(summary.passedTests || 0);
+  const failed = Number(summary.failedTests || 0);
+  const skipped = Number(summary.skippedTests || 0);
+
+  if (total === 0) {
+    return createBadge('tests', 'no tests', 'lightgrey');
+  }
+  if (failed > 0) {
+    return createBadge('tests', `${passed} passed / ${failed} failed`, 'red');
+  }
+  if (skipped > 0) {
+    return createBadge('tests', `${passed} passed / ${skipped} skipped`, 'yellow');
+  }
+  return createBadge('tests', `${passed} passed`, 'brightgreen');
+}
+
+export function createCoverageBadgePayload(summary = {}) {
+  const linesPct = summary?.coverage?.lines?.pct;
+  if (!Number.isFinite(linesPct)) {
+    return createBadge('coverage', 'n/a', 'lightgrey');
+  }
+  return createBadge('coverage', `${Number(linesPct).toFixed(1)}%`, badgeCoverageColor(linesPct));
+}
+
+export function createHealthBadgePayload(summary = {}) {
+  const linesPct = summary?.coverage?.lines?.pct;
+  if (!Number.isFinite(linesPct)) {
+    return createBadge('health', 'n/a', 'lightgrey');
+  }
+  return createBadge('health', `${Math.round(Number(linesPct))}%`, badgeCoverageColor(linesPct));
+}
+
+export function createPagesSummary(report) {
+  return {
+    generatedAt: report?.generatedAt || null,
+    projectName: report?.meta?.projectName || null,
+    summary: report?.summary || {},
+    artifacts: {
+      html: 'index.html',
+      reportJson: 'report.json',
+      rawDir: 'raw',
+      testsBadge: 'badges/tests.json',
+      coverageBadge: 'badges/coverage.json',
+      healthBadge: 'badges/health.json',
+    },
+  };
+}
+
 function resolveRootDir(report, options) {
   const candidate = options.projectRootDir || report?.meta?.projectRootDir || null;
   if (!candidate || typeof candidate !== 'string') {
@@ -1241,6 +1339,49 @@ function resolveRootDir(report, options) {
 
 function normalizeView(value) {
   return value === 'package' ? 'package' : 'module';
+}
+
+function resolvePagesInput(input) {
+  const resolvedInput = path.resolve(input);
+  const details = fs.statSync(resolvedInput);
+
+  if (details.isDirectory()) {
+    return {
+      inputDir: resolvedInput,
+      reportPath: path.join(resolvedInput, 'report.json'),
+    };
+  }
+
+  return {
+    inputDir: path.dirname(resolvedInput),
+    reportPath: resolvedInput,
+  };
+}
+
+function createBadge(label, message, color) {
+  return {
+    schemaVersion: 1,
+    label,
+    message,
+    color,
+  };
+}
+
+function badgeCoverageColor(pct) {
+  if (pct >= 90) {
+    return 'brightgreen';
+  }
+  if (pct >= 75) {
+    return 'yellowgreen';
+  }
+  if (pct >= 60) {
+    return 'yellow';
+  }
+  return 'red';
+}
+
+function writeJson(filePath, payload) {
+  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`);
 }
 
 function renderSummaryCard(label, value) {

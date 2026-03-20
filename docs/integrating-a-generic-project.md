@@ -193,7 +193,12 @@ The stable CLI commands are:
 npx test-station inspect --config ./test-station.config.mjs
 npx test-station run --config ./test-station.config.mjs --coverage --workspace app --output-dir ./artifacts/app-report
 npx test-station render --input ./artifacts/test-report/report.json --output ./artifacts/test-report
+npx test-station pages --input ./artifacts/test-report/report.json --output ./artifacts/test-pages
 ```
+
+`pages` copies a report directory into a GitHub Pages-friendly artifact, writes `.nojekyll`, and
+emits standard badge endpoints under `badges/tests.json`, `badges/coverage.json`, and
+`badges/health.json`.
 
 Useful overrides:
 

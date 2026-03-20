@@ -3,6 +3,7 @@
 [![npm](https://img.shields.io/npm/v/%40test-station%2Fcli?label=npm)](https://www.npmjs.com/package/@test-station/cli)
 [![tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fsmysnk.github.io%2Ftest-station%2Fbadges%2Ftests.json)](https://smysnk.github.io/test-station/)
 [![coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fsmysnk.github.io%2Ftest-station%2Fbadges%2Fcoverage.json)](https://smysnk.github.io/test-station/)
+[![health](https://img.shields.io/endpoint?url=https%3A%2F%2Fsmysnk.github.io%2Ftest-station%2Fbadges%2Fhealth.json)](https://smysnk.github.io/test-station/)
 
 Demo: [Latest self-test report](https://smysnk.github.io/test-station/) | [Latest `report.json`](https://smysnk.github.io/test-station/report.json)
 

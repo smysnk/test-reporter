@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadConfig, summarizeConfig, createPhase1ScaffoldReport } from '@test-station/core';
@@ -485,20 +486,23 @@ test('cli inspect command loads config successfully', () => {
 });
 
 test('cli render command writes an html file', () => {
-  const outputDir = path.join(repoRoot, 'artifacts', 'phase1-render-test');
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-station-render-'));
   const inputPath = path.join(outputDir, 'report.json');
-  fs.rmSync(outputDir, { recursive: true, force: true });
-  fs.mkdirSync(outputDir, { recursive: true });
-  fs.writeFileSync(inputPath, `${JSON.stringify(createSampleReport(), null, 2)}\n`);
-  const result = spawnSync(process.execPath, [cliPath, 'render', '--input', inputPath, '--output', outputDir], {
-    encoding: 'utf8',
-    cwd: repoRoot,
-  });
-  assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.equal(fs.existsSync(path.join(outputDir, 'index.html')), true);
-  const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
-  assert.match(html, /Group by Module/);
-  assert.match(html, /core fails/);
+
+  try {
+    fs.writeFileSync(inputPath, `${JSON.stringify(createSampleReport(), null, 2)}\n`);
+    const result = spawnSync(process.execPath, [cliPath, 'render', '--input', inputPath, '--output', outputDir], {
+      encoding: 'utf8',
+      cwd: repoRoot,
+    });
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    assert.equal(fs.existsSync(path.join(outputDir, 'index.html')), true);
+    const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
+    assert.match(html, /Group by Module/);
+    assert.match(html, /core fails/);
+  } finally {
+    fs.rmSync(outputDir, { recursive: true, force: true });
+  }
 });
 
 test('root-level consumer entrypoints stay stable', async () => {
