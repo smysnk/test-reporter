@@ -70,3 +70,14 @@ test('main release workflow gates npm publish, image build, and fleet deployment
   assert.match(workflow, /FLEET_KUBECONFIG/);
   assert.match(workflow, /deploy-fleet\.sh --kubeconfig "\$KUBECONFIG_PATH" --restart/);
 });
+
+test('pages workflow publishes the self-test site from main', () => {
+  const workflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'test-results-pages.yml'), 'utf8');
+
+  assert.match(workflow, /name:\s*Publish Test Results/);
+  assert.match(workflow, /branches:\s*\n\s*-\s*main/);
+  assert.match(workflow, /yarn test:coverage/);
+  assert.match(workflow, /yarn pages:build/);
+  assert.match(workflow, /upload-pages-artifact@v3/);
+  assert.match(workflow, /deploy-pages@v4/);
+});
