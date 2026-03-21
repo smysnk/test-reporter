@@ -1,8 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createGraphqlQueryService } from '../packages/server/graphql/query-service.js';
+import { createGraphqlQueryService, resolveRunBuildNumber } from '../packages/server/graphql/query-service.js';
 import { createServer } from '../packages/server/index.js';
 import { resolveActorFromRequest } from '../packages/server/graphql/context.js';
+
+test('query service resolves build number from stored source fallbacks', () => {
+  assert.equal(resolveRunBuildNumber({
+    metadata: {
+      source: {
+        buildNumber: 45,
+      },
+    },
+  }), 45);
+
+  assert.equal(resolveRunBuildNumber({
+    rawReport: {
+      meta: {
+        ci: {
+          environment: {
+            GITHUB_RUN_NUMBER: '12',
+          },
+        },
+      },
+    },
+  }), 12);
+});
 
 test('GraphQL exposes guest-safe public reads and hides private resources', async () => {
   const server = await createServer({

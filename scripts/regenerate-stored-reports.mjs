@@ -3,7 +3,7 @@
 import { pathToFileURL } from 'node:url';
 import sequelize, { dbReady } from '../packages/server/db.js';
 import { createIngestionService } from '../packages/server/ingest/index.js';
-import { Artifact, Project, Run } from '../packages/server/models/index.js';
+import { Artifact, Project, ProjectVersion, Run } from '../packages/server/models/index.js';
 
 export function parseRegenerateStoredReportsArgs(argv) {
   const parsed = {
@@ -65,6 +65,8 @@ export function buildReplayPayload({ project, run, artifacts = [] }) {
   }
 
   const sourceMetadata = sanitizeReplaySource(run?.metadata?.source);
+  const replayEnvironment = resolveReplayEnvironment({ sourceMetadata, rawReport: run?.rawReport });
+  const replayCi = buildReplayCi({ sourceMetadata, rawReport: run?.rawReport, environment: replayEnvironment });
 
   return {
     projectKey,
@@ -73,11 +75,22 @@ export function buildReplayPayload({ project, run, artifacts = [] }) {
       provider: sourceMetadata.provider || normalizeString(run?.sourceProvider),
       runId: sourceMetadata.runId || normalizeString(run?.sourceRunId),
       runUrl: sourceMetadata.runUrl || normalizeString(run?.sourceUrl),
-      actor: sourceMetadata.actor,
+      actor: sourceMetadata.actor || normalizeString(replayEnvironment.GITHUB_ACTOR),
+      repository: sourceMetadata.repository || normalizeString(replayEnvironment.GITHUB_REPOSITORY),
+      repositoryUrl: sourceMetadata.repositoryUrl || normalizeString(project?.repositoryUrl) || deriveRepositoryUrlFromEnvironment(replayEnvironment),
+      defaultBranch: sourceMetadata.defaultBranch || normalizeString(project?.defaultBranch),
+      projectName: sourceMetadata.projectName || normalizeString(project?.name),
       branch: sourceMetadata.branch || normalizeString(run?.branch),
+      tag: sourceMetadata.tag,
       commitSha: sourceMetadata.commitSha || normalizeString(run?.commitSha),
-      startedAt: sourceMetadata.startedAt || normalizeDate(run?.startedAt),
-      completedAt: sourceMetadata.completedAt || normalizeDate(run?.completedAt),
+      startedAt: sourceMetadata.startedAt || normalizeDate(run?.startedAt) || normalizeString(run?.rawReport?.generatedAt),
+      completedAt: sourceMetadata.completedAt || normalizeDate(run?.completedAt) || normalizeString(run?.rawReport?.generatedAt),
+      buildNumber: sourceMetadata.buildNumber ?? normalizeInteger(run?.projectVersion?.buildNumber) ?? deriveBuildNumberFromEnvironment(replayEnvironment),
+      semanticVersion: sourceMetadata.semanticVersion,
+      releaseName: sourceMetadata.releaseName,
+      versionKey: sourceMetadata.versionKey,
+      releasedAt: sourceMetadata.releasedAt,
+      ci: replayCi,
       metadata: sourceMetadata.metadata || {},
     },
     artifacts: buildRunArtifactReplayPayloads(artifacts),
@@ -220,6 +233,11 @@ async function loadReplayTargetById(runId, { projectKey = null } = {}) {
         ...(projectKey ? { where: { key: projectKey } } : {}),
       },
       {
+        model: ProjectVersion,
+        as: 'projectVersion',
+        required: false,
+      },
+      {
         model: Artifact,
         as: 'artifacts',
         required: false,
@@ -238,16 +256,92 @@ function sanitizeReplaySource(value) {
     runId: normalizeString(value.runId),
     runUrl: normalizeString(value.runUrl),
     actor: normalizeString(value.actor),
+    repository: normalizeString(value.repository),
+    repositoryUrl: normalizeString(value.repositoryUrl),
+    defaultBranch: normalizeString(value.defaultBranch),
+    projectName: normalizeString(value.projectName),
     branch: normalizeString(value.branch),
+    tag: normalizeString(value.tag),
     commitSha: normalizeString(value.commitSha),
     startedAt: normalizeString(value.startedAt),
     completedAt: normalizeString(value.completedAt),
+    buildNumber: normalizeInteger(value.buildNumber),
+    semanticVersion: normalizeString(value.semanticVersion),
+    releaseName: normalizeString(value.releaseName),
+    versionKey: normalizeString(value.versionKey),
+    releasedAt: normalizeString(value.releasedAt),
+    ci: value?.ci && typeof value.ci === 'object' ? value.ci : {},
+    environment: value?.ci?.environment && typeof value.ci.environment === 'object'
+      ? value.ci.environment
+      : {},
     metadata: value.metadata && typeof value.metadata === 'object' ? value.metadata : {},
   };
 }
 
+function resolveReplayEnvironment({ sourceMetadata = {}, rawReport = null } = {}) {
+  if (hasObjectKeys(sourceMetadata?.ci?.environment)) {
+    return sourceMetadata.ci.environment;
+  }
+
+  if (hasObjectKeys(sourceMetadata?.environment)) {
+    return sourceMetadata.environment;
+  }
+
+  if (hasObjectKeys(rawReport?.meta?.ci?.environment)) {
+    return rawReport.meta.ci.environment;
+  }
+
+  return {};
+}
+
+function buildReplayCi({ sourceMetadata = {}, rawReport = null, environment = {} } = {}) {
+  const sourceCi = sourceMetadata?.ci && typeof sourceMetadata.ci === 'object'
+    ? sourceMetadata.ci
+    : {};
+  const rawReportCi = rawReport?.meta?.ci && typeof rawReport.meta.ci === 'object'
+    ? rawReport.meta.ci
+    : {};
+
+  return {
+    ...rawReportCi,
+    ...sourceCi,
+    environment,
+  };
+}
+
+function deriveBuildNumberFromEnvironment(environment = {}) {
+  if (!environment || typeof environment !== 'object') {
+    return null;
+  }
+
+  return normalizeInteger(environment.GITHUB_RUN_NUMBER);
+}
+
+function deriveRepositoryUrlFromEnvironment(environment = {}) {
+  if (!environment || typeof environment !== 'object') {
+    return null;
+  }
+
+  const repository = normalizeString(environment.GITHUB_REPOSITORY);
+  const serverUrl = normalizeString(environment.GITHUB_SERVER_URL) || 'https://github.com';
+  return repository ? `${serverUrl}/${repository}` : null;
+}
+
+function hasObjectKeys(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0;
+}
+
 function normalizeString(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizeInteger(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) ? parsed : null;
 }
 
 function normalizeDate(value) {

@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { BenchmarkExplorer } from '../../components/BenchmarkBits.js';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
-import { formatCoveragePct, formatDateTime, formatDuration, formatRunBuildLabel } from '../../lib/format.js';
+import { formatCoveragePct, formatDateTime, formatDuration, formatRunBuildLabel, resolveRunBuildNumber } from '../../lib/format.js';
 import { getWebSession } from '../../lib/auth.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../../lib/requestTrace.js';
 import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../../lib/pageProfiling.js';
@@ -12,8 +12,9 @@ import { loadProjectExplorerPage } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
 
 function formatProjectRunBuildLabel(run) {
-  if (Number.isFinite(run?.projectVersion?.buildNumber)) {
-    return `#${Math.trunc(Number(run.projectVersion.buildNumber))}`;
+  const buildNumber = resolveRunBuildNumber(run);
+  if (Number.isFinite(buildNumber)) {
+    return `#${Math.trunc(Number(buildNumber))}`;
   }
 
   return formatRunBuildLabel(run);

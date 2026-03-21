@@ -149,6 +149,7 @@ export function createGraphqlQueryService(options = {}) {
       const runs = await this.listRuns({ actor, limit });
 
       return runs.map((run) => ({
+        buildNumber: resolveRunBuildNumber(run, run.projectVersion),
         id: run.id,
         externalKey: run.externalKey,
         status: run.status,
@@ -164,7 +165,6 @@ export function createGraphqlQueryService(options = {}) {
         projectName: run.project?.name || run.externalKey,
         projectRepositoryUrl: run.project?.repositoryUrl || null,
         versionKey: run.projectVersion?.versionKey || null,
-        buildNumber: toInteger(run.projectVersion?.buildNumber),
         linesPct: run.coverageSnapshot?.linesPct ?? null,
         totalTests: toInteger(run.summary?.totalTests),
         passedTests: toInteger(run.summary?.passedTests),
@@ -714,11 +714,39 @@ export function createGraphqlQueryService(options = {}) {
 }
 
 function decorateRun(run, related) {
+  const resolvedBuildNumber = resolveRunBuildNumber(run, related.projectVersion);
+  const projectVersion = withResolvedProjectVersionBuildNumber(related.projectVersion, resolvedBuildNumber);
+
   return {
     ...run,
     project: related.project,
-    projectVersion: related.projectVersion,
+    projectVersion,
     coverageSnapshot: related.coverageSnapshot,
+    buildNumber: resolvedBuildNumber,
+  };
+}
+
+export function resolveRunBuildNumber(run, projectVersion = run?.projectVersion || null) {
+  return parseInteger(projectVersion?.buildNumber)
+    ?? parseInteger(run?.buildNumber)
+    ?? parseInteger(run?.metadata?.source?.buildNumber)
+    ?? parseInteger(run?.metadata?.source?.environment?.GITHUB_RUN_NUMBER)
+    ?? parseInteger(run?.metadata?.source?.ci?.environment?.GITHUB_RUN_NUMBER)
+    ?? parseInteger(run?.rawReport?.meta?.ci?.environment?.GITHUB_RUN_NUMBER);
+}
+
+function withResolvedProjectVersionBuildNumber(projectVersion, buildNumber) {
+  if (!projectVersion || !Number.isFinite(buildNumber) || Number.isFinite(toInteger(projectVersion?.buildNumber))) {
+    return projectVersion;
+  }
+
+  const serialized = typeof projectVersion.toJSON === 'function'
+    ? projectVersion.toJSON()
+    : projectVersion;
+
+  return {
+    ...serialized,
+    buildNumber,
   };
 }
 
@@ -1019,6 +1047,15 @@ function diffMetric(current, previous) {
 
 function toInteger(value) {
   return Number.isFinite(value) ? Math.trunc(value) : null;
+}
+
+function parseInteger(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) ? parsed : null;
 }
 
 function toNumber(value) {

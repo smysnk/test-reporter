@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useDispatch, useSelector } from 'react-redux';
 import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/WebBits.js';
-import { formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel } from '../lib/format.js';
+import { formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel, resolveRunBuildNumber } from '../lib/format.js';
 import { buildHomeExplorerModel } from '../lib/homeExplorer.js';
 import { getWebSession } from '../lib/auth.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../lib/requestTrace.js';
@@ -46,8 +46,9 @@ function SidebarButton({ active = false, title, meta, status, onClick, perfId = 
 }
 
 function formatLandingBuildLabel(run) {
-  if (Number.isFinite(run?.projectVersion?.buildNumber)) {
-    return `#${Math.trunc(Number(run.projectVersion.buildNumber))}`;
+  const buildNumber = resolveRunBuildNumber(run);
+  if (Number.isFinite(buildNumber)) {
+    return `#${Math.trunc(Number(buildNumber))}`;
   }
 
   return formatRunBuildLabel(run);

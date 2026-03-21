@@ -50,9 +50,19 @@ export function formatBuildNumber(value) {
   return Number.isFinite(value) ? `build #${Math.trunc(Number(value))}` : 'Build unavailable';
 }
 
+export function resolveRunBuildNumber(run) {
+  return normalizeBuildNumber(run?.projectVersion?.buildNumber)
+    ?? normalizeBuildNumber(run?.buildNumber)
+    ?? normalizeBuildNumber(run?.metadata?.source?.buildNumber)
+    ?? normalizeBuildNumber(run?.metadata?.source?.environment?.GITHUB_RUN_NUMBER)
+    ?? normalizeBuildNumber(run?.metadata?.source?.ci?.environment?.GITHUB_RUN_NUMBER)
+    ?? normalizeBuildNumber(run?.rawReport?.meta?.ci?.environment?.GITHUB_RUN_NUMBER);
+}
+
 export function formatRunBuildLabel(run) {
-  if (Number.isFinite(run?.projectVersion?.buildNumber)) {
-    return formatBuildNumber(run.projectVersion.buildNumber);
+  const buildNumber = resolveRunBuildNumber(run);
+  if (Number.isFinite(buildNumber)) {
+    return formatBuildNumber(buildNumber);
   }
 
   if (typeof run?.sourceRunId === 'string' && run.sourceRunId.trim() !== '') {
@@ -177,4 +187,13 @@ function formatRoundedNumber(value, digits = null) {
   return resolvedDigits > 0
     ? rounded.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1')
     : rounded;
+}
+
+function normalizeBuildNumber(value) {
+  if (value == null || value === '') {
+    return null;
+  }
+
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) ? parsed : null;
 }

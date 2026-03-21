@@ -22,6 +22,7 @@ import {
   formatDuration,
   formatRepositoryName,
   formatRunBuildLabel,
+  resolveRunBuildNumber,
 } from '../packages/web/lib/format.js';
 import {
   beginClientRouteProfile,
@@ -1719,7 +1720,11 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(formatBuildNumber(88), 'build #88');
   assert.equal(formatCommitSha('abcdef1234567890'), 'abcdef1');
   assert.equal(formatRepositoryName('https://github.com/smysnk/test-station.git'), 'smysnk/test-station');
+  assert.equal(resolveRunBuildNumber({ projectVersion: { buildNumber: 88 } }), 88);
+  assert.equal(resolveRunBuildNumber({ buildNumber: 45 }), 45);
+  assert.equal(resolveRunBuildNumber({ rawReport: { meta: { ci: { environment: { GITHUB_RUN_NUMBER: '12' } } } } }), 12);
   assert.equal(formatRunBuildLabel({ projectVersion: { buildNumber: 88 } }), 'build #88');
+  assert.equal(formatRunBuildLabel({ rawReport: { meta: { ci: { environment: { GITHUB_RUN_NUMBER: '45' } } } } }), 'build #45');
   assert.equal(formatRunBuildLabel({ sourceRunId: '1001' }), 'run 1001');
   assert.equal(formatBenchmarkValue(57.54, 'ms'), '57.5 ms');
   assert.equal(formatBenchmarkValue(2048, 'bytes'), '2 KiB');
