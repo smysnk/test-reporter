@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
-import { RunBenchmarkSummary } from '../../components/BenchmarkBits.js';
+import { BenchmarkExplorer, RunBenchmarkSummary } from '../../components/BenchmarkBits.js';
+import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, InlineList, MetricGrid, RunSourceLink, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, formatSignedDelta } from '../../lib/format.js';
 import { getWebSession } from '../../lib/auth.js';
@@ -74,7 +75,7 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
           }),
         ),
       ),
-      React.createElement(MetricGrid, {
+    React.createElement(MetricGrid, {
         items: [
           { label: 'Completed', value: formatDateTime(run.completedAt), copy: run.branch || 'no branch' },
           { label: 'Duration', value: formatDuration(run.durationMs), copy: run.projectVersion?.versionKey || 'version unavailable' },
@@ -84,12 +85,61 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
         ],
       }),
     ),
+    React.createElement(RunHistoricalSignals, { data, run }),
     templateMode === 'runner'
       ? React.createElement(RunnerReportSection, {
         runId: run.id,
         externalKey: run.externalKey,
       })
       : React.createElement(OperationsRunDetail, { data }),
+  );
+}
+
+function RunHistoricalSignals({ data, run }) {
+  const coverageTrend = Array.isArray(data?.coverageTrend) ? data.coverageTrend : [];
+  const coverageTrendOverlays = Array.isArray(data?.coverageTrendOverlays) ? data.coverageTrendOverlays : [];
+  const benchmarkPanels = Array.isArray(data?.benchmarkPanels) ? data.benchmarkPanels : [];
+
+  return React.createElement(
+    'div',
+    { className: 'web-grid web-grid--two' },
+    React.createElement(
+      SectionCard,
+      {
+        eyebrow: 'Historical Coverage',
+        title: 'Coverage movement',
+        copy: 'Track how this project has been trending across recent runs without leaving the run detail view.',
+        compact: true,
+      },
+      coverageTrend.length > 0
+        ? React.createElement(CoverageTrendPanel, {
+          title: run.project?.name || 'Project line coverage',
+          subtitle: 'Recent project-wide line coverage',
+          points: coverageTrend,
+          overlays: coverageTrendOverlays,
+        })
+        : React.createElement(EmptyState, {
+          title: 'No historical coverage yet',
+          copy: 'Coverage trend points will appear here once this project has repeated runs with stored coverage snapshots.',
+        }),
+    ),
+    React.createElement(
+      SectionCard,
+      {
+        eyebrow: 'Historical Benchmarks',
+        title: 'Benchmark graphs',
+        copy: 'Review recent benchmark movement for this project directly from the run page.',
+        compact: true,
+      },
+      benchmarkPanels.length > 0
+        ? React.createElement(BenchmarkExplorer, {
+          benchmarkPanels,
+        })
+        : React.createElement(EmptyState, {
+          title: 'No benchmark history yet',
+          copy: 'Benchmark charts appear once this project begins publishing benchmark trend data.',
+        }),
+    ),
   );
 }
 

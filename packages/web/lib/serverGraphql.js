@@ -17,6 +17,7 @@ import {
   WEB_HOME_QUERY,
   PROJECT_ACTIVITY_QUERY,
   PROJECT_BY_SLUG_QUERY,
+  RUN_PROJECT_HISTORY_QUERY,
   RUN_HEADER_QUERY,
   RUN_SCOPE_TREND_CATALOG_QUERY,
   RUN_DETAIL_QUERY,
@@ -338,8 +339,58 @@ export async function loadRunExplorerPage({
     return null;
   }
 
+  const projectKey = typeof data.run?.project?.key === 'string' && data.run.project.key.trim()
+    ? data.run.project.key.trim()
+    : null;
+  let coverageTrend = [];
+  let coverageTrendOverlays = [];
+  let benchmarkPanels = [];
+
+  if (projectKey) {
+    try {
+      const historyResult = await measureProfileStep(profiler, 'run-project-history-query', () => executeWebGraphqlRequest({
+        session,
+        query: RUN_PROJECT_HISTORY_QUERY,
+        variables: { projectKey },
+        fetchImpl,
+        requestId,
+        requestTrace,
+      }), (response) => ({
+        query: 'RUN_PROJECT_HISTORY_QUERY',
+        projectKey,
+        runId,
+        ...response?.meta,
+      }));
+      const historyData = historyResult.data;
+      coverageTrend = Array.isArray(historyData.coverageTrend) ? historyData.coverageTrend : [];
+      coverageTrendOverlays = buildTrendOverlays(
+        coverageTrend,
+        Array.isArray(historyData.releaseNotes) ? historyData.releaseNotes : [],
+      );
+
+      benchmarkPanels = await measureProfileStep(profiler, 'run-project-benchmark-panels', () => loadProjectBenchmarkPanels({
+        session,
+        projectKey,
+        benchmarkCatalog: Array.isArray(historyData.benchmarkCatalog) ? historyData.benchmarkCatalog : [],
+        fetchImpl,
+        requestId,
+        requestTrace,
+      }), {
+        projectKey,
+        runId,
+      });
+    } catch {
+      coverageTrend = [];
+      coverageTrendOverlays = [];
+      benchmarkPanels = [];
+    }
+  }
+
   return {
     run: data.run,
+    coverageTrend,
+    coverageTrendOverlays,
+    benchmarkPanels,
     runPackages: useOperationsQuery && Array.isArray(data.runPackages) ? data.runPackages : [],
     runModules: useOperationsQuery && Array.isArray(data.runModules) ? data.runModules : [],
     runFiles: useOperationsQuery && Array.isArray(data.runFiles) ? data.runFiles : [],

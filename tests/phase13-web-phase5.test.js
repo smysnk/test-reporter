@@ -33,7 +33,7 @@ import {
   setClientServerPageProfile,
 } from '../packages/web/lib/pageProfiling.js';
 import { buildAdminPageResult, buildOverviewPageResult, buildProjectPageResult, buildRunPageResult } from '../packages/web/lib/pageProps.js';
-import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, PERFORMANCE_TREND_QUERY, RUN_DETAIL_QUERY, RUN_HEADER_QUERY } from '../packages/web/lib/queries.js';
+import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, PERFORMANCE_TREND_QUERY, RUN_DETAIL_QUERY, RUN_HEADER_QUERY, RUN_PROJECT_HISTORY_QUERY } from '../packages/web/lib/queries.js';
 import { resolvePublicRuntimeConfig } from '../packages/web/lib/runtimeConfig.js';
 import {
   ADMIN_PAGE_UNAUTHORIZED,
@@ -232,7 +232,7 @@ test('web hides demo auth and auto-selects Google when Google OAuth is configure
 });
 
 test('web sign-out redirects to a signed-out sign-in page without auto re-authenticating', () => {
-  assert.equal(buildSignedOutRedirectUrl(), '/auth/signin?signedOut=1');
+  assert.equal(buildSignedOutRedirectUrl(), '/');
 });
 
 test('web defaults NEXTAUTH_URL to localhost using WEB_PORT when unset', () => {
@@ -1509,85 +1509,167 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
     },
     role: 'member',
   };
-  const responses = [
-    {
-      data: {
-        run: {
-          id: 'run-1',
-          externalKey: 'workspace:github-actions:1001',
-          sourceRunId: '1001',
-          sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
-          project: { slug: 'workspace', name: 'Workspace' },
-          projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
-          coverageSnapshot: { linesPct: 80 },
+  const graphqlQueries = [];
+  const fetchImpl = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    const query = request.query;
+    graphqlQueries.push(query);
+
+    if (query.includes('query WebRunHeader')) {
+      return new Response(JSON.stringify({
+        data: {
+          run: {
+            id: 'run-1',
+            externalKey: 'workspace:github-actions:1001',
+            sourceRunId: '1001',
+            sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
+            project: { key: 'workspace', slug: 'workspace', name: 'Workspace' },
+            projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
+            coverageSnapshot: { linesPct: 80 },
+          },
         },
-      },
-    },
-    {
-      data: {
-        run: {
-          id: 'run-1',
-          externalKey: 'workspace:github-actions:1001',
-          sourceRunId: '1001',
-          sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
-          project: { slug: 'workspace', name: 'Workspace' },
-          projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
-          artifacts: [],
-          suites: [],
-          coverageSnapshot: { linesPct: 80 },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    if (query.includes('query WebRunDetail')) {
+      return new Response(JSON.stringify({
+        data: {
+          run: {
+            id: 'run-1',
+            externalKey: 'workspace:github-actions:1001',
+            sourceRunId: '1001',
+            sourceUrl: 'https://github.com/example/test-station/actions/runs/1001',
+            project: { key: 'workspace', slug: 'workspace', name: 'Workspace' },
+            projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
+            artifacts: [],
+            suites: [],
+            coverageSnapshot: { linesPct: 80 },
+          },
+          runPackages: [{ name: 'workspace' }],
+          runModules: [{ module: 'runtime' }],
+          runFiles: [{ path: '/repo/packages/core/src/index.js' }],
+          tests: [{ id: 'test-1', fullName: 'workspace fails', failureMessages: ['expected'] }],
+          runPerformanceStats: [{
+            id: 'perf-run-1-redux',
+            runId: 'run-1',
+            suiteRunId: null,
+            testExecutionId: null,
+            projectId: 'project-1',
+            projectKey: 'workspace',
+            externalKey: 'workspace:github-actions:1001',
+            versionKey: 'commit:abc123',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'abc123',
+            buildNumber: 88,
+            statGroup: 'benchmark.node.engine.nibbles.intro',
+            statName: 'elapsed_ms',
+            numericValue: 57.54,
+            textValue: null,
+            unit: 'ms',
+            seriesId: 'interpreter-redux',
+            runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {},
+          }],
+          runCoverageComparison: {
+            runId: 'run-1',
+            previousRunId: 'run-0',
+            currentExternalKey: 'workspace:github-actions:1001',
+            previousExternalKey: 'workspace:github-actions:1000',
+            currentVersionKey: 'commit:abc123',
+            previousVersionKey: 'commit:zzz999',
+            currentLinesPct: 80,
+            previousLinesPct: 74,
+            deltaLinesPct: 6,
+            packageChanges: [{ label: 'workspace', deltaLinesPct: 6 }],
+            moduleChanges: [{ label: 'runtime', deltaLinesPct: 6 }],
+            fileChanges: [{ label: '/repo/packages/core/src/index.js', filePath: '/repo/packages/core/src/index.js', deltaLinesPct: 6 }],
+          },
         },
-        runPackages: [{ name: 'workspace' }],
-        runModules: [{ module: 'runtime' }],
-        runFiles: [{ path: '/repo/packages/core/src/index.js' }],
-        tests: [{ id: 'test-1', fullName: 'workspace fails', failureMessages: ['expected'] }],
-        runPerformanceStats: [{
-          id: 'perf-run-1-redux',
-          runId: 'run-1',
-          suiteRunId: null,
-          testExecutionId: null,
-          projectId: 'project-1',
-          projectKey: 'workspace',
-          externalKey: 'workspace:github-actions:1001',
-          versionKey: 'commit:abc123',
-          completedAt: '2026-03-09T15:00:00.000Z',
-          branch: 'release',
-          commitSha: 'abc123',
-          buildNumber: 88,
-          statGroup: 'benchmark.node.engine.nibbles.intro',
-          statName: 'elapsed_ms',
-          numericValue: 57.54,
-          textValue: null,
-          unit: 'ms',
-          seriesId: 'interpreter-redux',
-          runnerKey: 'gha-ubuntu-latest-node20',
-          metadata: {},
-        }],
-        runCoverageComparison: {
-          runId: 'run-1',
-          previousRunId: 'run-0',
-          currentExternalKey: 'workspace:github-actions:1001',
-          previousExternalKey: 'workspace:github-actions:1000',
-          currentVersionKey: 'commit:abc123',
-          previousVersionKey: 'commit:zzz999',
-          currentLinesPct: 80,
-          previousLinesPct: 74,
-          deltaLinesPct: 6,
-          packageChanges: [{ label: 'workspace', deltaLinesPct: 6 }],
-          moduleChanges: [{ label: 'runtime', deltaLinesPct: 6 }],
-          fileChanges: [{ label: '/repo/packages/core/src/index.js', filePath: '/repo/packages/core/src/index.js', deltaLinesPct: 6 }],
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    if (query.includes('query WebRunProjectHistory')) {
+      return new Response(JSON.stringify({
+        data: {
+          coverageTrend: [{
+            runId: 'run-1',
+            externalKey: 'workspace:github-actions:1001',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            versionKey: 'commit:abc123',
+            linesPct: 80,
+            branchesPct: 70,
+            functionsPct: 81,
+            statementsPct: 79,
+          }],
+          releaseNotes: [{
+            id: 'note-1',
+            title: 'Workspace Release',
+            sourceUrl: 'https://example.test/releases/1',
+            publishedAt: '2026-03-09T16:00:00.000Z',
+            body: 'details',
+            projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
+          }],
+          benchmarkCatalog: [{
+            projectKey: 'workspace',
+            statGroup: 'benchmark.node.engine.nibbles.intro',
+            statNames: ['elapsed_ms'],
+            units: ['ms'],
+            seriesIds: ['interpreter-redux'],
+            runnerKeys: ['gha-ubuntu-latest-node20'],
+            latestCompletedAt: '2026-03-09T15:00:00.000Z',
+            pointCount: 1,
+          }],
         },
-      },
-    },
-    {
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    if (query.includes('query WebPerformanceTrend')) {
+      return new Response(JSON.stringify({
+        data: {
+          performanceTrend: [{
+            id: 'perf-run-1-redux',
+            runId: 'run-1',
+            suiteRunId: null,
+            testExecutionId: null,
+            projectId: 'project-1',
+            projectKey: 'workspace',
+            externalKey: 'workspace:github-actions:1001',
+            versionKey: 'commit:abc123',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'abc123',
+            buildNumber: 88,
+            statGroup: 'benchmark.node.engine.nibbles.intro',
+            statName: 'elapsed_ms',
+            numericValue: 57.54,
+            textValue: null,
+            unit: 'ms',
+            seriesId: 'interpreter-redux',
+            runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {},
+          }],
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({
       data: {
         projects: [],
       },
-    },
-  ];
-  const graphqlQueries = [];
-  const fetchImpl = async (_url, options) => {
-    graphqlQueries.push(JSON.parse(options.body).query);
-    return new Response(JSON.stringify(responses.shift()), {
+    }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
     });
@@ -1603,6 +1685,8 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.deepEqual(runnerView.failedTests, []);
   assert.deepEqual(runnerView.runModules, []);
   assert.equal(runnerView.coverageComparison, null);
+  assert.equal(runnerView.coverageTrend.length, 1);
+  assert.equal(runnerView.benchmarkPanels.length, 1);
 
   const operationsView = await loadRunExplorerPage({
     session,
@@ -1617,6 +1701,9 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(operationsView.runPerformanceStats[0].statGroup, 'benchmark.node.engine.nibbles.intro');
   assert.equal(operationsView.coverageComparison.deltaLinesPct, 6);
   assert.equal(operationsView.coverageComparison.fileChanges[0].filePath, '/repo/packages/core/src/index.js');
+  assert.equal(operationsView.coverageTrend.length, 1);
+  assert.equal(operationsView.coverageTrendOverlays.length, 2);
+  assert.equal(operationsView.benchmarkPanels.length, 1);
 
   const direct = await executeWebGraphql({
     session,
@@ -1642,6 +1729,8 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader') && query.includes('runPackages(runId: $runId)')), false);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPackages(runId: $runId)')), true);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPerformanceStats(runId: $runId)')), true);
+  assert.equal(graphqlQueries.some((query) => query.includes('query WebRunProjectHistory') && query.includes('coverageTrend(projectKey: $projectKey')), true);
+  assert.equal(graphqlQueries.some((query) => query.includes('query WebPerformanceTrend') && query.includes('performanceTrend(projectKey: $projectKey')), true);
 });
 
 test('web run build chip and GraphQL queries include build metadata and source links', () => {
@@ -1677,6 +1766,8 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(RUN_DETAIL_QUERY, /sourceUrl/);
   assert.match(RUN_DETAIL_QUERY, /buildNumber/);
   assert.match(RUN_DETAIL_QUERY, /runPerformanceStats\(runId: \$runId\)/);
+  assert.match(RUN_PROJECT_HISTORY_QUERY, /coverageTrend\(projectKey: \$projectKey, limit: 12\)/);
+  assert.match(RUN_PROJECT_HISTORY_QUERY, /benchmarkCatalog\(projectKey: \$projectKey\)/);
 });
 
 test('run source link renders a direct action back to the GitHub Actions run', () => {

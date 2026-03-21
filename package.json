@@ -33,6 +33,7 @@
     "test:e2e:interactions": "playwright test -c ./playwright.interactions.config.mjs",
     "test:e2e:interactions:list": "playwright test -c ./playwright.interactions.config.mjs --list",
     "pages:build": "node ./scripts/pages/build-self-test-site.mjs",
+    "reports:regenerate": "node ./scripts/regenerate-stored-reports.mjs",
     "server:dev": "yarn workspace server dev",
     "server:start": "yarn workspace server start",
     "server:build": "yarn workspace server build",

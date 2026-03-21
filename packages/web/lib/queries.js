@@ -65,6 +65,7 @@ export const PROJECT_ACTIVITY_QUERY = `
       sourceUrl
       completedAt
       durationMs
+      summary
       projectVersion {
         versionKey
         buildNumber
@@ -142,6 +143,42 @@ export const PERFORMANCE_TREND_QUERY = `
       seriesId
       runnerKey
       metadata
+    }
+  }
+`;
+
+export const RUN_PROJECT_HISTORY_QUERY = `
+  query WebRunProjectHistory($projectKey: String!) {
+    coverageTrend(projectKey: $projectKey, limit: 12) {
+      runId
+      externalKey
+      completedAt
+      versionKey
+      linesPct
+      branchesPct
+      functionsPct
+      statementsPct
+    }
+    releaseNotes(projectKey: $projectKey) {
+      id
+      title
+      sourceUrl
+      publishedAt
+      body
+      projectVersion {
+        versionKey
+        buildNumber
+      }
+    }
+    benchmarkCatalog(projectKey: $projectKey) {
+      projectKey
+      statGroup
+      statNames
+      units
+      seriesIds
+      runnerKeys
+      latestCompletedAt
+      pointCount
     }
   }
 `;

@@ -1,15 +1,189 @@
 import React from 'react';
-import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { BenchmarkExplorer } from '../../components/BenchmarkBits.js';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
-import { EmptyState, MetricGrid, SectionCard, StatusPill, RunBuildChip } from '../../components/WebBits.js';
-import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName } from '../../lib/format.js';
+import { EmptyState, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
+import { formatCoveragePct, formatDateTime, formatDuration, formatRunBuildLabel } from '../../lib/format.js';
 import { getWebSession } from '../../lib/auth.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../../lib/requestTrace.js';
 import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../../lib/pageProfiling.js';
 import { buildProjectPageResult } from '../../lib/pageProps.js';
 import { loadProjectExplorerPage } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
+
+function formatProjectRunBuildLabel(run) {
+  if (Number.isFinite(run?.projectVersion?.buildNumber)) {
+    return `#${Math.trunc(Number(run.projectVersion.buildNumber))}`;
+  }
+
+  return formatRunBuildLabel(run);
+}
+
+function formatProjectRunSummary(run) {
+  const total = run?.summary?.totalTests;
+  const passed = run?.summary?.passedTests;
+  const failed = run?.summary?.failedTests;
+
+  if (!Number.isFinite(total) || !Number.isFinite(passed) || !Number.isFinite(failed)) {
+    return 'Test summary unavailable';
+  }
+
+  return `${passed} passed • ${failed} failed • ${total} total`;
+}
+
+function isInteractiveRowTarget(target) {
+  return Boolean(target?.closest?.('a, button, input, select, textarea, summary'));
+}
+
+function ProjectRunTable({ runs }) {
+  const router = useRouter();
+
+  if (!Array.isArray(runs) || runs.length === 0) {
+    return React.createElement(EmptyState, {
+      title: 'No recent runs for this project',
+      copy: 'Once CI begins posting reports, this project timeline will fill in automatically.',
+    });
+  }
+
+  return React.createElement(
+    'div',
+    { className: 'web-table-wrap' },
+    React.createElement(
+      'table',
+      { className: 'web-table web-explorer-table' },
+      React.createElement(
+        'colgroup',
+        null,
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--run' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--status' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--build' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--branch' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--duration' }),
+        React.createElement('col', { className: 'web-explorer-table__col web-explorer-table__col--coverage' }),
+      ),
+      React.createElement(
+        'thead',
+        null,
+        React.createElement(
+          'tr',
+          null,
+          React.createElement('th', null, 'Run'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Status'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Build'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Branch'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Duration'),
+          React.createElement('th', { className: 'web-explorer-table__head web-explorer-table__head--tight' }, 'Coverage'),
+        ),
+      ),
+      React.createElement(
+        'tbody',
+        null,
+        ...runs.map((run) => {
+          const buildLabel = formatProjectRunBuildLabel(run);
+          const runHref = `/runs/${run.id}`;
+
+          return React.createElement(
+            'tr',
+            {
+              key: run.id,
+              className: 'web-explorer-table__row',
+              tabIndex: 0,
+              role: 'link',
+              'aria-label': `Open run ${run.id}`,
+              onClick: (event) => {
+                if (isInteractiveRowTarget(event.target)) {
+                  return;
+                }
+
+                void router.push(runHref);
+              },
+              onKeyDown: (event) => {
+                if (isInteractiveRowTarget(event.target)) {
+                  return;
+                }
+
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  void router.push(runHref);
+                }
+              },
+            },
+            React.createElement(
+              'td',
+              null,
+              React.createElement(
+                'div',
+                { className: 'web-explorer-table__entity' },
+                React.createElement('span', { className: 'web-explorer-table__primary' }, formatDateTime(run.completedAt)),
+                React.createElement(
+                  'div',
+                  { className: 'web-explorer-table__meta-row' },
+                  React.createElement('span', { className: 'web-explorer-table__meta' }, formatProjectRunSummary(run)),
+                ),
+              ),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell web-explorer-table__cell--status web-explorer-table__cell--tight' },
+              React.createElement(StatusPill, { status: run.status }),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell web-explorer-table__cell--tight' },
+              React.createElement(
+                'div',
+                { className: 'web-explorer-table__build' },
+                buildLabel
+                  ? (
+                    run.sourceUrl
+                      ? React.createElement(
+                        'a',
+                        {
+                          href: run.sourceUrl,
+                          target: '_blank',
+                          rel: 'noreferrer',
+                          className: 'web-explorer-table__text-link',
+                        },
+                        buildLabel,
+                      )
+                      : React.createElement(
+                        'span',
+                        { className: 'web-explorer-table__text-value' },
+                        buildLabel,
+                      )
+                  )
+                  : React.createElement('span', { className: 'web-explorer-table__text-value web-explorer-table__text-value--muted' }, 'No build'),
+              ),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell web-explorer-table__cell--tight' },
+              React.createElement(
+                'span',
+                {
+                  className: run.branch
+                    ? 'web-explorer-table__text-value'
+                    : 'web-explorer-table__text-value web-explorer-table__text-value--muted',
+                },
+                run.branch || 'no-branch',
+              ),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell web-explorer-table__cell--tight' },
+              formatDuration(run.durationMs),
+            ),
+            React.createElement(
+              'td',
+              { className: 'web-explorer-table__cell web-explorer-table__cell--tight' },
+              formatCoveragePct(run.coverageSnapshot?.linesPct),
+            ),
+          );
+        }),
+      ),
+    ),
+  );
+}
 
 export default function ProjectExplorerPage({ data }) {
   const project = data?.project || null;
@@ -73,43 +247,12 @@ export default function ProjectExplorerPage({ data }) {
       React.createElement(
         SectionCard,
         {
-          eyebrow: 'Recent Runs',
-          title: 'Execution feed',
+          eyebrow: 'Recent',
+          title: 'Test Runs',
           copy: 'Open a run to inspect suites, failures, files, and artifacts.',
           compact: true,
         },
-        runs.length > 0
-          ? React.createElement(
-            'div',
-            { className: 'web-list' },
-            ...runs.map((run) => React.createElement(
-              Link,
-              { key: run.id, href: `/runs/${run.id}`, className: 'web-list__item' },
-              React.createElement(
-                'div',
-                { className: 'web-list__row' },
-                React.createElement('strong', { className: 'web-list__title' }, run.externalKey),
-                React.createElement(StatusPill, { status: run.status }),
-              ),
-              React.createElement(
-                'div',
-                { className: 'web-list__meta' },
-                `${formatRepositoryName(project.repositoryUrl)} • ${formatCommitSha(run.commitSha)} • ${formatDateTime(run.completedAt)}`,
-              ),
-              React.createElement(
-                'div',
-                { className: 'web-list__row' },
-                React.createElement('span', { className: 'web-chip' }, run.branch || 'no-branch'),
-                React.createElement(RunBuildChip, { run }),
-                React.createElement('span', { className: 'web-chip' }, formatDuration(run.durationMs)),
-                React.createElement('span', { className: 'web-chip' }, `lines ${formatCoveragePct(run.coverageSnapshot?.linesPct)}`),
-              ),
-            )),
-          )
-          : React.createElement(EmptyState, {
-            title: 'No runs ingested',
-            copy: 'Once CI begins posting reports, this project timeline will fill in automatically.',
-          }),
+        React.createElement(ProjectRunTable, { runs }),
       ),
       React.createElement(
         SectionCard,
