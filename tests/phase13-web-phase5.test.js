@@ -52,7 +52,11 @@ import { buildRunTemplateHref, resolveRunTemplateMode } from '../packages/web/li
 import { buildSignInRedirectUrl, isProtectedWebPath } from '../packages/web/lib/routeProtection.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
 import { decorateEmbeddedRunnerReportHtml } from '../packages/web/lib/runReportTemplate.js';
-import { resolveNextAuthHandler } from '../packages/web/pages/api/auth/[...nextauth].js';
+import {
+  createWebAuthHandler,
+  handleRecoverableOAuthCallbackError,
+  resolveNextAuthHandler,
+} from '../packages/web/pages/api/auth/[...nextauth].js';
 import { createBadgeHandler, resolveRequestedBadgeType, sanitizeBadgeSummary } from '../packages/web/pages/api/badges/[badge].json.js';
 import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
@@ -395,6 +399,57 @@ test('web server URL ignores NEXT_PUBLIC_SERVER_URL and uses runtime SERVER_URL'
 
 test('web auth API resolves a callable NextAuth handler', () => {
   assert.equal(typeof resolveNextAuthHandler(), 'function');
+});
+
+test('web auth API recovers OAuth callback invalid_grant errors by clearing auth cookies and redirecting to sign-in', async () => {
+  const headers = new Map();
+  let ended = false;
+  const response = {
+    statusCode: 200,
+    setHeader(name, value) {
+      headers.set(String(name).toLowerCase(), value);
+    },
+    end() {
+      ended = true;
+    },
+  };
+  const handler = createWebAuthHandler(async () => {
+    const error = new Error('invalid_grant (Bad Request)');
+    error.name = 'OAuthCallbackError';
+    throw error;
+  });
+
+  await handler(
+    { url: '/api/auth/callback/google?code=test-code' },
+    response,
+  );
+
+  assert.equal(response.statusCode, 302);
+  assert.equal(headers.get('location'), '/auth/signin?callbackUrl=%2F&error=OAuthCallback');
+  assert.equal(ended, true);
+
+  const cookies = headers.get('set-cookie');
+  assert.ok(Array.isArray(cookies));
+  assert.ok(cookies.some((cookie) => cookie.startsWith('__Secure-next-auth.pkce.code_verifier=')));
+  assert.ok(cookies.some((cookie) => cookie.startsWith('__Secure-next-auth.state=')));
+  assert.ok(cookies.some((cookie) => cookie.startsWith('__Secure-next-auth.session-token=')));
+});
+
+test('web auth API only recovers OAuth callback errors for the Google callback route', () => {
+  const handled = handleRecoverableOAuthCallbackError(
+    { url: '/api/auth/session' },
+    {
+      setHeader() {
+        throw new Error('should not be called');
+      },
+      end() {
+        throw new Error('should not be called');
+      },
+    },
+    Object.assign(new Error('invalid_grant (Bad Request)'), { name: 'OAuthCallbackError' }),
+  );
+
+  assert.equal(handled, false);
 });
 
 test('web health endpoint returns a fast readiness payload', () => {
