@@ -80,6 +80,7 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
     });
 
     assert.equal(authOptions.pages.signIn, '/auth/signin');
+    assert.equal(authOptions.pages.error, '/auth/signin');
     assert.equal(authOptions.providers.some((provider) => provider.type === 'credentials'), true);
 
     const token = await authOptions.callbacks.jwt({

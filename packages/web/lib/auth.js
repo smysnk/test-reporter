@@ -29,6 +29,7 @@ export function createAuthOptions(options = {}) {
     },
     pages: {
       signIn: '/auth/signin',
+      error: '/auth/signin',
     },
     callbacks: {
       async jwt({ token, user }) {
