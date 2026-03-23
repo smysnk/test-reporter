@@ -378,13 +378,22 @@ const GlobalStyle = createGlobalStyle`
   }
   .web-explorer__sidebar-status {
     display: flex;
-    justify-content: flex-start;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .web-explorer__sidebar-status-spacer {
+    width: 1px;
+    min-width: 1px;
+    height: 1px;
   }
   .web-explorer__sidebar-meta {
     color: ${(props) => props.theme.colors.muted};
-    font-size: 0.9rem;
-    line-height: 1.5;
-    overflow-wrap: anywhere;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    margin-left: auto;
+    text-align: right;
+    white-space: nowrap;
   }
   .web-explorer__main {
     min-width: 0;

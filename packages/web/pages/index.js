@@ -19,6 +19,8 @@ function selectOverviewProject(dispatch, slug) {
 }
 
 function SidebarButton({ active = false, title, meta, status, onClick, perfId = null, projectSlug = null }) {
+  const hasStatusMetaRow = Boolean(status || meta);
+
   return React.createElement(
     'button',
     {
@@ -34,14 +36,14 @@ function SidebarButton({ active = false, title, meta, status, onClick, perfId = 
       { className: 'web-explorer__sidebar-row' },
       React.createElement('strong', { className: 'web-explorer__sidebar-title' }, title),
     ),
-    status
+    hasStatusMetaRow
       ? React.createElement(
         'div',
         { className: 'web-explorer__sidebar-status' },
-        React.createElement(StatusPill, { status }),
+        status ? React.createElement(StatusPill, { status }) : React.createElement('span', { className: 'web-explorer__sidebar-status-spacer', 'aria-hidden': 'true' }),
+        meta ? React.createElement('span', { className: 'web-explorer__sidebar-meta' }, meta) : null,
       )
       : null,
-    meta ? React.createElement('span', { className: 'web-explorer__sidebar-meta' }, meta) : null,
   );
 }
 
