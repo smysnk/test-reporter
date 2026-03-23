@@ -27,6 +27,7 @@ export function createAuthOptions(options = {}) {
     session: {
       strategy: 'jwt',
     },
+    logger: createNextAuthLogger(),
     pages: {
       signIn: '/auth/signin',
       error: '/auth/signin',
@@ -146,6 +147,20 @@ export function resolveDemoAuthEnabled(options = {}) {
   return parseBooleanFlag(env.get('WEB_DEMO_AUTH_ENABLED').default('false').asString(), false);
 }
 
+export function createNextAuthLogger() {
+  return {
+    error(code, metadata) {
+      writeNextAuthLog('error', code, metadata);
+    },
+    warn(code, metadata) {
+      writeNextAuthLog('warn', code, metadata);
+    },
+    debug(code, metadata) {
+      writeNextAuthLog('debug', code, metadata);
+    },
+  };
+}
+
 function resolveAuthProviders(options = {}) {
   const providers = [];
   const githubClientId = env.get('GITHUB_CLIENT_ID').default('').asString();
@@ -232,6 +247,78 @@ function resolveRole(email, adminEmails) {
   return email && normalizeEmailList(adminEmails).includes(normalizeEmail(email))
     ? 'admin'
     : 'member';
+}
+
+function writeNextAuthLog(level, code, metadata) {
+  const payload = {
+    level,
+    code: typeof code === 'string' ? code : String(code),
+    metadata: sanitizeNextAuthMetadata(metadata),
+  };
+
+  process.stderr.write(`[next-auth:logger] ${JSON.stringify(payload)}\n`);
+}
+
+function sanitizeNextAuthMetadata(value, seen = new WeakSet()) {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return sanitizeNextAuthString(value);
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+
+  if (value instanceof Error) {
+    return {
+      name: value.name || 'Error',
+      message: sanitizeNextAuthString(value.message || ''),
+      stack: typeof value.stack === 'string' ? sanitizeStack(value.stack) : null,
+      cause: sanitizeNextAuthMetadata(value.cause, seen),
+    };
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizeNextAuthMetadata(entry, seen));
+  }
+
+  if (typeof value === 'object') {
+    if (seen.has(value)) {
+      return '[circular]';
+    }
+    seen.add(value);
+
+    const result = {};
+    for (const [key, entry] of Object.entries(value)) {
+      result[key] = sanitizeSensitiveKey(key)
+        ? '<redacted>'
+        : sanitizeNextAuthMetadata(entry, seen);
+    }
+    return result;
+  }
+
+  return String(value);
+}
+
+function sanitizeNextAuthString(value) {
+  return value
+    .replace(/([?&](?:code|state|access_token|id_token|refresh_token|token)=)[^&]+/gi, '$1<redacted>')
+    .replace(/(client_secret=)[^&\s]+/gi, '$1<redacted>');
+}
+
+function sanitizeStack(stack) {
+  return stack
+    .split('\n')
+    .slice(0, 12)
+    .map((line) => sanitizeNextAuthString(line))
+    .join('\n');
+}
+
+function sanitizeSensitiveKey(key) {
+  return /token|secret|code_verifier|clientsecret|access_token|refresh_token|id_token/i.test(key);
 }
 
 function normalizeEmailList(values) {
