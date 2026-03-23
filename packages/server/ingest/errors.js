@@ -26,6 +26,12 @@ export class ValidationError extends HttpError {
   }
 }
 
+export class InvalidJsonError extends HttpError {
+  constructor(message = 'Invalid ingest JSON payload.', details = null) {
+    super(400, 'INGEST_INVALID_JSON', message, details);
+  }
+}
+
 export function toErrorResponse(error) {
   if (error instanceof HttpError) {
     return {

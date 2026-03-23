@@ -379,12 +379,12 @@ export function normalizeIngestPayload(payload, options = {}) {
       durationMs: runDurationMs,
       status: runStatus,
       reportSchemaVersion: normalizeOptionalString(report.schemaVersion) || SUPPORTED_REPORT_SCHEMA_VERSION,
-      rawReport: report,
+      rawReport: normalizeJsonValue(report),
       summary: normalizeJsonObject(report.summary),
       metadata: {
         artifactsProvided: runArtifacts.length,
         ingestedAt: now,
-        source,
+        source: normalizeJsonValue(source),
       },
     },
     packages: normalizedPackages,
@@ -716,7 +716,11 @@ function requireNonEmptyString(value, field) {
 }
 
 function normalizeJsonObject(value) {
-  return isPlainObject(value) ? value : {};
+  if (!isPlainObject(value)) {
+    return {};
+  }
+
+  return normalizeJsonValue(value);
 }
 
 function normalizeReportPerformanceStats(entries, context) {
@@ -848,8 +852,32 @@ function normalizeOptionalString(value) {
   if (typeof value !== 'string') {
     return null;
   }
-  const normalized = value.trim();
+  const normalized = sanitizeJsonString(value).trim();
   return normalized || null;
+}
+
+function normalizeJsonValue(value) {
+  if (typeof value === 'string') {
+    return sanitizeJsonString(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeJsonValue(entry));
+  }
+
+  if (isPlainObject(value)) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [sanitizeJsonString(key), normalizeJsonValue(entry)]),
+    );
+  }
+
+  return value;
+}
+
+function sanitizeJsonString(value) {
+  return value.includes('\u0000')
+    ? value.replace(/\u0000/g, '')
+    : value;
 }
 
 function normalizeInteger(value) {

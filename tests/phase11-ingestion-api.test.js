@@ -67,6 +67,91 @@ test('normalizeIngestPayload rejects malformed custom performance stats clearly'
   );
 });
 
+test('normalizeIngestPayload strips null characters from JSON-bound payload fields', () => {
+  const normalized = normalizeIngestPayload(createSamplePayload({
+    source: {
+      repository: 'react-retro-display\u0000tty',
+    },
+    report: {
+      meta: {
+        projectName: 'retro\u0000display',
+        nested: {
+          label: 'ansi\u0000output',
+        },
+      },
+      summary: {
+        note: 'line\u0000break',
+      },
+      packages: [
+        {
+          name: 'workspace',
+          location: 'packages',
+          status: 'failed',
+          durationMs: 3000,
+          summary: { total: 2, passed: 1, failed: 1, skipped: 0 },
+          coverage: {
+            lines: { covered: 8, total: 10, pct: 80 },
+            branches: { covered: 3, total: 4, pct: 75 },
+            functions: { covered: 2, total: 3, pct: 66.67 },
+            statements: { covered: 8, total: 10, pct: 80 },
+          },
+          modules: ['runtime'],
+          frameworks: ['node-test'],
+          suites: [
+            {
+              id: 'repo-node',
+              label: 'Repository Tests',
+              runtime: 'node-test',
+              command: 'node --test ../tests/*.test.js',
+              cwd: '/repo/packages',
+              status: 'failed',
+              durationMs: 3000,
+              summary: { total: 2, passed: 1, failed: 1, skipped: 0 },
+              warnings: ['fixture warning\u0000'],
+              output: {
+                stdout: 'suite output\u0000',
+                stderr: '',
+              },
+              rawArtifacts: [],
+              tests: [
+                {
+                  name: 'fails',
+                  fullName: 'workspace fails',
+                  status: 'failed',
+                  durationMs: 12,
+                  file: '/repo/packages/core/src/index.js',
+                  line: 24,
+                  column: 4,
+                  assertions: ['assert.equal(1, 2)\u0000'],
+                  setup: ['load fixture'],
+                  mocks: [],
+                  failureMessages: ['expected 2 but received 1\u0000'],
+                  rawDetails: { snippet: 'bad\u0000json' },
+                  sourceSnippet: 'assert.equal(1, 2)\u0000',
+                  module: 'runtime',
+                  theme: 'core',
+                  classificationSource: 'fixture',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  }));
+
+  assert.equal(normalized.run.rawReport.meta.projectName, 'retrodisplay');
+  assert.equal(normalized.run.rawReport.meta.nested.label, 'ansioutput');
+  assert.equal(normalized.run.rawReport.summary.note, 'linebreak');
+  assert.equal(normalized.run.metadata.source.repository, 'react-retro-displaytty');
+  assert.equal(normalized.suites[0].warnings[0], 'fixture warning');
+  assert.equal(normalized.suites[0].output.stdout, 'suite output');
+  assert.equal(normalized.tests[0].assertions[0], 'assert.equal(1, 2)');
+  assert.equal(normalized.tests[0].failureMessages[0], 'expected 2 but received 1');
+  assert.equal(normalized.tests[0].rawDetails.snippet, 'badjson');
+  assert.equal(normalized.tests[0].sourceSnippet, 'assert.equal(1, 2)');
+});
+
 test('ingestion persistence upserts duplicate runs and replaces prior facts', async () => {
   const persistenceContext = createFakePersistenceContext();
   const persistence = createSequelizeIngestionPersistence(persistenceContext);
@@ -296,6 +381,44 @@ test('server ingest route returns JSON when the payload exceeds the ingest body 
   const oversizedPayload = await oversized.json();
   assert.equal(oversizedPayload.error.code, 'INGEST_PAYLOAD_TOO_LARGE');
   assert.match(oversizedPayload.error.message, /1b/);
+
+  await closeServer(server);
+});
+
+test('server ingest route returns JSON when the payload body is not valid JSON', async () => {
+  const server = await createServer({
+    port: 0,
+    corsOrigin: 'http://localhost:3001',
+    ingestSharedKeys: ['top-secret'],
+    ingestionService: createIngestionService({
+      persistence: {
+        async persistRun() {
+          throw new Error('should not persist invalid JSON payloads');
+        },
+      },
+    }),
+  });
+
+  await new Promise((resolve) => {
+    server.httpServer.listen(0, resolve);
+  });
+
+  const address = server.httpServer.address();
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  const invalid = await fetch(`${baseUrl}/api/ingest`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      authorization: 'Bearer top-secret',
+    },
+    body: '{"projectKey":"workspace","report":"\\u{1F600}"}',
+  });
+
+  assert.equal(invalid.status, 400);
+  const invalidPayload = await invalid.json();
+  assert.equal(invalidPayload.error.code, 'INGEST_INVALID_JSON');
+  assert.match(invalidPayload.error.message, /Unicode|JSON|escape/i);
 
   await closeServer(server);
 });

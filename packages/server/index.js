@@ -9,6 +9,7 @@ import express from 'express';
 import env from '../../config/env.mjs';
 import { dbReady } from './db.js';
 import { buildGraphqlContext, resolvers, schemaVersion, typeDefs } from './graphql/index.js';
+import { InvalidJsonError, toErrorResponse } from './ingest/errors.js';
 import { createIngestRouter } from './ingest/index.js';
 import {
   applyTraceHeadersToNodeResponse,
@@ -70,6 +71,15 @@ export async function createServer(options = {}) {
         return;
       }
 
+      if (error?.type === 'entity.parse.failed' || error?.status === 400) {
+        const parseError = new InvalidJsonError(error?.message || 'Invalid ingest JSON payload.');
+        logIngestError(parseError, req);
+        const response = toErrorResponse(parseError);
+        res.status(response.statusCode).json(response.body);
+        return;
+      }
+
+      logIngestError(error, req);
       next(error);
     });
   }, createIngestRouter(options));
@@ -90,6 +100,12 @@ export async function createServer(options = {}) {
     graphqlServer,
     port: resolvePort(options),
   };
+}
+
+function logIngestError(error, req) {
+  const requestId = req?.testStationTrace?.requestId || req?.headers?.['x-request-id'] || 'unknown';
+  const message = error instanceof Error ? error.stack || error.message : String(error);
+  process.stderr.write(`[ingest] requestId=${requestId} ${message}\n`);
 }
 
 export async function startServer(options = {}) {
