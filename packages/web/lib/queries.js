@@ -464,24 +464,6 @@ export const ADMIN_OVERVIEW_QUERY = `
       email
       name
       isAdmin
-      roleKeys
-      groupKeys
-    }
-    adminRoles {
-      id
-      key
-      name
-      description
-      userCount
-      projectCount
-    }
-    adminGroups {
-      id
-      key
-      name
-      description
-      userCount
-      projectCount
     }
     adminProjects {
       project {
@@ -493,8 +475,6 @@ export const ADMIN_OVERVIEW_QUERY = `
         defaultBranch
       }
       isPublic
-      roleKeys
-      groupKeys
     }
   }
 `;
@@ -518,8 +498,6 @@ export const ADMIN_PROJECTS_QUERY = `
         defaultBranch
       }
       isPublic
-      roleKeys
-      groupKeys
     }
   }
 `;
@@ -543,40 +521,6 @@ export const ADMIN_PROJECT_ACCESS_QUERY = `
         defaultBranch
       }
       isPublic
-      roleKeys
-      groupKeys
-      roles {
-        id
-        key
-        name
-        description
-        userCount
-        projectCount
-      }
-      groups {
-        id
-        key
-        name
-        description
-        userCount
-        projectCount
-      }
-    }
-    adminRoles {
-      id
-      key
-      name
-      description
-      userCount
-      projectCount
-    }
-    adminGroups {
-      id
-      key
-      name
-      description
-      userCount
-      projectCount
     }
   }
 `;
@@ -637,72 +581,6 @@ export const ADMIN_USERS_QUERY = `
       name
       avatarUrl
       isAdmin
-      roleKeys
-      groupKeys
-    }
-    adminRoles {
-      id
-      key
-      name
-      description
-      userCount
-      projectCount
-    }
-    adminGroups {
-      id
-      key
-      name
-      description
-      userCount
-      projectCount
-    }
-  }
-`;
-
-export const ADMIN_CREATE_ROLE_MUTATION = `
-  mutation AdminCreateRole($input: AdminRoleCreateInput!) {
-    adminCreateRole(input: $input) {
-      id
-    }
-  }
-`;
-
-export const ADMIN_UPDATE_ROLE_MUTATION = `
-  mutation AdminUpdateRole($id: ID!, $input: AdminRoleUpdateInput!) {
-    adminUpdateRole(id: $id, input: $input) {
-      id
-    }
-  }
-`;
-
-export const ADMIN_DELETE_ROLE_MUTATION = `
-  mutation AdminDeleteRole($id: ID!) {
-    adminDeleteRole(id: $id) {
-      id
-    }
-  }
-`;
-
-export const ADMIN_CREATE_GROUP_MUTATION = `
-  mutation AdminCreateGroup($input: AdminGroupCreateInput!) {
-    adminCreateGroup(input: $input) {
-      id
-    }
-  }
-`;
-
-export const ADMIN_UPDATE_GROUP_MUTATION = `
-  mutation AdminUpdateGroup($id: ID!, $input: AdminGroupUpdateInput!) {
-    adminUpdateGroup(id: $id, input: $input) {
-      id
-    }
-  }
-`;
-
-export const ADMIN_DELETE_GROUP_MUTATION = `
-  mutation AdminDeleteGroup($id: ID!) {
-    adminDeleteGroup(id: $id) {
-      id
     }
   }
 `;
@@ -750,46 +628,6 @@ export const ADMIN_REMOVE_USER_GROUP_MUTATION = `
 export const ADMIN_SET_PROJECT_PUBLIC_MUTATION = `
   mutation AdminSetProjectPublic($projectId: ID!, $isPublic: Boolean!) {
     adminSetProjectPublic(projectId: $projectId, isPublic: $isPublic) {
-      project {
-        id
-      }
-    }
-  }
-`;
-
-export const ADMIN_ADD_PROJECT_ROLE_ACCESS_MUTATION = `
-  mutation AdminAddProjectRoleAccess($projectId: ID!, $roleId: ID!) {
-    adminAddProjectRoleAccess(projectId: $projectId, roleId: $roleId) {
-      project {
-        id
-      }
-    }
-  }
-`;
-
-export const ADMIN_REMOVE_PROJECT_ROLE_ACCESS_MUTATION = `
-  mutation AdminRemoveProjectRoleAccess($projectId: ID!, $roleId: ID!) {
-    adminRemoveProjectRoleAccess(projectId: $projectId, roleId: $roleId) {
-      project {
-        id
-      }
-    }
-  }
-`;
-
-export const ADMIN_ADD_PROJECT_GROUP_ACCESS_MUTATION = `
-  mutation AdminAddProjectGroupAccess($projectId: ID!, $groupId: ID!) {
-    adminAddProjectGroupAccess(projectId: $projectId, groupId: $groupId) {
-      project {
-        id
-      }
-    }
-  }
-`;
-
-export const ADMIN_REMOVE_PROJECT_GROUP_ACCESS_MUTATION = `
-  mutation AdminRemoveProjectGroupAccess($projectId: ID!, $groupId: ID!) {
-    adminRemoveProjectGroupAccess(projectId: $projectId, groupId: $groupId) {
       project {
         id
       }

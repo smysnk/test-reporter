@@ -49,11 +49,11 @@ export default function WebSignInPage({ callbackUrl, providers, autoSignInProvid
           : error
           ? `Authentication failed (${error}). Try the configured provider again or adjust the web auth environment.`
           : credentialProvider && oauthProviders.length > 0
-            ? 'Use one of the configured SSO providers below, or use demo access if you have enabled it for this deployment. Project visibility still comes from server-side public, role, and group access rules.'
+            ? 'Use one of the configured SSO providers below, or use demo access if you have enabled it for this deployment. Guests can see public projects, and signed-in users can see the full workspace.'
             : oauthProviders.length > 0
               ? 'Use one of the configured SSO providers below.'
               : credentialProvider
-                ? 'Demo access is enabled for this deployment. Project visibility still comes from server-side public, role, and group access rules.'
+                ? 'Demo access is enabled for this deployment. Guests can see public projects, and signed-in users can see the full workspace.'
                 : 'No web auth providers are configured. Set Google OAuth or explicitly enable WEB_DEMO_AUTH_ENABLED=true.',
     ),
     error

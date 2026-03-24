@@ -1,19 +1,9 @@
-import {
-  Group,
-  Project,
-  ProjectGroupAccess,
-  ProjectRoleAccess,
-  Role,
-} from '../models/index.js';
+import { Project } from '../models/index.js';
 import { isAdminActor } from './guards.js';
 
 export function createProjectAccessService(options = {}) {
   const models = options.models || {
     Project,
-    Role,
-    Group,
-    ProjectRoleAccess,
-    ProjectGroupAccess,
   };
 
   return {
@@ -66,34 +56,8 @@ export function createProjectAccessService(options = {}) {
         return visibleProjectIds;
       }
 
-      const [roles, groups, projectRoleAccess, projectGroupAccess] = await Promise.all([
-        loadAll(models.Role),
-        loadAll(models.Group),
-        loadAll(models.ProjectRoleAccess),
-        loadAll(models.ProjectGroupAccess),
-      ]);
-
-      const roleIds = new Set(
-        roles
-          .filter((role) => Array.isArray(actor.roleKeys) && actor.roleKeys.includes(role.key))
-          .map((role) => role.id),
-      );
-      const groupIds = new Set(
-        groups
-          .filter((group) => Array.isArray(actor.groupKeys) && actor.groupKeys.includes(group.key))
-          .map((group) => group.id),
-      );
-
-      for (const entry of projectRoleAccess) {
-        if (roleIds.has(entry.roleId)) {
-          visibleProjectIds.add(entry.projectId);
-        }
-      }
-
-      for (const entry of projectGroupAccess) {
-        if (groupIds.has(entry.groupId)) {
-          visibleProjectIds.add(entry.projectId);
-        }
+      for (const project of projectList) {
+        visibleProjectIds.add(project.id);
       }
 
       return visibleProjectIds;

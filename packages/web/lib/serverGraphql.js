@@ -466,8 +466,6 @@ export async function loadAdminOverviewPage({ session, fetchImpl = fetch, reques
   return {
     viewer,
     users: Array.isArray(data.adminUsers) ? data.adminUsers : [],
-    roles: Array.isArray(data.adminRoles) ? data.adminRoles : [],
-    groups: Array.isArray(data.adminGroups) ? data.adminGroups : [],
     projects: Array.isArray(data.adminProjects) ? data.adminProjects : [],
   };
 }
@@ -514,8 +512,6 @@ export async function loadAdminProjectAccessPage({ session, slug, fetchImpl = fe
   return {
     viewer,
     projectAccess: data.adminProjectAccess,
-    roles: Array.isArray(data.adminRoles) ? data.adminRoles : [],
-    groups: Array.isArray(data.adminGroups) ? data.adminGroups : [],
   };
 }
 
@@ -576,8 +572,6 @@ export async function loadAdminUsersPage({ session, fetchImpl = fetch, requestId
   return {
     viewer,
     users: Array.isArray(data.adminUsers) ? data.adminUsers : [],
-    roles: Array.isArray(data.adminRoles) ? data.adminRoles : [],
-    groups: Array.isArray(data.adminGroups) ? data.adminGroups : [],
   };
 }
 

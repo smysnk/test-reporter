@@ -118,6 +118,160 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
   }
 });
 
+test('web auth callbacks shape a successful Google OAuth user into a stable token and session', async () => {
+  const authOptions = createAuthOptions({
+    secret: 'test-secret',
+    adminEmails: ['admin@example.com'],
+    demoAuthEnabled: false,
+  });
+
+  const token = await authOptions.callbacks.jwt({
+    token: {
+      picture: 'https://example.com/avatar.png',
+    },
+    user: {
+      id: 'google-user-1',
+      email: 'josh@psidox.com',
+      name: 'Joshua Bellamy',
+      image: 'https://example.com/avatar.png',
+    },
+    account: {
+      provider: 'google',
+      type: 'oauth',
+      providerAccountId: 'google-account-1',
+    },
+    profile: {
+      sub: 'google-account-1',
+      email: 'josh@psidox.com',
+      name: 'Joshua Bellamy',
+      picture: 'https://example.com/avatar.png',
+    },
+  });
+
+  assert.deepEqual(token, {
+    sub: 'google-user-1',
+    userId: 'google-user-1',
+    email: 'josh@psidox.com',
+    name: 'Joshua Bellamy',
+    role: 'member',
+    picture: 'https://example.com/avatar.png',
+  });
+
+  const session = await authOptions.callbacks.session({
+    session: {
+      expires: '2099-01-01T00:00:00.000Z',
+      user: {},
+    },
+    token,
+  });
+
+  assert.deepEqual(session, {
+    expires: '2099-01-01T00:00:00.000Z',
+    user: {
+      name: 'Joshua Bellamy',
+      email: 'josh@psidox.com',
+      image: 'https://example.com/avatar.png',
+    },
+    userId: 'google-user-1',
+    role: 'member',
+  });
+});
+
+test('web auth callbacks keep a stable identity on follow-up requests after Google OAuth sign-in', async () => {
+  const authOptions = createAuthOptions({
+    secret: 'test-secret',
+    adminEmails: ['admin@example.com'],
+    demoAuthEnabled: false,
+  });
+
+  const token = await authOptions.callbacks.jwt({
+    token: {
+      sub: 'google-user-1',
+      userId: 'google-user-1',
+      email: 'admin@example.com',
+      name: 'Admin Operator',
+      role: 'admin',
+      picture: 'https://example.com/avatar.png',
+    },
+  });
+
+  assert.deepEqual(token, {
+    sub: 'google-user-1',
+    userId: 'google-user-1',
+    email: 'admin@example.com',
+    name: 'Admin Operator',
+    role: 'admin',
+    picture: 'https://example.com/avatar.png',
+  });
+
+  const session = await authOptions.callbacks.session({
+    session: {
+      user: {
+        image: 'https://example.com/fallback.png',
+      },
+    },
+    token,
+  });
+
+  assert.deepEqual(session, {
+    user: {
+      name: 'Admin Operator',
+      email: 'admin@example.com',
+      image: 'https://example.com/avatar.png',
+    },
+    userId: 'google-user-1',
+    role: 'admin',
+  });
+});
+
+test('web auth logger redacts sensitive OAuth callback metadata', async () => {
+  const authOptions = createAuthOptions({
+    secret: 'test-secret',
+    demoAuthEnabled: false,
+  });
+  const originalWrite = process.stderr.write;
+  const chunks = [];
+
+  process.stderr.write = function patchedWrite(chunk, encoding, callback) {
+    chunks.push(String(chunk));
+    if (typeof encoding === 'function') {
+      encoding();
+    }
+    if (typeof callback === 'function') {
+      callback();
+    }
+    return true;
+  };
+
+  try {
+    authOptions.logger.debug('OAUTH_CALLBACK_RESPONSE', {
+      url: 'https://test-station.smysnk.com/api/auth/callback/google?code=secret-code&state=secret-state',
+      account: {
+        provider: 'google',
+        access_token: 'access-token',
+        id_token: 'id-token',
+        refresh_token: 'refresh-token',
+      },
+      profile: {
+        email: 'josh@psidox.com',
+        picture: 'https://example.com/avatar.png',
+      },
+    });
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+
+  assert.equal(chunks.length, 1);
+  const logged = chunks[0];
+  assert.match(logged, /\[next-auth:logger\]/);
+  assert.doesNotMatch(logged, /secret-code/);
+  assert.doesNotMatch(logged, /secret-state/);
+  assert.doesNotMatch(logged, /access-token/);
+  assert.doesNotMatch(logged, /id-token/);
+  assert.doesNotMatch(logged, /refresh-token/);
+  assert.match(logged, /<redacted>/);
+});
+
 test('web exposes Google as an OAuth provider when configured', () => {
   const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
   const originalGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -1344,22 +1498,6 @@ test('web admin loaders normalize overview and project access data for admin pag
             roleKeys: ['platform'],
             groupKeys: [],
           }],
-          adminRoles: [{
-            id: 'role-1',
-            key: 'platform',
-            name: 'Platform',
-            description: 'Platform team',
-            userCount: 1,
-            projectCount: 1,
-          }],
-          adminGroups: [{
-            id: 'group-1',
-            key: 'staff',
-            name: 'Staff',
-            description: 'Internal team',
-            userCount: 1,
-            projectCount: 1,
-          }],
           adminProjects: [{
             project: {
               id: 'project-1',
@@ -1370,8 +1508,6 @@ test('web admin loaders normalize overview and project access data for admin pag
               defaultBranch: 'main',
             },
             isPublic: false,
-            roleKeys: ['platform'],
-            groupKeys: ['staff'],
           }],
         },
       }), {
@@ -1400,41 +1536,7 @@ test('web admin loaders normalize overview and project access data for admin pag
               defaultBranch: 'main',
             },
             isPublic: false,
-            roleKeys: ['platform'],
-            groupKeys: ['staff'],
-            roles: [{
-              id: 'role-1',
-              key: 'platform',
-              name: 'Platform',
-              description: 'Platform team',
-              userCount: 1,
-              projectCount: 1,
-            }],
-            groups: [{
-              id: 'group-1',
-              key: 'staff',
-              name: 'Staff',
-              description: 'Internal team',
-              userCount: 1,
-              projectCount: 1,
-            }],
           },
-          adminRoles: [{
-            id: 'role-1',
-            key: 'platform',
-            name: 'Platform',
-            description: 'Platform team',
-            userCount: 1,
-            projectCount: 1,
-          }],
-          adminGroups: [{
-            id: 'group-1',
-            key: 'staff',
-            name: 'Staff',
-            description: 'Internal team',
-            userCount: 1,
-            projectCount: 1,
-          }],
         },
       }), {
         status: 200,
@@ -1457,9 +1559,7 @@ test('web admin loaders normalize overview and project access data for admin pag
     requestId: 'admin-project',
   });
   assert.equal(projectAccess.projectAccess.project.slug, 'workspace');
-  assert.equal(projectAccess.projectAccess.roles.length, 1);
-  assert.equal(projectAccess.roles.length, 1);
-  assert.equal(projectAccess.groups.length, 1);
+  assert.equal(projectAccess.projectAccess.isPublic, false);
   assert.match(requests[0].query, /WebViewerAccess/);
   assert.match(requests[1].query, /AdminOverviewPage/);
   assert.match(requests[2].query, /WebViewerAccess/);

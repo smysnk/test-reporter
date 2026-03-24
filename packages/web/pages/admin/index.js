@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { AdminAssignmentChips, AdminShortcutGrid, AdminVisibilityChip } from '../../components/AdminBits.js';
+import { AdminShortcutGrid, AdminVisibilityChip } from '../../components/AdminBits.js';
 import { EmptyState, MetricGrid, SectionCard } from '../../components/WebBits.js';
 import { loadAdminServerPage } from '../../lib/adminPageLoader.js';
 import { loadAdminOverviewPage } from '../../lib/serverGraphql.js';
@@ -10,10 +10,9 @@ const h = React.createElement;
 
 export default function AdminOverviewPage({ data }) {
   const users = Array.isArray(data?.users) ? data.users : [];
-  const roles = Array.isArray(data?.roles) ? data.roles : [];
-  const groups = Array.isArray(data?.groups) ? data.groups : [];
   const projects = Array.isArray(data?.projects) ? data.projects : [];
   const publicProjectCount = projects.filter((entry) => entry.isPublic).length;
+  const privateProjectCount = Math.max(projects.length - publicProjectCount, 0);
 
   return h(
     React.Fragment,
@@ -22,23 +21,21 @@ export default function AdminOverviewPage({ data }) {
       SectionCard,
       {
         eyebrow: 'Admin',
-        title: 'Access control overview',
-        copy: 'Manage who can see which projects, which projects are public, and how users are grouped.',
+        title: 'Workspace visibility',
+        copy: 'Manage which projects are public for guests and which users can administer visibility settings.',
       },
       h(MetricGrid, {
         items: [
           { label: 'Users', value: String(users.length), copy: 'Persisted viewer accounts' },
-          { label: 'Roles', value: String(roles.length), copy: 'Global role definitions' },
-          { label: 'Groups', value: String(groups.length), copy: 'Manual membership groups' },
-          { label: 'Public Projects', value: String(publicProjectCount), copy: `${projects.length} total tracked projects` },
+          { label: 'Admins', value: String(users.filter((entry) => entry.isAdmin).length), copy: 'Can manage project visibility' },
+          { label: 'Public Projects', value: String(publicProjectCount), copy: 'Visible to guests' },
+          { label: 'Private Projects', value: String(privateProjectCount), copy: 'Require sign-in' },
         ],
       }),
       h(AdminShortcutGrid, {
         items: [
-          { href: '/admin/projects', title: 'Projects', copy: 'Control public visibility and project-to-role/group grants.' },
-          { href: '/admin/users', title: 'Users', copy: 'Toggle admin access and manage role/group membership.' },
-          { href: '/admin/roles', title: 'Roles', copy: 'Define reusable access roles for multiple projects.' },
-          { href: '/admin/groups', title: 'Groups', copy: 'Curate manual groups for cross-project visibility.' },
+          { href: '/admin/projects', title: 'Projects', copy: 'Control which projects are public and which remain sign-in only.' },
+          { href: '/admin/users', title: 'Users', copy: 'Toggle admin access for authenticated users.' },
         ],
       }),
     ),
@@ -50,7 +47,7 @@ export default function AdminOverviewPage({ data }) {
         {
           eyebrow: 'Projects',
           title: 'Visibility at a glance',
-          copy: 'Public projects are visible to guests. Private projects require explicit role or group access.',
+          copy: 'Public projects are visible to guests. Private projects remain available to signed-in users.',
           compact: true,
         },
         projects.length > 0
@@ -71,18 +68,6 @@ export default function AdminOverviewPage({ data }) {
                 h(AdminVisibilityChip, { isPublic: entry.isPublic }),
               ),
               h('div', { className: 'web-list__meta' }, entry.project.repositoryUrl || entry.project.key),
-              h(
-                'div',
-                { className: 'web-list__row' },
-                h(AdminAssignmentChips, {
-                  items: entry.roleKeys,
-                  emptyLabel: 'No role grants',
-                }),
-                h(AdminAssignmentChips, {
-                  items: entry.groupKeys,
-                  emptyLabel: 'No group grants',
-                }),
-              ),
             )),
           )
           : h(EmptyState, {
@@ -94,42 +79,36 @@ export default function AdminOverviewPage({ data }) {
         SectionCard,
         {
           eyebrow: 'Identity',
-          title: 'Membership summary',
-          copy: 'Roles and groups stay global, then projects opt into whichever definitions should grant access.',
+          title: 'Admin summary',
+          copy: 'The workspace now uses a simple model: guests see public projects, signed-in users see the full workspace, and admins manage visibility.',
           compact: true,
         },
         h(MetricGrid, {
           items: [
             { label: 'Admins', value: String(users.filter((entry) => entry.isAdmin).length), copy: 'Durable admin accounts' },
-            { label: 'Users With Roles', value: String(users.filter((entry) => entry.roleKeys.length > 0).length), copy: 'At least one role assignment' },
-            { label: 'Users In Groups', value: String(users.filter((entry) => entry.groupKeys.length > 0).length), copy: 'At least one group assignment' },
+            { label: 'Members', value: String(users.filter((entry) => entry.isAdmin !== true).length), copy: 'Signed-in non-admin users' },
+            { label: 'Public Projects', value: String(publicProjectCount), copy: 'Visible without signing in' },
           ],
         }),
-        roles.length > 0
+        users.length > 0
           ? h(
             'div',
             { className: 'web-list' },
-            ...roles.slice(0, 3).map((role) => h(
+            ...users.slice(0, 3).map((user) => h(
               'article',
-              { className: 'web-list__item', key: role.id },
+              { className: 'web-list__item', key: user.id },
               h(
                 'div',
                 { className: 'web-list__row' },
-                h('strong', { className: 'web-list__title' }, role.name),
-                h('span', { className: 'web-chip' }, role.key),
+                h('strong', { className: 'web-list__title' }, user.name || user.email),
+                h('span', { className: user.isAdmin ? 'web-chip web-chip--admin-public' : 'web-chip web-chip--muted' }, user.isAdmin ? 'Admin' : 'Member'),
               ),
-              h('div', { className: 'web-list__meta' }, role.description || 'No description configured.'),
-              h(
-                'div',
-                { className: 'web-list__row' },
-                h('span', { className: 'web-chip' }, `${role.userCount} users`),
-                h('span', { className: 'web-chip' }, `${role.projectCount} projects`),
-              ),
+              h('div', { className: 'web-list__meta' }, user.email),
             )),
           )
           : h(EmptyState, {
-            title: 'No roles configured',
-            copy: 'Create your first role to start granting project visibility by reusable capability.',
+            title: 'No users stored',
+            copy: 'Users appear here after they authenticate through the web app.',
           }),
       ),
     ),

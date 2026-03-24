@@ -364,7 +364,7 @@ test('GraphQL returns trace headers and request profiling metadata', async () =>
   await closeServer(server);
 });
 
-test('GraphQL exposes project, run, file, test, artifact, trend, and release-note reads for authorized actors', async () => {
+test('GraphQL exposes project, run, file, test, artifact, trend, and release-note reads for signed-in actors', async () => {
   const server = await createServer({
     port: 0,
     corsOrigin: 'http://localhost:3001',
@@ -576,6 +576,10 @@ test('GraphQL exposes project, run, file, test, artifact, trend, and release-not
     {
       key: 'group-only',
       name: 'Group Only',
+    },
+    {
+      key: 'hidden',
+      name: 'Hidden',
     },
     {
       key: 'public-site',
@@ -1163,7 +1167,7 @@ test('GraphQL admin queries and mutations manage roles, groups, users, and proje
   await closeServer(server);
 });
 
-test('query service filters visible projects from public, role, and group grants', async () => {
+test('query service exposes public projects to guests and the full workspace to signed-in users', async () => {
   const queryService = createGraphqlQueryService({
     models: createGraphqlModels(),
   });
@@ -1196,7 +1200,7 @@ test('query service filters visible projects from public, role, and group grants
       groupKeys: ['qa'],
     },
   });
-  assert.deepEqual(memberProjects.map((project) => project.key), ['group-only', 'public-site', 'workspace']);
+  assert.deepEqual(memberProjects.map((project) => project.key), ['group-only', 'hidden', 'public-site', 'workspace']);
 
   const adminProjects = await queryService.listProjects({
     actor: {

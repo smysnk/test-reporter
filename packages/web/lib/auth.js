@@ -34,6 +34,12 @@ export function createAuthOptions(options = {}) {
     },
     callbacks: {
       async jwt({ token, user }) {
+        writeNextAuthLog('debug', 'JWT_CALLBACK_INPUT', {
+          hasUser: Boolean(user),
+          tokenPreview: buildTokenPreview(token),
+          userPreview: buildUserPreview(user),
+        });
+
         if (user) {
           token.userId = user.id || token.userId || token.sub || crypto.randomUUID();
           token.email = user.email || token.email || null;
@@ -45,10 +51,16 @@ export function createAuthOptions(options = {}) {
         }
 
         token.sub = token.userId;
+        writeNextAuthLog('debug', 'JWT_CALLBACK_OUTPUT', buildTokenPreview(token));
         return token;
       },
       async session({ session, token }) {
-        return {
+        writeNextAuthLog('debug', 'SESSION_CALLBACK_INPUT', {
+          sessionPreview: buildSessionPreview(session),
+          tokenPreview: buildTokenPreview(token),
+        });
+
+        const nextSession = {
           ...session,
           user: {
             ...session.user,
@@ -61,6 +73,9 @@ export function createAuthOptions(options = {}) {
           userId: token.userId || token.sub || null,
           role: typeof token.role === 'string' ? token.role : 'member',
         };
+
+        writeNextAuthLog('debug', 'SESSION_CALLBACK_OUTPUT', buildSessionPreview(nextSession));
+        return nextSession;
       },
     },
   };
@@ -319,6 +334,53 @@ function sanitizeStack(stack) {
 
 function sanitizeSensitiveKey(key) {
   return /token|secret|code_verifier|clientsecret|access_token|refresh_token|id_token/i.test(key);
+}
+
+function buildTokenPreview(token) {
+  if (!token || typeof token !== 'object') {
+    return null;
+  }
+
+  return {
+    sub: token.sub || null,
+    userId: token.userId || null,
+    email: token.email || null,
+    name: token.name || null,
+    role: token.role || null,
+    picturePresent: Boolean(token.picture),
+  };
+}
+
+function buildUserPreview(user) {
+  if (!user || typeof user !== 'object') {
+    return null;
+  }
+
+  return {
+    id: user.id || null,
+    email: user.email || null,
+    name: user.name || null,
+    role: user.role || null,
+    imagePresent: Boolean(user.image),
+  };
+}
+
+function buildSessionPreview(session) {
+  if (!session || typeof session !== 'object') {
+    return null;
+  }
+
+  return {
+    userId: session.userId || null,
+    role: session.role || null,
+    user: session.user
+      ? {
+        name: session.user.name || null,
+        email: session.user.email || null,
+        imagePresent: Boolean(session.user.image),
+      }
+      : null,
+  };
 }
 
 function normalizeEmailList(values) {
