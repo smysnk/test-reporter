@@ -20,7 +20,7 @@ import {
 } from '../models/index.js';
 import { createProjectAccessService } from './access-service.js';
 
-const DEFAULT_LIMIT = 25;
+const DEFAULT_LIMIT = 125;
 const MAX_LIMIT = 1000;
 const RUN_LIST_ATTRIBUTES = [
   'id',
