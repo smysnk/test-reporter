@@ -8,6 +8,7 @@ const repoRoot = path.resolve(import.meta.dirname, '..');
 test('fleet bundle files exist for unified web and server deployment', () => {
   const expectedFiles = [
     'fleet.yaml',
+    'fleet/fleet.yaml',
     'fleet/README.md',
     'fleet/gitrepo.yml',
     'fleet/test-station/Chart.yaml',
@@ -36,6 +37,7 @@ test('fleet bundle files exist for unified web and server deployment', () => {
 
 test('fleet values and workflow use the unified image contract without stray reference names', () => {
   const fleetYaml = fs.readFileSync(path.join(repoRoot, 'fleet.yaml'), 'utf8');
+  const scopedFleetYaml = fs.readFileSync(path.join(repoRoot, 'fleet/fleet.yaml'), 'utf8');
   const gitRepoYaml = fs.readFileSync(path.join(repoRoot, 'fleet/gitrepo.yml'), 'utf8');
   const valuesYaml = fs.readFileSync(path.join(repoRoot, 'fleet/test-station/values.yaml'), 'utf8');
   const webIngressYaml = fs.readFileSync(path.join(repoRoot, 'fleet/test-station/templates/web-ingress.yaml'), 'utf8');
@@ -48,6 +50,9 @@ test('fleet values and workflow use the unified image contract without stray ref
   const dockerfile = fs.readFileSync(path.join(repoRoot, 'docker/Dockerfile'), 'utf8');
 
   assert.match(fleetYaml, /publicDomain:\s*test-station\.smysnk\.com/);
+  assert.match(fleetYaml, /chart:\s*\.\/fleet\/test-station/);
+  assert.match(scopedFleetYaml, /publicDomain:\s*test-station\.smysnk\.com/);
+  assert.match(scopedFleetYaml, /chart:\s*\.\/test-station/);
   assert.match(fleetYaml, /image:\s*\n\s*tag:\s*main/);
   assert.match(fleetYaml, /existingSecret:\s*test-station-runtime-secret/);
   assert.match(fleetYaml, /className:\s*traefik/);

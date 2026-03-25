@@ -2,7 +2,7 @@ defaultNamespace: test-station
 
 helm:
   releaseName: test-station
-  chart: ./fleet/test-station
+  chart: ./test-station
   values:
     image:
       tag: main
