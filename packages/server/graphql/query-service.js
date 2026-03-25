@@ -21,7 +21,7 @@ import {
 import { createProjectAccessService } from './access-service.js';
 
 const DEFAULT_LIMIT = 25;
-const MAX_LIMIT = 100;
+const MAX_LIMIT = 1000;
 const RUN_LIST_ATTRIBUTES = [
   'id',
   'projectId',
