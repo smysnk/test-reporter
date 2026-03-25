@@ -54,7 +54,7 @@ test('fleet values and workflow use the unified image contract without stray ref
   assert.match(fleetYaml, /cert-manager\.io\/cluster-issuer:\s*letsencrypt-prod/);
   assert.match(fleetYaml, /tls:\s*\n\s*enabled:\s*true/);
   assert.match(fleetYaml, /enabled:\s*true/);
-  assert.match(gitRepoYaml, /paths:\s*\n\s*-\s*\./);
+  assert.match(gitRepoYaml, /paths:\s*\n\s*-\s*fleet/);
   assert.match(gitRepoYaml, /branch:\s*main/);
   assert.doesNotMatch(gitRepoYaml, /helm:\s*\n\s*values:/);
   assert.match(valuesYaml, /publicDomain:\s*""/);

@@ -8,4 +8,4 @@ spec:
   clientSecretName: your-github-ssh-secret
   branch: main
   paths:
-    - .
+    - fleet

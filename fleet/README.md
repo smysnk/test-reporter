@@ -29,6 +29,8 @@ By default:
 
 This Fleet cluster rejects `GitRepo.spec.helm`, so repo-specific Helm overrides live in `fleet.yaml` instead of `fleet/gitrepo.yml`.
 
+The `GitRepo` is intentionally scoped to `paths: ["fleet"]` so Fleet only bundles deployment assets instead of the entire repository. That keeps the generated `Bundle` small enough to avoid etcd request-size failures in Rancher.
+
 ## Apply GitRepo SSH Secret
 
 This secret is referenced by `fleet/gitrepo.yml` as `clientSecretName: smysnk-com-github-ssh`.
