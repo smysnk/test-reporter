@@ -17,6 +17,7 @@ export function createAuthOptions(options = {}) {
   ensureNextAuthUrl(options);
 
   const adminEmails = resolveAdminEmails(options);
+  const useSecureCookies = shouldUseSecureCookies(options);
 
   return {
     providers: resolveAuthProviders({
@@ -27,6 +28,20 @@ export function createAuthOptions(options = {}) {
     session: {
       strategy: 'jwt',
     },
+    cookies: {
+      sessionToken: {
+        name: useSecureCookies
+          ? '__Secure-next-auth.session-token'
+          : 'next-auth.session-token',
+        options: {
+          httpOnly: false,
+          sameSite: 'lax',
+          path: '/',
+          secure: useSecureCookies,
+        },
+      },
+    },
+    trustHost: true,
     logger: createNextAuthLogger(),
     pages: {
       signIn: '/auth/signin',
@@ -174,6 +189,23 @@ export function createNextAuthLogger() {
       writeNextAuthLog('debug', code, metadata);
     },
   };
+}
+
+function shouldUseSecureCookies(options = {}) {
+  const candidates = [
+    typeof options.nextAuthUrl === 'string' ? options.nextAuthUrl : null,
+    process.env.NEXTAUTH_URL,
+    process.env.WEB_URL,
+  ]
+    .filter(Boolean)
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  if (candidates.some((value) => value.startsWith('https://'))) {
+    return true;
+  }
+
+  return process.env.NODE_ENV === 'production';
 }
 
 function resolveAuthProviders(options = {}) {

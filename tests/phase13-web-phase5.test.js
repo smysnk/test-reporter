@@ -69,10 +69,14 @@ import { buildHomeExplorerModel } from '../packages/web/lib/homeExplorer.js';
 test('web auth options expose the sign-in page and session actor metadata', async () => {
   const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
   const originalGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const originalNextAuthUrl = process.env.NEXTAUTH_URL;
+  const originalNodeEnv = process.env.NODE_ENV;
 
   try {
     delete process.env.GOOGLE_CLIENT_ID;
     delete process.env.GOOGLE_CLIENT_SECRET;
+    process.env.NEXTAUTH_URL = 'https://test-station.smysnk.com';
+    process.env.NODE_ENV = 'production';
 
     const authOptions = createAuthOptions({
       secret: 'test-secret',
@@ -82,6 +86,9 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
 
     assert.equal(authOptions.pages.signIn, '/auth/signin');
     assert.equal(authOptions.pages.error, '/auth/signin');
+    assert.equal(authOptions.trustHost, true);
+    assert.equal(authOptions.cookies.sessionToken.name, '__Secure-next-auth.session-token');
+    assert.equal(authOptions.cookies.sessionToken.options.secure, true);
     assert.equal(authOptions.providers.some((provider) => provider.type === 'credentials'), true);
 
     const token = await authOptions.callbacks.jwt({
@@ -115,6 +122,18 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
       delete process.env.GOOGLE_CLIENT_SECRET;
     } else {
       process.env.GOOGLE_CLIENT_SECRET = originalGoogleClientSecret;
+    }
+
+    if (originalNextAuthUrl === undefined) {
+      delete process.env.NEXTAUTH_URL;
+    } else {
+      process.env.NEXTAUTH_URL = originalNextAuthUrl;
+    }
+
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
     }
   }
 });
