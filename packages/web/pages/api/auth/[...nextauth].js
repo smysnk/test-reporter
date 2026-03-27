@@ -38,7 +38,9 @@ export function createWebAuthHandler(nextAuthHandler = resolveNextAuthHandler())
     logGoogleCallbackRequest(req, 'incoming');
 
     try {
-      return await nextAuthHandler(req, res, createAuthOptions());
+      const result = await nextAuthHandler(req, res, createAuthOptions());
+      logGoogleCallbackResponse(req, res);
+      return result;
     } catch (error) {
       logGoogleCallbackRequest(req, 'error', error);
       if (handleRecoverableOAuthCallbackError(req, res, error)) {
@@ -129,6 +131,34 @@ function logGoogleCallbackRequest(req, stage, error = null) {
   process.stderr.write(`[auth:google-callback] ${JSON.stringify(payload)}\n`);
 }
 
+function logGoogleCallbackResponse(req, res) {
+  if (!isGoogleCallbackRequest(req)) {
+    return;
+  }
+
+  const setCookie = normalizeSetCookieHeader(res?.getHeader?.('Set-Cookie'));
+  const setCookieNames = setCookie
+    .map((value) => typeof value === 'string' ? value.split(';')[0] : '')
+    .filter(Boolean)
+    .map((value) => value.split('=')[0])
+    .filter(Boolean);
+
+  const payload = {
+    stage: 'response',
+    url: redactGoogleCallbackUrl(typeof req?.url === 'string' ? req.url : ''),
+    statusCode: Number.isInteger(res?.statusCode) ? res.statusCode : null,
+    location: headerValue({ headers: { location: res?.getHeader?.('Location') } }, 'location'),
+    setCookiePresent: setCookie.length > 0,
+    setCookieNames,
+    setsSecureSessionToken: setCookieNames.includes('__Secure-next-auth.session-token'),
+    setsLegacySessionToken: setCookieNames.includes('next-auth.session-token'),
+    clearsSecureStateCookie: setCookie.some((value) => includesCookieDirective(value, '__Secure-next-auth.state', EXPIRED_COOKIE_TIMESTAMP)),
+    clearsSecurePkceCookie: setCookie.some((value) => includesCookieDirective(value, '__Secure-next-auth.pkce.code_verifier', EXPIRED_COOKIE_TIMESTAMP)),
+  };
+
+  process.stderr.write(`[auth:google-callback] ${JSON.stringify(payload)}\n`);
+}
+
 function redactGoogleCallbackUrl(url) {
   if (!url) {
     return url;
@@ -165,6 +195,24 @@ function extractGoogleCallbackQueryKeys(req) {
 function headerValue(req, name) {
   const value = req?.headers?.[name];
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizeSetCookieHeader(value) {
+  if (Array.isArray(value)) {
+    return value.filter((entry) => typeof entry === 'string');
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    return [value];
+  }
+
+  return [];
+}
+
+function includesCookieDirective(setCookieValue, cookieName, directive) {
+  return typeof setCookieValue === 'string'
+    && setCookieValue.startsWith(`${cookieName}=`)
+    && setCookieValue.includes(directive);
 }
 
 function buildExpiredCookie({ name, secure }) {
