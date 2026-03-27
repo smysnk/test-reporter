@@ -19,6 +19,7 @@ import {
   formatBuildNumber,
   formatCommitSha,
   formatCoveragePct,
+  formatDateTime,
   formatDuration,
   formatRepositoryName,
   formatRunBuildLabel,
@@ -222,6 +223,10 @@ test('web auth callbacks keep a stable identity on follow-up requests after Goog
     userId: 'google-user-1',
     role: 'admin',
   });
+});
+
+test('formatDateTime supports millisecond timestamp strings from GraphQL payloads', () => {
+  assert.equal(formatDateTime('1774302510000'), formatDateTime(1774302510000));
 });
 
 test('web auth logger redacts sensitive OAuth callback metadata', async () => {

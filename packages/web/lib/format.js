@@ -3,7 +3,7 @@ export function formatDateTime(value) {
     return 'Unavailable';
   }
 
-  const date = new Date(value);
+  const date = parseDateValue(value);
   if (Number.isNaN(date.valueOf())) {
     return 'Unavailable';
   }
@@ -12,6 +12,17 @@ export function formatDateTime(value) {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date);
+}
+
+function parseDateValue(value) {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    if (/^\d+$/.test(normalized)) {
+      return new Date(Number.parseInt(normalized, 10));
+    }
+  }
+
+  return new Date(value);
 }
 
 export function formatDuration(value) {
