@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useDispatch, useSelector } from 'react-redux';
 import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/WebBits.js';
-import { formatCoveragePct, formatDuration, formatRepositoryName, formatRunBuildLabel, resolveRunBuildNumber } from '../lib/format.js';
+import { formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, resolveRunBuildNumber } from '../lib/format.js';
 import { buildHomeExplorerModel } from '../lib/homeExplorer.js';
 import { getWebSession } from '../lib/auth.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../lib/requestTrace.js';
@@ -69,12 +69,16 @@ function formatLandingRunSummary(run) {
   const total = run?.summary?.totalTests;
   const passed = run?.summary?.passedTests;
   const failed = run?.summary?.failedTests;
+  const completedAt = formatDateTime(run?.completedAt);
+  const completedAtLabel = completedAt !== 'Unavailable' ? completedAt : null;
 
   if (!Number.isFinite(total) || !Number.isFinite(passed) || !Number.isFinite(failed)) {
-    return 'Test summary unavailable';
+    return completedAtLabel ? `Test summary unavailable • ${completedAtLabel}` : 'Test summary unavailable';
   }
 
-  return `${passed} passed • ${failed} failed • ${total} total`;
+  return completedAtLabel
+    ? `${passed} passed • ${failed} failed • ${total} total • ${completedAtLabel}`
+    : `${passed} passed • ${failed} failed • ${total} total`;
 }
 
 function isInteractiveRowTarget(target) {
