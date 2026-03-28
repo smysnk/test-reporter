@@ -56,16 +56,16 @@ export function createAuthOptions(options = {}) {
         });
 
         if (user) {
-          token.userId = user.id || token.userId || token.sub || crypto.randomUUID();
-          token.email = user.email || token.email || null;
-          token.name = user.name || token.name || token.email || token.userId;
+          token.sub = user.id || token.sub || crypto.randomUUID();
           token.role = user.role || resolveRole(user.email, adminEmails);
         } else {
-          token.role = typeof token.role === 'string' && token.role.trim() ? token.role : resolveRole(token.email, adminEmails);
-          token.userId = token.userId || token.sub || token.email || 'web-user';
+          token.sub = typeof token.sub === 'string' && token.sub.trim() ? token.sub : 'web-user';
+          token.role = typeof token.role === 'string' && token.role.trim() ? token.role : 'member';
         }
 
-        token.sub = token.userId;
+        delete token.userId;
+        delete token.email;
+        delete token.name;
         delete token.picture;
         delete token.image;
         writeNextAuthLog('debug', 'JWT_CALLBACK_OUTPUT', buildTokenPreview(token));
@@ -79,13 +79,8 @@ export function createAuthOptions(options = {}) {
 
         const nextSession = {
           ...session,
-          user: {
-            ...session.user,
-            name: token.name || session.user?.name || null,
-            email: token.email || session.user?.email || null,
-            image: null,
-          },
-          userId: token.userId || token.sub || null,
+          user: null,
+          userId: token.sub || null,
           role: typeof token.role === 'string' ? token.role : 'member',
         };
 
@@ -146,9 +141,9 @@ export function buildWebActorHeaders(session) {
   }
 
   return {
-    'x-test-station-actor-id': session.userId || session.user?.email || 'web-user',
-    'x-test-station-actor-email': session.user?.email || '',
-    'x-test-station-actor-name': session.user?.name || session.user?.email || session.userId || 'Web User',
+    'x-test-station-actor-id': session.userId || 'web-user',
+    'x-test-station-actor-email': '',
+    'x-test-station-actor-name': session.userId || 'Web User',
     'x-test-station-actor-role': session.role || 'member',
   };
 }

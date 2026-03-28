@@ -100,7 +100,7 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
       },
     });
 
-    assert.equal(token.userId, 'user-1');
+    assert.equal(token.sub, 'user-1');
     assert.equal(token.role, 'admin');
 
     const session = await authOptions.callbacks.session({
@@ -110,7 +110,7 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
 
     assert.equal(session.userId, 'user-1');
     assert.equal(session.role, 'admin');
-    assert.equal(session.user.image, null);
+    assert.equal(session.user, null);
   } finally {
     if (originalGoogleClientId === undefined) {
       delete process.env.GOOGLE_CLIENT_ID;
@@ -170,9 +170,6 @@ test('web auth callbacks shape a successful Google OAuth user into a stable toke
 
   assert.deepEqual(token, {
     sub: 'google-user-1',
-    userId: 'google-user-1',
-    email: 'josh@psidox.com',
-    name: 'Joshua Bellamy',
     role: 'member',
   });
 
@@ -186,11 +183,7 @@ test('web auth callbacks shape a successful Google OAuth user into a stable toke
 
   assert.deepEqual(session, {
     expires: '2099-01-01T00:00:00.000Z',
-    user: {
-      name: 'Joshua Bellamy',
-      email: 'josh@psidox.com',
-      image: null,
-    },
+    user: null,
     userId: 'google-user-1',
     role: 'member',
   });
@@ -206,18 +199,12 @@ test('web auth callbacks keep a stable identity on follow-up requests after Goog
   const token = await authOptions.callbacks.jwt({
     token: {
       sub: 'google-user-1',
-      userId: 'google-user-1',
-      email: 'admin@example.com',
-      name: 'Admin Operator',
       role: 'admin',
     },
   });
 
   assert.deepEqual(token, {
     sub: 'google-user-1',
-    userId: 'google-user-1',
-    email: 'admin@example.com',
-    name: 'Admin Operator',
     role: 'admin',
   });
 
@@ -231,11 +218,7 @@ test('web auth callbacks keep a stable identity on follow-up requests after Goog
   });
 
   assert.deepEqual(session, {
-    user: {
-      name: 'Admin Operator',
-      email: 'admin@example.com',
-      image: null,
-    },
+    user: null,
     userId: 'google-user-1',
     role: 'admin',
   });
@@ -516,8 +499,8 @@ test('web actor headers and route protection helpers produce the expected auth w
 
   assert.deepEqual(headers, {
     'x-test-station-actor-id': 'user-1',
-    'x-test-station-actor-email': 'user@example.com',
-    'x-test-station-actor-name': 'Web User',
+    'x-test-station-actor-email': '',
+    'x-test-station-actor-name': 'user-1',
     'x-test-station-actor-role': 'member',
   });
 
