@@ -44,6 +44,7 @@ export function createWebAuthHandler(nextAuthHandler = resolveNextAuthHandler())
       return undefined;
     }
 
+    const restoreResponseInterceptors = installGoogleCallbackResponseNormalizer(req, res);
     try {
       const result = await nextAuthHandler(req, res, createAuthOptions());
       logGoogleCallbackResponse(req, res);
@@ -54,6 +55,8 @@ export function createWebAuthHandler(nextAuthHandler = resolveNextAuthHandler())
         return undefined;
       }
       throw error;
+    } finally {
+      restoreResponseInterceptors();
     }
   };
 }
@@ -111,6 +114,22 @@ function handleGoogleCallbackReplay(req, res) {
   res.setHeader('Location', entry.location || '/');
   res.end();
   return true;
+}
+
+function installGoogleCallbackResponseNormalizer(req, res) {
+  if (!isGoogleCallbackRequest(req) || typeof res?.end !== 'function') {
+    return () => {};
+  }
+
+  const originalEnd = res.end.bind(res);
+  res.end = function patchedEnd(...args) {
+    normalizeGoogleCallbackResponse(req, res);
+    return originalEnd(...args);
+  };
+
+  return () => {
+    res.end = originalEnd;
+  };
 }
 
 function logGoogleCallbackRequest(req, stage, error = null) {
@@ -312,6 +331,67 @@ function buildExpiredCookie({ name, secure }) {
 function resolveRequestId(req) {
   const value = req?.headers?.['x-request-id'];
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function normalizeGoogleCallbackResponse(req, res) {
+  const normalized = resolveGoogleCallbackErrorRedirect(req, res);
+  if (!normalized) {
+    return false;
+  }
+
+  res.statusCode = 302;
+  res.setHeader('Location', normalized.location);
+  res.setHeader('Set-Cookie', RECOVERABLE_AUTH_COOKIE_NAMES.map(buildExpiredCookie));
+  return true;
+}
+
+function resolveGoogleCallbackErrorRedirect(req, res) {
+  if (!isGoogleCallbackRequest(req)) {
+    return null;
+  }
+
+  const statusCode = Number.isInteger(res?.statusCode) ? res.statusCode : null;
+  const locationHeader = headerValue({ headers: { location: res?.getHeader?.('Location') } }, 'location');
+  const locationUrl = normalizeAuthErrorLocation(locationHeader);
+
+  if (locationUrl) {
+    return {
+      location: buildAuthErrorUrl({
+        callbackUrl: '/',
+        error: locationUrl.searchParams.get('error') || 'OAuthCallback',
+        requestId: resolveRequestId(req),
+      }),
+    };
+  }
+
+  if (statusCode && statusCode >= 500) {
+    return {
+      location: buildAuthErrorUrl({
+        callbackUrl: '/',
+        error: 'OAuthCallback',
+        requestId: resolveRequestId(req),
+      }),
+    };
+  }
+
+  return null;
+}
+
+function normalizeAuthErrorLocation(value) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value, 'https://test-station.local');
+    if (url.pathname !== '/api/auth/error') {
+      return null;
+    }
+
+    return url;
+  } catch {
+    return null;
+  }
 }
 
 export default createWebAuthHandler();

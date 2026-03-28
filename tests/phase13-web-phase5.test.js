@@ -690,6 +690,83 @@ test('web auth API short-circuits duplicate Google callback codes after a succes
   assert.equal(replayResponse.headers.has('set-cookie'), false);
 });
 
+test('web auth API rewrites NextAuth callback redirects from /api/auth/error to the auth error page', async () => {
+  const headers = new Map();
+  let ended = false;
+  const response = {
+    statusCode: 200,
+    setHeader(name, value) {
+      headers.set(String(name).toLowerCase(), value);
+    },
+    getHeader(name) {
+      return headers.get(String(name).toLowerCase());
+    },
+    end() {
+      ended = true;
+    },
+  };
+  const handler = createWebAuthHandler(async (_req, res) => {
+    res.statusCode = 302;
+    res.setHeader('Location', '/api/auth/error?error=OAuthCallback');
+    res.end();
+  });
+
+  await handler(
+    {
+      url: '/api/auth/callback/google?code=redirect-error-code',
+      headers: {
+        'x-request-id': 'req-auth-4',
+      },
+    },
+    response,
+  );
+
+  assert.equal(response.statusCode, 302);
+  assert.equal(headers.get('location'), '/auth/error?callbackUrl=%2F&error=OAuthCallback&requestId=req-auth-4');
+  assert.equal(ended, true);
+  const cookies = headers.get('set-cookie');
+  assert.ok(Array.isArray(cookies));
+  assert.ok(cookies.some((cookie) => cookie.startsWith('__Secure-next-auth.session-token=')));
+});
+
+test('web auth API rewrites Google callback 500 responses to the auth error page', async () => {
+  const headers = new Map();
+  let ended = false;
+  const response = {
+    statusCode: 200,
+    setHeader(name, value) {
+      headers.set(String(name).toLowerCase(), value);
+    },
+    getHeader(name) {
+      return headers.get(String(name).toLowerCase());
+    },
+    end() {
+      ended = true;
+    },
+  };
+  const handler = createWebAuthHandler(async (_req, res) => {
+    res.statusCode = 500;
+    res.end('Internal Server Error');
+  });
+
+  await handler(
+    {
+      url: '/api/auth/callback/google?code=server-error-code',
+      headers: {
+        'x-request-id': 'req-auth-5',
+      },
+    },
+    response,
+  );
+
+  assert.equal(response.statusCode, 302);
+  assert.equal(headers.get('location'), '/auth/error?callbackUrl=%2F&error=OAuthCallback&requestId=req-auth-5');
+  assert.equal(ended, true);
+  const cookies = headers.get('set-cookie');
+  assert.ok(Array.isArray(cookies));
+  assert.ok(cookies.some((cookie) => cookie.startsWith('__Secure-next-auth.state=')));
+});
+
 test('web auth API only recovers OAuth callback errors for the Google callback route', () => {
   const handled = handleRecoverableOAuthCallbackError(
     { url: '/api/auth/session' },
