@@ -45,7 +45,7 @@ export function createAuthOptions(options = {}) {
     logger: createNextAuthLogger(),
     pages: {
       signIn: '/auth/signin',
-      error: '/auth/signin',
+      error: '/auth/error',
     },
     callbacks: {
       async jwt({ token, account, user }) {

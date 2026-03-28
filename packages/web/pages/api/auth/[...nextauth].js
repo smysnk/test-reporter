@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import '../../../lib/nextAuthEnv.js';
 import NextAuth from 'next-auth';
 import { createAuthOptions } from '../../../lib/auth.js';
-import { buildSignInRedirectUrl } from '../../../lib/routeProtection.js';
+import { buildAuthErrorUrl } from '../../../lib/authRoutes.js';
 
 const EXPIRED_COOKIE_TIMESTAMP = 'Thu, 01 Jan 1970 00:00:00 GMT';
 const GOOGLE_CALLBACK_REPLAY_TTL_MS = 15 * 60 * 1000;
@@ -80,7 +80,11 @@ export function handleRecoverableOAuthCallbackError(req, res, error) {
     return false;
   }
 
-  const location = `${buildSignInRedirectUrl('/')}&error=OAuthCallback`;
+  const location = buildAuthErrorUrl({
+    callbackUrl: '/',
+    error: 'OAuthCallback',
+    requestId: resolveRequestId(req),
+  });
   res.statusCode = 302;
   res.setHeader('Location', location);
   res.setHeader('Set-Cookie', RECOVERABLE_AUTH_COOKIE_NAMES.map(buildExpiredCookie));
@@ -303,6 +307,11 @@ function includesCookieDirective(setCookieValue, cookieName, directive) {
 
 function buildExpiredCookie({ name, secure }) {
   return `${name}=; Path=/; Expires=${EXPIRED_COOKIE_TIMESTAMP}; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
+}
+
+function resolveRequestId(req) {
+  const value = req?.headers?.['x-request-id'];
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 export default createWebAuthHandler();

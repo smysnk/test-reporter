@@ -10,7 +10,7 @@ import {
   resolveDemoAuthEnabled,
   resolveNextAuthUrl,
 } from '../packages/web/lib/auth.js';
-import { buildSignedOutRedirectUrl } from '../packages/web/lib/authRoutes.js';
+import { buildAuthErrorUrl, buildSignedOutRedirectUrl } from '../packages/web/lib/authRoutes.js';
 import { ensureNextAuthUrl } from '../packages/web/lib/nextAuthEnv.js';
 import {
   formatBenchmarkMetricLabel,
@@ -58,6 +58,7 @@ import {
   handleRecoverableOAuthCallbackError,
   resolveNextAuthHandler,
 } from '../packages/web/pages/api/auth/[...nextauth].js';
+import WebAuthErrorPage from '../packages/web/pages/auth/error.js';
 import { createBadgeHandler, resolveRequestedBadgeType, sanitizeBadgeSummary } from '../packages/web/pages/api/badges/[badge].json.js';
 import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
@@ -85,7 +86,7 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
     });
 
     assert.equal(authOptions.pages.signIn, '/auth/signin');
-    assert.equal(authOptions.pages.error, '/auth/signin');
+    assert.equal(authOptions.pages.error, '/auth/error');
     assert.equal(authOptions.trustHost, true);
     assert.equal(authOptions.cookies.sessionToken.name, '__Secure-next-auth.session-token');
     assert.equal(authOptions.cookies.sessionToken.options.secure, true);
@@ -433,6 +434,17 @@ test('web sign-out redirects to a signed-out sign-in page without auto re-authen
   assert.equal(buildSignedOutRedirectUrl(), '/');
 });
 
+test('web auth error routes include callback, error code, and request id', () => {
+  assert.equal(
+    buildAuthErrorUrl({
+      callbackUrl: '/projects/workspace',
+      error: 'OAuthCallback',
+      requestId: 'req-auth-1',
+    }),
+    '/auth/error?callbackUrl=%2Fprojects%2Fworkspace&error=OAuthCallback&requestId=req-auth-1',
+  );
+});
+
 test('web defaults NEXTAUTH_URL to localhost using WEB_PORT when unset', () => {
   const originalNextAuthUrl = process.env.NEXTAUTH_URL;
   const originalWebPort = process.env.WEB_PORT;
@@ -594,7 +606,7 @@ test('web auth API resolves a callable NextAuth handler', () => {
   assert.equal(typeof resolveNextAuthHandler(), 'function');
 });
 
-test('web auth API recovers OAuth callback invalid_grant errors by clearing auth cookies and redirecting to sign-in', async () => {
+test('web auth API recovers OAuth callback invalid_grant errors by clearing auth cookies and redirecting to the auth error page', async () => {
   const headers = new Map();
   let ended = false;
   const response = {
@@ -618,7 +630,7 @@ test('web auth API recovers OAuth callback invalid_grant errors by clearing auth
   );
 
   assert.equal(response.statusCode, 302);
-  assert.equal(headers.get('location'), '/auth/signin?callbackUrl=%2F&error=OAuthCallback');
+  assert.equal(headers.get('location'), '/auth/error?callbackUrl=%2F&error=OAuthCallback');
   assert.equal(ended, true);
 
   const cookies = headers.get('set-cookie');
@@ -693,6 +705,41 @@ test('web auth API only recovers OAuth callback errors for the Google callback r
   );
 
   assert.equal(handled, false);
+});
+
+test('web auth API includes the request id when redirecting recoverable callback errors', () => {
+  const headers = new Map();
+  const handled = handleRecoverableOAuthCallbackError(
+    {
+      url: '/api/auth/callback/google?code=test-code',
+      headers: {
+        'x-request-id': 'req-auth-2',
+      },
+    },
+    {
+      statusCode: 200,
+      setHeader(name, value) {
+        headers.set(String(name).toLowerCase(), value);
+      },
+      end() {},
+    },
+    Object.assign(new Error('invalid_grant (Bad Request)'), { name: 'OAuthCallbackError' }),
+  );
+
+  assert.equal(handled, true);
+  assert.equal(headers.get('location'), '/auth/error?callbackUrl=%2F&error=OAuthCallback&requestId=req-auth-2');
+});
+
+test('web auth error page renders request details and retry actions', () => {
+  const markup = renderToStaticMarkup(React.createElement(WebAuthErrorPage, {
+    callbackUrl: '/projects/workspace',
+    error: 'OAuthCallback',
+    requestId: 'req-auth-3',
+  }));
+
+  assert.match(markup, /We could not finish signing you in/);
+  assert.match(markup, /req-auth-3/);
+  assert.match(markup, /Try Sign-In Again/);
 });
 
 test('web health endpoint returns a fast readiness payload', () => {
