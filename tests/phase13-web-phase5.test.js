@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
   buildWebActorHeaders,
   createAuthOptions,
+  logWebSessionProbe,
   resolveAutoSignInProviderId,
   resolveDemoAuthEnabled,
   resolveNextAuthUrl,
@@ -242,6 +243,45 @@ test('web auth callbacks keep a stable identity on follow-up requests after Goog
     userId: 'google-user-1',
     role: 'admin',
   });
+});
+
+test('web session probe logs incoming session-token cookie state without exposing values', () => {
+  const originalStderrWrite = process.stderr.write;
+  const lines = [];
+  process.stderr.write = (chunk, encoding, callback) => {
+    lines.push(String(chunk));
+    if (typeof encoding === 'function') {
+      encoding();
+    } else if (typeof callback === 'function') {
+      callback();
+    }
+    return true;
+  };
+
+  try {
+    logWebSessionProbe({
+      req: {
+        headers: {
+          cookie: '__Secure-next-auth.session-token=secret-value; __Host-next-auth.csrf-token=csrf-value',
+        },
+      },
+      route: '/',
+      session: {
+        userId: 'user-1',
+        user: { email: 'user@example.com' },
+        role: 'member',
+      },
+    });
+  } finally {
+    process.stderr.write = originalStderrWrite;
+  }
+
+  const output = lines.join('');
+  assert.match(output, /\[web:session-probe\]/);
+  assert.match(output, /"route":"\/"/);
+  assert.match(output, /"hasSecureSessionToken":true/);
+  assert.match(output, /"sessionResolved":true/);
+  assert.doesNotMatch(output, /secret-value/);
 });
 
 test('formatDateTime supports millisecond timestamp strings from GraphQL payloads', () => {

@@ -100,6 +100,28 @@ export async function getWebSession(req, res, options = {}) {
   return getServerSession(req, res, createAuthOptions(options));
 }
 
+export function logWebSessionProbe({ req, route, session }) {
+  const cookieHeader = typeof req?.headers?.cookie === 'string' ? req.headers.cookie : '';
+  const cookieNames = cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => part.split('=')[0])
+    .filter(Boolean);
+
+  process.stderr.write(`[web:session-probe] ${JSON.stringify({
+    route,
+    hasCookieHeader: Boolean(cookieHeader),
+    cookieNames,
+    hasSecureSessionToken: cookieNames.includes('__Secure-next-auth.session-token'),
+    hasLegacySessionToken: cookieNames.includes('next-auth.session-token'),
+    sessionResolved: Boolean(session),
+    sessionUserId: session?.userId || null,
+    sessionEmail: session?.user?.email || null,
+    sessionRole: session?.role || null,
+  })}\n`);
+}
+
 export async function requireWebSession(context, options = {}) {
   const session = await getWebSession(context.req, context.res, options);
   if (session) {

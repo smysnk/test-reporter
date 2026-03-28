@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/WebBits.js';
 import { formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, resolveRunBuildNumber } from '../lib/format.js';
 import { buildHomeExplorerModel } from '../lib/homeExplorer.js';
-import { getWebSession } from '../lib/auth.js';
+import { getWebSession, logWebSessionProbe } from '../lib/auth.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../lib/requestTrace.js';
 import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../lib/pageProfiling.js';
 import { buildOverviewPageResult } from '../lib/pageProps.js';
@@ -408,6 +408,11 @@ export default function WebIndexPage({ data }) {
 
 export const getServerSideProps = wrapper.getServerSideProps((store) => async (context) => {
   const session = await getWebSession(context.req, context.res);
+  logWebSessionProbe({
+    req: context.req,
+    route: '/',
+    session,
+  });
   const requestTrace = resolveWebRequestTrace(context.req);
   applyTraceHeadersToNextResponse(context.res, requestTrace);
   const pageProfiler = createPageLoadProfiler({

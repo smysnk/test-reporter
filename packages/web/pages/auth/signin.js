@@ -2,7 +2,7 @@ import React from 'react';
 import '../../lib/nextAuthEnv.js';
 import { getServerSession } from 'next-auth/next';
 import { signIn } from 'next-auth/react';
-import { createAuthOptions, describeAuthProviders, resolveAutoSignInProviderId } from '../../lib/auth.js';
+import { createAuthOptions, describeAuthProviders, logWebSessionProbe, resolveAutoSignInProviderId } from '../../lib/auth.js';
 
 export default function WebSignInPage({ callbackUrl, providers, autoSignInProviderId, error, signedOut }) {
   const credentialProvider = providers.find((provider) => provider.type === 'credentials') || null;
@@ -130,6 +130,11 @@ export async function getServerSideProps(context) {
     ? context.query.error.trim()
     : null;
   const session = await getServerSession(context.req, context.res, createAuthOptions());
+  logWebSessionProbe({
+    req: context.req,
+    route: '/auth/signin',
+    session,
+  });
   if (session) {
     return {
       redirect: {
