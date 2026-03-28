@@ -66,6 +66,8 @@ export function createAuthOptions(options = {}) {
         }
 
         token.sub = token.userId;
+        delete token.picture;
+        delete token.image;
         writeNextAuthLog('debug', 'JWT_CALLBACK_OUTPUT', buildTokenPreview(token));
         return token;
       },
@@ -81,9 +83,7 @@ export function createAuthOptions(options = {}) {
             ...session.user,
             name: token.name || session.user?.name || null,
             email: token.email || session.user?.email || null,
-            image: typeof token.picture === 'string' && token.picture.trim()
-              ? token.picture
-              : session.user?.image || null,
+            image: null,
           },
           userId: token.userId || token.sub || null,
           role: typeof token.role === 'string' ? token.role : 'member',

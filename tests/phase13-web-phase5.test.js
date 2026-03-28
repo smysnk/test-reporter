@@ -175,7 +175,6 @@ test('web auth callbacks shape a successful Google OAuth user into a stable toke
     email: 'josh@psidox.com',
     name: 'Joshua Bellamy',
     role: 'member',
-    picture: 'https://example.com/avatar.png',
   });
 
   const session = await authOptions.callbacks.session({
@@ -191,7 +190,7 @@ test('web auth callbacks shape a successful Google OAuth user into a stable toke
     user: {
       name: 'Joshua Bellamy',
       email: 'josh@psidox.com',
-      image: 'https://example.com/avatar.png',
+      image: null,
     },
     userId: 'google-user-1',
     role: 'member',
@@ -212,7 +211,6 @@ test('web auth callbacks keep a stable identity on follow-up requests after Goog
       email: 'admin@example.com',
       name: 'Admin Operator',
       role: 'admin',
-      picture: 'https://example.com/avatar.png',
     },
   });
 
@@ -222,7 +220,6 @@ test('web auth callbacks keep a stable identity on follow-up requests after Goog
     email: 'admin@example.com',
     name: 'Admin Operator',
     role: 'admin',
-    picture: 'https://example.com/avatar.png',
   });
 
   const session = await authOptions.callbacks.session({
@@ -238,7 +235,7 @@ test('web auth callbacks keep a stable identity on follow-up requests after Goog
     user: {
       name: 'Admin Operator',
       email: 'admin@example.com',
-      image: 'https://example.com/avatar.png',
+      image: null,
     },
     userId: 'google-user-1',
     role: 'admin',
