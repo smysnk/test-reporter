@@ -1,4 +1,4 @@
-import { signIn } from 'next-auth/react';
+import { buildSignInRedirectUrl } from './routeProtection.js';
 
 const AUTO_SIGN_IN_RECOVERY_KEY = 'test-station:auto-sign-in-recovery';
 const AUTO_SIGN_IN_RECOVERY_COOLDOWN_MS = 60_000;
@@ -90,5 +90,5 @@ export function handleUnauthorizedApolloError({ graphQLErrors, networkError }) {
   }
 
   writeRecoveryState(callbackUrl);
-  signIn(undefined, { callbackUrl });
+  window.location.assign(buildSignInRedirectUrl(callbackUrl));
 }

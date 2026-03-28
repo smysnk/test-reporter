@@ -110,7 +110,7 @@ test('web auth options expose the sign-in page and session actor metadata', asyn
 
     assert.equal(session.userId, 'user-1');
     assert.equal(session.role, 'admin');
-    assert.equal(session.user, null);
+    assert.equal('user' in session, false);
   } finally {
     if (originalGoogleClientId === undefined) {
       delete process.env.GOOGLE_CLIENT_ID;
@@ -183,7 +183,6 @@ test('web auth callbacks shape a successful Google OAuth user into a stable toke
 
   assert.deepEqual(session, {
     expires: '2099-01-01T00:00:00.000Z',
-    user: null,
     userId: 'google-user-1',
     role: 'member',
   });
@@ -218,7 +217,6 @@ test('web auth callbacks keep a stable identity on follow-up requests after Goog
   });
 
   assert.deepEqual(session, {
-    user: null,
     userId: 'google-user-1',
     role: 'admin',
   });

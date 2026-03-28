@@ -1,28 +1,12 @@
 import React from 'react';
 import '../../lib/nextAuthEnv.js';
 import { getServerSession } from 'next-auth/next';
-import { signIn } from 'next-auth/react';
+import { getCsrfToken } from 'next-auth/react';
 import { createAuthOptions, describeAuthProviders, logWebSessionProbe } from '../../lib/auth.js';
 
-export default function WebSignInPage({ callbackUrl, providers, error, signedOut }) {
+export default function WebSignInPage({ callbackUrl, csrfToken, providers, error, signedOut }) {
   const credentialProvider = providers.find((provider) => provider.type === 'credentials') || null;
   const oauthProviders = providers.filter((provider) => provider.type !== 'credentials');
-
-  async function handleDemoSubmit(event) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    await signIn('demo-access', {
-      callbackUrl,
-      email: formData.get('email'),
-      name: formData.get('name'),
-    });
-  }
-
-  async function handleProviderSignIn(providerId) {
-    await signIn(providerId, {
-      callbackUrl,
-    });
-  }
 
   return React.createElement(
     'section',
@@ -56,21 +40,48 @@ export default function WebSignInPage({ callbackUrl, providers, error, signedOut
         'div',
         { className: 'web-auth__providers' },
         ...oauthProviders.map((provider) => React.createElement(
-          'button',
+          'form',
           {
             key: provider.id,
-            type: 'button',
-            className: 'web-button web-button--primary',
-            onClick: () => handleProviderSignIn(provider.id),
+            action: `/api/auth/signin/${provider.id}`,
+            method: 'post',
+            className: 'web-auth__provider-form',
           },
-          `Continue with ${provider.name}`,
+          React.createElement('input', {
+            type: 'hidden',
+            name: 'csrfToken',
+            value: csrfToken,
+          }),
+          React.createElement('input', {
+            type: 'hidden',
+            name: 'callbackUrl',
+            value: callbackUrl,
+          }),
+          React.createElement(
+            'button',
+            {
+              type: 'submit',
+              className: 'web-button web-button--primary',
+            },
+            `Continue with ${provider.name}`,
+          ),
         )),
       )
       : null,
     credentialProvider
       ? React.createElement(
         'form',
-        { className: 'web-auth__form', onSubmit: handleDemoSubmit },
+        { className: 'web-auth__form', action: '/api/auth/callback/demo-access', method: 'post' },
+        React.createElement('input', {
+          type: 'hidden',
+          name: 'csrfToken',
+          value: csrfToken,
+        }),
+        React.createElement('input', {
+          type: 'hidden',
+          name: 'callbackUrl',
+          value: callbackUrl,
+        }),
         React.createElement(
           'label',
           { className: 'web-field' },
@@ -130,10 +141,12 @@ export async function getServerSideProps(context) {
     };
   }
 
+  const csrfToken = await getCsrfToken(context);
   const providers = describeAuthProviders();
   return {
     props: {
       callbackUrl,
+      csrfToken: typeof csrfToken === 'string' ? csrfToken : '',
       providers,
       error,
       signedOut,

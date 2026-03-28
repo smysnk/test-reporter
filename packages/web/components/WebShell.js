@@ -1,58 +1,15 @@
 import React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { signOut, useSession } from 'next-auth/react';
 import { useSelector } from 'react-redux';
-import { executeBrowserGraphql } from '../lib/adminClient.js';
 import { buildSignedOutRedirectUrl } from '../lib/authRoutes.js';
-import { VIEWER_ACCESS_QUERY } from '../lib/queries.js';
 import { buildSignInRedirectUrl } from '../lib/routeProtection.js';
 
-export function WebShell({ children, viewer = null }) {
-  const { data: session } = useSession();
+export function WebShell({ children, viewer = null, session = null }) {
   const router = useRouter();
   const selectedProjectSlug = useSelector((state) => state.explorer.selectedProjectSlug);
   const selectedRunId = useSelector((state) => state.explorer.selectedRunId);
-  const [resolvedViewer, setResolvedViewer] = React.useState(viewer);
-
-  React.useEffect(() => {
-    setResolvedViewer(viewer || null);
-  }, [viewer]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    if (!session) {
-      setResolvedViewer(viewer || null);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    if (viewer?.isAdmin === true) {
-      setResolvedViewer(viewer);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    executeBrowserGraphql({
-      query: VIEWER_ACCESS_QUERY,
-    }).then((data) => {
-      if (!cancelled) {
-        setResolvedViewer(data.viewer || null);
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        setResolvedViewer(viewer || null);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [session, viewer]);
-
+  const resolvedViewer = viewer || null;
   const isAdmin = resolvedViewer?.isAdmin === true;
   const accessLabel = isAdmin
     ? 'admin access'
@@ -129,11 +86,10 @@ export function WebShell({ children, viewer = null }) {
             React.createElement('span', { className: 'web-shell__identity-label' }, session.user?.name || session.user?.email || session.userId || 'Operator'),
             React.createElement('span', { className: 'web-shell__identity-meta' }, accessLabel),
             React.createElement(
-              'button',
+              Link,
               {
-                type: 'button',
+                href: `/api/auth/logout?callbackUrl=${encodeURIComponent(buildSignedOutRedirectUrl())}`,
                 className: 'web-button web-button--ghost web-shell__identity-action',
-                onClick: () => signOut({ callbackUrl: buildSignedOutRedirectUrl() }),
               },
               'Sign out',
             ),

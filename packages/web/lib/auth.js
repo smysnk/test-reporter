@@ -48,8 +48,9 @@ export function createAuthOptions(options = {}) {
       error: '/auth/signin',
     },
     callbacks: {
-      async jwt({ token, user }) {
+      async jwt({ token, account, user }) {
         writeNextAuthLog('debug', 'JWT_CALLBACK_INPUT', {
+          hasAccount: Boolean(account),
           hasUser: Boolean(user),
           tokenPreview: buildTokenPreview(token),
           userPreview: buildUserPreview(user),
@@ -68,6 +69,8 @@ export function createAuthOptions(options = {}) {
         delete token.name;
         delete token.picture;
         delete token.image;
+        delete token.user;
+        delete token.providers;
         writeNextAuthLog('debug', 'JWT_CALLBACK_OUTPUT', buildTokenPreview(token));
         return token;
       },
@@ -79,10 +82,11 @@ export function createAuthOptions(options = {}) {
 
         const nextSession = {
           ...session,
-          user: null,
           userId: token.sub || null,
           role: typeof token.role === 'string' ? token.role : 'member',
         };
+        delete nextSession.user;
+        delete nextSession.providers;
 
         writeNextAuthLog('debug', 'SESSION_CALLBACK_OUTPUT', buildSessionPreview(nextSession));
         return nextSession;

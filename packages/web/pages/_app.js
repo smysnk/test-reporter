@@ -1,7 +1,6 @@
 import React from 'react';
 import { GoogleAnalytics } from '@next/third-parties/google';
 import { ApolloProvider } from '@apollo/client';
-import { SessionProvider } from 'next-auth/react';
 import { useRouter } from 'next/router';
 import { Provider, useSelector } from 'react-redux';
 import { ThemeProvider, createGlobalStyle } from 'styled-components';
@@ -1016,6 +1015,7 @@ const GlobalStyle = createGlobalStyle`
 
 function WebAppContent({ Component, pageProps }) {
   const viewer = pageProps.data?.viewer || null;
+  const session = pageProps.session || null;
   const runtimeConfig = useSelector((state) => state.runtime.config);
   const runtimeConfigLoaded = useSelector((state) => state.runtime.loaded);
   const gaMeasurementId = runtimeConfig?.GA_MEASUREMENT_ID || null;
@@ -1093,7 +1093,7 @@ function WebAppContent({ Component, pageProps }) {
       React.createElement(GlobalStyle, null),
       React.createElement(
         WebShell,
-        { viewer },
+        { viewer, session },
         React.createElement(Component, pageProps),
       ),
     ),
@@ -1104,18 +1104,16 @@ export default function WebApp({ Component, ...rest }) {
   const { store, props } = wrapper.useWrappedStore(rest);
   const client = getApolloClient();
   const pageProps = props.pageProps || {};
-  const session = pageProps.session || null;
 
   return React.createElement(
-    SessionProvider,
-    { session },
+    ApolloProvider,
+    { client },
     React.createElement(
-      ApolloProvider,
-      { client },
+      Provider,
+      { store },
       React.createElement(
-        Provider,
-        { store },
-        React.createElement(WebAppContent, { Component, pageProps }),
+        WebAppContent,
+        { Component, pageProps },
       ),
     ),
   );
