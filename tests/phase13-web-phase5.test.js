@@ -630,6 +630,56 @@ test('web auth API recovers OAuth callback invalid_grant errors by clearing auth
   assert.ok(cookies.some((cookie) => cookie.startsWith('__Secure-next-auth.session-token=')));
 });
 
+test('web auth API short-circuits duplicate Google callback codes after a successful first response', async () => {
+  let invocationCount = 0;
+  const handler = createWebAuthHandler(async (_req, res) => {
+    invocationCount += 1;
+    res.statusCode = 302;
+    res.setHeader('Location', 'https://test-station.smysnk.com/');
+    res.setHeader('Set-Cookie', [
+      '__Secure-next-auth.session-token=session-token; Path=/; HttpOnly; SameSite=Lax; Secure',
+    ]);
+    res.end();
+  });
+
+  const createResponse = () => {
+    const headers = new Map();
+    return {
+      statusCode: 200,
+      ended: false,
+      setHeader(name, value) {
+        headers.set(String(name).toLowerCase(), value);
+      },
+      getHeader(name) {
+        return headers.get(String(name).toLowerCase());
+      },
+      end() {
+        this.ended = true;
+      },
+      headers,
+    };
+  };
+
+  const request = {
+    url: '/api/auth/callback/google?code=replay-test-code&state=replay-state',
+  };
+
+  const firstResponse = createResponse();
+  await handler(request, firstResponse);
+
+  assert.equal(invocationCount, 1);
+  assert.equal(firstResponse.statusCode, 302);
+  assert.equal(firstResponse.headers.get('location'), 'https://test-station.smysnk.com/');
+
+  const replayResponse = createResponse();
+  await handler(request, replayResponse);
+
+  assert.equal(invocationCount, 1);
+  assert.equal(replayResponse.statusCode, 302);
+  assert.equal(replayResponse.headers.get('location'), 'https://test-station.smysnk.com/');
+  assert.equal(replayResponse.headers.has('set-cookie'), false);
+});
+
 test('web auth API only recovers OAuth callback errors for the Google callback route', () => {
   const handled = handleRecoverableOAuthCallbackError(
     { url: '/api/auth/session' },

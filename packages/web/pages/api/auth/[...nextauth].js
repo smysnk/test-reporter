@@ -1,9 +1,11 @@
+import crypto from 'node:crypto';
 import '../../../lib/nextAuthEnv.js';
 import NextAuth from 'next-auth';
 import { createAuthOptions } from '../../../lib/auth.js';
 import { buildSignInRedirectUrl } from '../../../lib/routeProtection.js';
 
 const EXPIRED_COOKIE_TIMESTAMP = 'Thu, 01 Jan 1970 00:00:00 GMT';
+const GOOGLE_CALLBACK_REPLAY_TTL_MS = 15 * 60 * 1000;
 const RECOVERABLE_AUTH_COOKIE_NAMES = [
   { name: 'next-auth.session-token', secure: false },
   { name: '__Secure-next-auth.session-token', secure: true },
@@ -16,6 +18,7 @@ const RECOVERABLE_AUTH_COOKIE_NAMES = [
   { name: '__Secure-next-auth.pkce.code_verifier', secure: true },
   { name: 'next-auth.pkce.code_verifier', secure: false },
 ];
+const successfulGoogleCallbackCodes = new Map();
 
 export function resolveNextAuthHandler() {
   if (typeof NextAuth === 'function') {
@@ -36,6 +39,10 @@ export function resolveNextAuthHandler() {
 export function createWebAuthHandler(nextAuthHandler = resolveNextAuthHandler()) {
   return async function webAuth(req, res) {
     logGoogleCallbackRequest(req, 'incoming');
+    if (handleGoogleCallbackReplay(req, res)) {
+      logGoogleCallbackResponse(req, res, 'replay');
+      return undefined;
+    }
 
     try {
       const result = await nextAuthHandler(req, res, createAuthOptions());
@@ -86,6 +93,22 @@ function isGoogleCallbackRequest(req) {
   return url.startsWith('/api/auth/callback/google');
 }
 
+function handleGoogleCallbackReplay(req, res) {
+  if (!isGoogleCallbackRequest(req)) {
+    return false;
+  }
+
+  const entry = resolveSuccessfulGoogleCallback(req);
+  if (!entry) {
+    return false;
+  }
+
+  res.statusCode = 302;
+  res.setHeader('Location', entry.location || '/');
+  res.end();
+  return true;
+}
+
 function logGoogleCallbackRequest(req, stage, error = null) {
   if (!isGoogleCallbackRequest(req)) {
     return;
@@ -131,7 +154,7 @@ function logGoogleCallbackRequest(req, stage, error = null) {
   process.stderr.write(`[auth:google-callback] ${JSON.stringify(payload)}\n`);
 }
 
-function logGoogleCallbackResponse(req, res) {
+function logGoogleCallbackResponse(req, res, stage = 'response') {
   if (!isGoogleCallbackRequest(req)) {
     return;
   }
@@ -142,12 +165,16 @@ function logGoogleCallbackResponse(req, res) {
     .filter(Boolean)
     .map((value) => value.split('=')[0])
     .filter(Boolean);
+  const location = headerValue({ headers: { location: res?.getHeader?.('Location') } }, 'location');
+  if (stage === 'response' && setCookieNames.includes('__Secure-next-auth.session-token')) {
+    rememberSuccessfulGoogleCallback(req, location || '/');
+  }
 
   const payload = {
-    stage: 'response',
+    stage,
     url: redactGoogleCallbackUrl(typeof req?.url === 'string' ? req.url : ''),
     statusCode: Number.isInteger(res?.statusCode) ? res.statusCode : null,
-    location: headerValue({ headers: { location: res?.getHeader?.('Location') } }, 'location'),
+    location,
     setCookiePresent: setCookie.length > 0,
     setCookieNames,
     setsSecureSessionToken: setCookieNames.includes('__Secure-next-auth.session-token'),
@@ -190,6 +217,65 @@ function extractGoogleCallbackQueryKeys(req) {
   } catch {
     return [];
   }
+}
+
+function resolveSuccessfulGoogleCallback(req, now = Date.now()) {
+  pruneSuccessfulGoogleCallbacks(now);
+  const codeHash = hashGoogleCallbackCode(extractGoogleCallbackCode(req));
+  if (!codeHash) {
+    return null;
+  }
+
+  const entry = successfulGoogleCallbackCodes.get(codeHash);
+  if (!entry || entry.expiresAt <= now) {
+    successfulGoogleCallbackCodes.delete(codeHash);
+    return null;
+  }
+
+  return entry;
+}
+
+function rememberSuccessfulGoogleCallback(req, location, now = Date.now()) {
+  pruneSuccessfulGoogleCallbacks(now);
+  const codeHash = hashGoogleCallbackCode(extractGoogleCallbackCode(req));
+  if (!codeHash) {
+    return;
+  }
+
+  successfulGoogleCallbackCodes.set(codeHash, {
+    location,
+    expiresAt: now + GOOGLE_CALLBACK_REPLAY_TTL_MS,
+  });
+}
+
+function pruneSuccessfulGoogleCallbacks(now = Date.now()) {
+  for (const [key, entry] of successfulGoogleCallbackCodes.entries()) {
+    if (!entry || entry.expiresAt <= now) {
+      successfulGoogleCallbackCodes.delete(key);
+    }
+  }
+}
+
+function extractGoogleCallbackCode(req) {
+  const url = typeof req?.url === 'string' ? req.url : '';
+  const queryIndex = url.indexOf('?');
+  if (queryIndex === -1) {
+    return '';
+  }
+
+  try {
+    return new URLSearchParams(url.slice(queryIndex + 1)).get('code') || '';
+  } catch {
+    return '';
+  }
+}
+
+function hashGoogleCallbackCode(code) {
+  if (typeof code !== 'string' || code.trim() === '') {
+    return '';
+  }
+
+  return crypto.createHash('sha256').update(code).digest('hex');
 }
 
 function headerValue(req, name) {
