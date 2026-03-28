@@ -2,21 +2,11 @@ import React from 'react';
 import '../../lib/nextAuthEnv.js';
 import { getServerSession } from 'next-auth/next';
 import { signIn } from 'next-auth/react';
-import { createAuthOptions, describeAuthProviders, logWebSessionProbe, resolveAutoSignInProviderId } from '../../lib/auth.js';
+import { createAuthOptions, describeAuthProviders, logWebSessionProbe } from '../../lib/auth.js';
 
-export default function WebSignInPage({ callbackUrl, providers, autoSignInProviderId, error, signedOut }) {
+export default function WebSignInPage({ callbackUrl, providers, error, signedOut }) {
   const credentialProvider = providers.find((provider) => provider.type === 'credentials') || null;
   const oauthProviders = providers.filter((provider) => provider.type !== 'credentials');
-
-  React.useEffect(() => {
-    if (!autoSignInProviderId) {
-      return;
-    }
-
-    void signIn(autoSignInProviderId, {
-      callbackUrl,
-    });
-  }, [autoSignInProviderId, callbackUrl]);
 
   async function handleDemoSubmit(event) {
     event.preventDefault();
@@ -42,19 +32,17 @@ export default function WebSignInPage({ callbackUrl, providers, autoSignInProvid
     React.createElement(
       'p',
       { className: 'web-card__copy' },
-      autoSignInProviderId
-        ? `Redirecting to ${formatProviderName(autoSignInProviderId)} sign-in...`
-        : signedOut
-          ? 'You have signed out. Choose a provider below when you are ready to sign in again.'
-          : error
-          ? `Authentication failed (${error}). Try the configured provider again or adjust the web auth environment.`
-          : credentialProvider && oauthProviders.length > 0
-            ? 'Use one of the configured SSO providers below, or use demo access if you have enabled it for this deployment. Guests can see public projects, and signed-in users can see the full workspace.'
-            : oauthProviders.length > 0
-              ? 'Use one of the configured SSO providers below.'
-              : credentialProvider
-                ? 'Demo access is enabled for this deployment. Guests can see public projects, and signed-in users can see the full workspace.'
-                : 'No web auth providers are configured. Set Google OAuth or explicitly enable WEB_DEMO_AUTH_ENABLED=true.',
+      signedOut
+        ? 'You have signed out. Choose a provider below when you are ready to sign in again.'
+        : error
+        ? `Authentication failed (${error}). Try the configured provider again or adjust the web auth environment.`
+        : credentialProvider && oauthProviders.length > 0
+          ? 'Use one of the configured SSO providers below, or use demo access if you have enabled it for this deployment. Guests can see public projects, and signed-in users can see the full workspace.'
+          : oauthProviders.length > 0
+            ? 'Use one of the configured SSO providers below.'
+            : credentialProvider
+              ? 'Demo access is enabled for this deployment. Guests can see public projects, and signed-in users can see the full workspace.'
+              : 'No web auth providers are configured. Set Google OAuth or explicitly enable WEB_DEMO_AUTH_ENABLED=true.',
     ),
     error
       ? React.createElement(
@@ -63,25 +51,23 @@ export default function WebSignInPage({ callbackUrl, providers, autoSignInProvid
         `Sign-in error: ${error}`,
       )
       : null,
-    autoSignInProviderId
-      ? null
-      : oauthProviders.length > 0
-        ? React.createElement(
-          'div',
-          { className: 'web-auth__providers' },
-          ...oauthProviders.map((provider) => React.createElement(
-            'button',
-            {
-              key: provider.id,
-              type: 'button',
-              className: 'web-button web-button--primary',
-              onClick: () => handleProviderSignIn(provider.id),
-            },
-            `Continue with ${provider.name}`,
-          )),
-        )
-        : null,
-    !autoSignInProviderId && credentialProvider
+    oauthProviders.length > 0
+      ? React.createElement(
+        'div',
+        { className: 'web-auth__providers' },
+        ...oauthProviders.map((provider) => React.createElement(
+          'button',
+          {
+            key: provider.id,
+            type: 'button',
+            className: 'web-button web-button--primary',
+            onClick: () => handleProviderSignIn(provider.id),
+          },
+          `Continue with ${provider.name}`,
+        )),
+      )
+      : null,
+    credentialProvider
       ? React.createElement(
         'form',
         { className: 'web-auth__form', onSubmit: handleDemoSubmit },
@@ -149,13 +135,8 @@ export async function getServerSideProps(context) {
     props: {
       callbackUrl,
       providers,
-      autoSignInProviderId: resolveAutoSignInProviderId(providers, { error, signedOut }),
       error,
       signedOut,
     },
   };
-}
-
-function formatProviderName(providerId) {
-  return providerId === 'google' ? 'Google' : providerId;
 }

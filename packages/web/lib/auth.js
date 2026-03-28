@@ -161,16 +161,6 @@ export function describeAuthProviders(options = {}) {
   }));
 }
 
-export function resolveAutoSignInProviderId(providers = [], options = {}) {
-  if (options?.signedOut || options?.error) {
-    return null;
-  }
-
-  return Array.isArray(providers) && providers.some((provider) => provider?.id === 'google')
-    ? 'google'
-    : null;
-}
-
 export function resolveAuthSecret(options = {}) {
   if (typeof options.secret === 'string' && options.secret.trim()) {
     return options.secret.trim();

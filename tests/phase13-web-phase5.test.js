@@ -7,7 +7,6 @@ import {
   buildWebActorHeaders,
   createAuthOptions,
   logWebSessionProbe,
-  resolveAutoSignInProviderId,
   resolveDemoAuthEnabled,
   resolveNextAuthUrl,
 } from '../packages/web/lib/auth.js';
@@ -415,7 +414,7 @@ test('web demo auth can be enabled from WEB_DEMO_AUTH_ENABLED', () => {
   }
 });
 
-test('web hides demo auth and auto-selects Google when Google OAuth is configured', () => {
+test('web hides demo auth when Google OAuth is configured and leaves sign-in user-driven', () => {
   const originalDemoAuthEnabled = process.env.WEB_DEMO_AUTH_ENABLED;
   const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
   const originalGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -428,9 +427,6 @@ test('web hides demo auth and auto-selects Google when Google OAuth is configure
     const authOptions = createAuthOptions();
     assert.equal(authOptions.providers.some((provider) => provider.id === 'google'), true);
     assert.equal(authOptions.providers.some((provider) => provider.type === 'credentials'), false);
-    assert.equal(resolveAutoSignInProviderId(authOptions.providers), 'google');
-    assert.equal(resolveAutoSignInProviderId(authOptions.providers, { signedOut: true }), null);
-    assert.equal(resolveAutoSignInProviderId(authOptions.providers, { error: 'OAuthSignin' }), null);
   } finally {
     if (originalDemoAuthEnabled === undefined) {
       delete process.env.WEB_DEMO_AUTH_ENABLED;
