@@ -1,7 +1,7 @@
 import React from 'react';
 import '../../lib/nextAuthEnv.js';
 import { getServerSession } from 'next-auth/next';
-import { getCsrfToken } from 'next-auth/react';
+import { getCsrfToken, signIn } from 'next-auth/react';
 import { createAuthOptions, describeAuthProviders, logWebSessionProbe } from '../../lib/auth.js';
 
 export default function WebSignInPage({ callbackUrl, csrfToken, providers, error, signedOut }) {
@@ -40,31 +40,16 @@ export default function WebSignInPage({ callbackUrl, csrfToken, providers, error
         'div',
         { className: 'web-auth__providers' },
         ...oauthProviders.map((provider) => React.createElement(
-          'form',
+          'button',
           {
             key: provider.id,
-            action: `/api/auth/signin/${provider.id}`,
-            method: 'post',
-            className: 'web-auth__provider-form',
-          },
-          React.createElement('input', {
-            type: 'hidden',
-            name: 'csrfToken',
-            value: csrfToken,
-          }),
-          React.createElement('input', {
-            type: 'hidden',
-            name: 'callbackUrl',
-            value: callbackUrl,
-          }),
-          React.createElement(
-            'button',
-            {
-              type: 'submit',
-              className: 'web-button web-button--primary',
+            type: 'button',
+            className: 'web-button web-button--primary web-auth__provider-button',
+            onClick: () => {
+              void signIn(provider.id, { callbackUrl });
             },
-            `Continue with ${provider.name}`,
-          ),
+          },
+          `Continue with ${provider.name}`,
         )),
       )
       : null,
