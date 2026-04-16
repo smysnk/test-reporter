@@ -192,6 +192,7 @@ function logGoogleCallbackResponse(req, res, stage = 'response') {
   if (stage === 'response' && setCookieNames.includes('__Secure-next-auth.session-token')) {
     rememberSuccessfulGoogleCallback(req, location || '/');
   }
+  const sessionCookieDiagnostics = buildSessionCookieDiagnostics(setCookie);
 
   const payload = {
     stage,
@@ -204,6 +205,7 @@ function logGoogleCallbackResponse(req, res, stage = 'response') {
     setsLegacySessionToken: setCookieNames.includes('next-auth.session-token'),
     clearsSecureStateCookie: setCookie.some((value) => includesCookieDirective(value, '__Secure-next-auth.state', EXPIRED_COOKIE_TIMESTAMP)),
     clearsSecurePkceCookie: setCookie.some((value) => includesCookieDirective(value, '__Secure-next-auth.pkce.code_verifier', EXPIRED_COOKIE_TIMESTAMP)),
+    sessionCookie: sessionCookieDiagnostics,
   };
 
   process.stderr.write(`[auth:google-callback] ${JSON.stringify(payload)}\n`);
@@ -331,6 +333,77 @@ function buildExpiredCookie({ name, secure }) {
 function resolveRequestId(req) {
   const value = req?.headers?.['x-request-id'];
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function buildSessionCookieDiagnostics(setCookieHeaders) {
+  const matchingCookies = setCookieHeaders
+    .filter((value) => typeof value === 'string')
+    .map(parseSetCookieDiagnostics)
+    .filter((entry) => entry && isSessionCookieName(entry.name));
+
+  if (matchingCookies.length === 0) {
+    return null;
+  }
+
+  const primaryCookie = matchingCookies[0];
+  return {
+    name: primaryCookie.name,
+    matchingCookieCount: matchingCookies.length,
+    totalBytes: primaryCookie.totalBytes,
+    valueBytes: primaryCookie.valueBytes,
+    attributeBytes: primaryCookie.attributeBytes,
+    attributes: primaryCookie.attributes,
+  };
+}
+
+function parseSetCookieDiagnostics(setCookieValue) {
+  if (typeof setCookieValue !== 'string' || !setCookieValue.trim()) {
+    return null;
+  }
+
+  const parts = setCookieValue.split(';').map((part) => part.trim()).filter(Boolean);
+  if (parts.length === 0) {
+    return null;
+  }
+
+  const [nameValue, ...attributeParts] = parts;
+  const equalsIndex = nameValue.indexOf('=');
+  if (equalsIndex === -1) {
+    return null;
+  }
+
+  const name = nameValue.slice(0, equalsIndex);
+  const value = nameValue.slice(equalsIndex + 1);
+  const attributes = {};
+
+  for (const attributePart of attributeParts) {
+    const [rawKey, ...rawValueParts] = attributePart.split('=');
+    const key = String(rawKey || '').trim().toLowerCase();
+    const joinedValue = rawValueParts.join('=').trim();
+
+    if (!key) {
+      continue;
+    }
+
+    if (key === 'httponly' || key === 'secure') {
+      attributes[key] = true;
+      continue;
+    }
+
+    attributes[key] = joinedValue || true;
+  }
+
+  return {
+    name,
+    totalBytes: Buffer.byteLength(setCookieValue, 'utf8'),
+    valueBytes: Buffer.byteLength(value, 'utf8'),
+    attributeBytes: Buffer.byteLength(attributeParts.join('; '), 'utf8'),
+    attributes,
+  };
+}
+
+function isSessionCookieName(value) {
+  return value === '__Secure-next-auth.session-token' || value === 'next-auth.session-token';
 }
 
 function normalizeGoogleCallbackResponse(req, res) {

@@ -49,16 +49,17 @@ export function createAuthOptions(options = {}) {
     },
     callbacks: {
       async jwt({ token, account, user }) {
+        const sanitizedUser = sanitizeAuthUser(user);
         writeNextAuthLog('debug', 'JWT_CALLBACK_INPUT', {
           hasAccount: Boolean(account),
-          hasUser: Boolean(user),
+          hasUser: Boolean(sanitizedUser),
           tokenPreview: buildTokenPreview(token),
-          userPreview: buildUserPreview(user),
+          userPreview: buildUserPreview(sanitizedUser),
         });
 
-        if (user) {
-          token.sub = user.id || token.sub || crypto.randomUUID();
-          token.role = user.role || resolveRole(user.email, adminEmails);
+        if (sanitizedUser) {
+          token.sub = sanitizedUser.id || token.sub || crypto.randomUUID();
+          token.role = sanitizedUser.role || resolveRole(sanitizedUser.email, adminEmails);
         } else {
           token.sub = typeof token.sub === 'string' && token.sub.trim() ? token.sub : 'web-user';
           token.role = typeof token.role === 'string' && token.role.trim() ? token.role : 'member';
@@ -233,7 +234,7 @@ function resolveAuthProviders(options = {}) {
   const credentialsProviderFactory = unwrapProviderFactory(CredentialsProvider);
 
   if (githubClientId && githubClientSecret) {
-    providers.push(githubProviderFactory({
+    const provider = githubProviderFactory({
       clientId: githubClientId,
       clientSecret: githubClientSecret,
       authorization: {
@@ -241,21 +242,27 @@ function resolveAuthProviders(options = {}) {
           scope: 'read:user user:email',
         },
       },
-    }));
+    });
+    provider.profile = mapOAuthProfile;
+    providers.push(provider);
   }
 
   if (googleClientId && googleClientSecret) {
-    providers.push(googleProviderFactory({
+    const provider = googleProviderFactory({
       clientId: googleClientId,
       clientSecret: googleClientSecret,
-    }));
+    });
+    provider.profile = mapOAuthProfile;
+    providers.push(provider);
   }
 
   if (discordClientId && discordClientSecret) {
-    providers.push(discordProviderFactory({
+    const provider = discordProviderFactory({
       clientId: discordClientId,
       clientSecret: discordClientSecret,
-    }));
+    });
+    provider.profile = mapOAuthProfile;
+    providers.push(provider);
   }
 
   const demoAuthEnabled = resolveDemoAuthEnabled(options) && !(googleClientId && googleClientSecret);
@@ -445,6 +452,48 @@ function splitConfiguredValues(value) {
     return [];
   }
   return value.split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function sanitizeAuthUser(user) {
+  if (!user || typeof user !== 'object') {
+    return user ?? null;
+  }
+
+  const sanitizedUser = { ...user };
+  delete sanitizedUser.image;
+  delete sanitizedUser.picture;
+  return sanitizedUser;
+}
+
+function mapOAuthProfile(profile) {
+  const id = normalizeOAuthProfileId(profile);
+  const mappedProfile = {
+    id,
+    name: normalizeOAuthProfileString(profile?.name)
+      || normalizeOAuthProfileString(profile?.login)
+      || normalizeOAuthProfileString(profile?.preferred_username)
+      || null,
+    email: normalizeOAuthProfileString(profile?.email),
+  };
+
+  return sanitizeAuthUser(mappedProfile);
+}
+
+function normalizeOAuthProfileId(profile) {
+  const rawId = profile?.sub ?? profile?.id;
+  if (typeof rawId === 'string' && rawId.trim()) {
+    return rawId.trim();
+  }
+
+  if (typeof rawId === 'number' && Number.isFinite(rawId)) {
+    return String(rawId);
+  }
+
+  return crypto.randomUUID();
+}
+
+function normalizeOAuthProfileString(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function parseBooleanFlag(value, fallback) {

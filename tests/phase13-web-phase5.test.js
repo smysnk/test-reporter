@@ -314,6 +314,50 @@ test('web auth logger redacts sensitive OAuth callback metadata', async () => {
   assert.match(logged, /<redacted>/);
 });
 
+test('web auth providers sanitize image fields out of OAuth profiles before session shaping', () => {
+  const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
+  const originalGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+
+  try {
+    process.env.GOOGLE_CLIENT_ID = 'google-client-id';
+    process.env.GOOGLE_CLIENT_SECRET = 'google-client-secret';
+
+    const authOptions = createAuthOptions({
+      secret: 'test-secret',
+      demoAuthEnabled: false,
+    });
+    const googleProvider = authOptions.providers.find((provider) => provider.id === 'google');
+
+    assert.ok(googleProvider);
+    const mappedProfile = googleProvider.profile({
+      sub: 'google-user-99',
+      email: 'user@example.com',
+      name: 'User Example',
+      picture: 'https://example.com/avatar.png',
+    });
+
+    assert.deepEqual(mappedProfile, {
+      id: 'google-user-99',
+      email: 'user@example.com',
+      name: 'User Example',
+    });
+    assert.equal('image' in mappedProfile, false);
+    assert.equal('picture' in mappedProfile, false);
+  } finally {
+    if (originalGoogleClientId === undefined) {
+      delete process.env.GOOGLE_CLIENT_ID;
+    } else {
+      process.env.GOOGLE_CLIENT_ID = originalGoogleClientId;
+    }
+
+    if (originalGoogleClientSecret === undefined) {
+      delete process.env.GOOGLE_CLIENT_SECRET;
+    } else {
+      process.env.GOOGLE_CLIENT_SECRET = originalGoogleClientSecret;
+    }
+  }
+});
+
 test('web exposes Google as an OAuth provider when configured', () => {
   const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
   const originalGoogleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -688,6 +732,63 @@ test('web auth API short-circuits duplicate Google callback codes after a succes
   assert.equal(replayResponse.statusCode, 302);
   assert.equal(replayResponse.headers.get('location'), 'https://test-station.smysnk.com/');
   assert.equal(replayResponse.headers.has('set-cookie'), false);
+});
+
+test('web auth API logs session cookie size and attributes on successful Google callback responses', async () => {
+  const originalWrite = process.stderr.write;
+  const lines = [];
+  process.stderr.write = function patchedWrite(chunk, encoding, callback) {
+    lines.push(String(chunk));
+    if (typeof encoding === 'function') {
+      encoding();
+    }
+    if (typeof callback === 'function') {
+      callback();
+    }
+    return true;
+  };
+
+  try {
+    const handler = createWebAuthHandler(async (_req, res) => {
+      res.statusCode = 302;
+      res.setHeader('Location', 'https://test-station.smysnk.com/');
+      res.setHeader('Set-Cookie', [
+        '__Secure-next-auth.session-token=session-token-value; Path=/; HttpOnly; SameSite=Lax; Secure',
+      ]);
+      res.end();
+    });
+
+    const response = {
+      statusCode: 200,
+      headers: new Map(),
+      setHeader(name, value) {
+        this.headers.set(String(name).toLowerCase(), value);
+      },
+      getHeader(name) {
+        return this.headers.get(String(name).toLowerCase());
+      },
+      end() {},
+    };
+
+    await handler(
+      { url: '/api/auth/callback/google?code=log-session-cookie-code&state=session-cookie-state' },
+      response,
+    );
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+
+  const output = lines.join('');
+  assert.match(output, /\[auth:google-callback\]/);
+  assert.match(output, /"stage":"response"/);
+  assert.match(output, /"sessionCookie":\{/);
+  assert.match(output, /"name":"__Secure-next-auth\.session-token"/);
+  assert.match(output, /"matchingCookieCount":1/);
+  assert.match(output, /"totalBytes":/);
+  assert.match(output, /"valueBytes":/);
+  assert.match(output, /"attributeBytes":/);
+  assert.match(output, /"attributes":\{"path":"\/","httponly":true,"samesite":"Lax","secure":true\}/);
+  assert.doesNotMatch(output, /session-token-value/);
 });
 
 test('web auth API rewrites NextAuth callback redirects from /api/auth/error to the auth error page', async () => {
