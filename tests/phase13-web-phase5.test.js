@@ -50,7 +50,7 @@ import {
   resolveWebServerUrl,
 } from '../packages/web/lib/serverGraphql.js';
 import { buildRunTemplateHref, resolveRunTemplateMode } from '../packages/web/lib/runTemplateRouting.js';
-import { buildSignInRedirectUrl, isProtectedWebPath } from '../packages/web/lib/routeProtection.js';
+import { buildSignInRedirectUrl, isProtectedWebPath, normalizeCallbackTarget } from '../packages/web/lib/routeProtection.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
 import { decorateEmbeddedRunnerReportHtml } from '../packages/web/lib/runReportTemplate.js';
 import {
@@ -569,6 +569,12 @@ test('web actor headers and route protection helpers produce the expected auth w
     buildSignInRedirectUrl('https://0.0.0.0:3001/?foo=bar#frag'),
     '/auth/signin?callbackUrl=%2F%3Ffoo%3Dbar%23frag',
   );
+  assert.equal(buildSignInRedirectUrl('/auth/signin?callbackUrl=%2F'), '/auth/signin?callbackUrl=%2F');
+  assert.equal(buildSignInRedirectUrl('/auth/error?callbackUrl=%2Fprojects'), '/auth/signin?callbackUrl=%2F');
+  assert.equal(buildSignInRedirectUrl('/api/auth/signin/google'), '/auth/signin?callbackUrl=%2F');
+  assert.equal(normalizeCallbackTarget('/auth/signin?callbackUrl=%2Fprojects'), '/');
+  assert.equal(normalizeCallbackTarget('/auth/error?callbackUrl=%2Fprojects'), '/');
+  assert.equal(normalizeCallbackTarget('/api/auth/callback/google'), '/');
 });
 
 test('web defaults SERVER_URL to localhost using SERVER_PORT when unset', () => {

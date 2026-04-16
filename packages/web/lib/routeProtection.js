@@ -12,17 +12,36 @@ export function buildSignInRedirectUrl(callbackUrl) {
   return `/auth/signin?callbackUrl=${encodeURIComponent(target)}`;
 }
 
-function normalizeCallbackTarget(value) {
+export function normalizeCallbackTarget(value) {
   const target = typeof value === 'string' && value.trim() ? value.trim() : '/';
+  const normalizedTarget = normalizeCallbackTargetValue(target);
 
-  if (target.startsWith('/')) {
-    return target;
+  if (normalizedTarget.startsWith('/')) {
+    return isUnsafeAuthCallbackTarget(normalizedTarget) ? '/' : normalizedTarget;
   }
 
   try {
-    const url = new URL(target);
-    return `${url.pathname}${url.search}${url.hash}` || '/';
+    const url = new URL(normalizedTarget);
+    const pathTarget = `${url.pathname}${url.search}${url.hash}` || '/';
+    return isUnsafeAuthCallbackTarget(pathTarget) ? '/' : pathTarget;
   } catch {
     return '/';
   }
+}
+
+function normalizeCallbackTargetValue(value) {
+  if (typeof value !== 'string') {
+    return '/';
+  }
+
+  return value.trim() || '/';
+}
+
+function isUnsafeAuthCallbackTarget(target) {
+  return target === '/auth/signin'
+    || target.startsWith('/auth/signin?')
+    || target === '/auth/error'
+    || target.startsWith('/auth/error?')
+    || target === '/api/auth'
+    || target.startsWith('/api/auth/');
 }

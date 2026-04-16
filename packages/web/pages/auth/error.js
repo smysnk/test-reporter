@@ -1,7 +1,7 @@
 import React from 'react';
 import { getServerSession } from 'next-auth/next';
 import { createAuthOptions, logWebSessionProbe } from '../../lib/auth.js';
-import { buildSignInRedirectUrl } from '../../lib/routeProtection.js';
+import { buildSignInRedirectUrl, normalizeCallbackTarget } from '../../lib/routeProtection.js';
 
 export default function WebAuthErrorPage({ callbackUrl, error, requestId }) {
   return React.createElement(
@@ -54,9 +54,11 @@ export default function WebAuthErrorPage({ callbackUrl, error, requestId }) {
 }
 
 export async function getServerSideProps(context) {
-  const callbackUrl = typeof context.query.callbackUrl === 'string' && context.query.callbackUrl.trim()
-    ? context.query.callbackUrl.trim()
-    : '/';
+  const callbackUrl = normalizeCallbackTarget(
+    typeof context.query.callbackUrl === 'string' && context.query.callbackUrl.trim()
+      ? context.query.callbackUrl.trim()
+      : '/',
+  );
   const error = typeof context.query.error === 'string' && context.query.error.trim()
     ? context.query.error.trim()
     : 'AuthError';

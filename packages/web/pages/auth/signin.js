@@ -3,6 +3,7 @@ import '../../lib/nextAuthEnv.js';
 import { getServerSession } from 'next-auth/next';
 import { getCsrfToken, signIn } from 'next-auth/react';
 import { createAuthOptions, describeAuthProviders, logWebSessionProbe } from '../../lib/auth.js';
+import { normalizeCallbackTarget } from '../../lib/routeProtection.js';
 
 export default function WebSignInPage({ callbackUrl, csrfToken, providers, error, signedOut }) {
   const credentialProvider = providers.find((provider) => provider.type === 'credentials') || null;
@@ -104,9 +105,11 @@ export default function WebSignInPage({ callbackUrl, csrfToken, providers, error
 }
 
 export async function getServerSideProps(context) {
-  const callbackUrl = typeof context.query.callbackUrl === 'string' && context.query.callbackUrl.trim()
-    ? context.query.callbackUrl
-    : '/';
+  const callbackUrl = normalizeCallbackTarget(
+    typeof context.query.callbackUrl === 'string' && context.query.callbackUrl.trim()
+      ? context.query.callbackUrl
+      : '/',
+  );
   const signedOut = context.query.signedOut === '1' || context.query.signedOut === 'true';
   const error = typeof context.query.error === 'string' && context.query.error.trim()
     ? context.query.error.trim()
