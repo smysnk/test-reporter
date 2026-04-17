@@ -2,6 +2,10 @@
 {{- $hosts := default (list) .Values.web.ingress.hosts -}}
 {{- $host := .Values.web.ingress.host | default (include "test-station.publicDomain" . | trim) -}}
 {{- $serverPaths := default (list) .Values.server.ingressPaths -}}
+{{- $webPaths := default (list) .Values.web.ingress.paths -}}
+{{- if eq (len $webPaths) 0 }}
+{{- $webPaths = list (dict "path" .Values.web.ingress.path "pathType" .Values.web.ingress.pathType) -}}
+{{- end }}
 {{- $tls := default (dict) .Values.web.ingress.tls -}}
 {{- $annotations := dict -}}
 {{- range $key, $value := default (dict) .Values.web.ingress.annotations }}
@@ -46,7 +50,8 @@ spec:
                 port:
                   number: {{ $.Values.server.service.port }}
           {{- end }}
-          {{- range .paths }}
+          {{- $hostPaths := default $webPaths .paths }}
+          {{- range $hostPaths }}
           - path: {{ .path }}
             pathType: {{ .pathType }}
             backend:
@@ -69,13 +74,15 @@ spec:
                 port:
                   number: {{ $.Values.server.service.port }}
           {{- end }}
-          - path: {{ $.Values.web.ingress.path }}
-            pathType: {{ $.Values.web.ingress.pathType }}
+          {{- range $webPaths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
             backend:
               service:
                 name: {{ include "test-station.webName" $ }}
                 port:
                   number: {{ $.Values.web.service.port }}
+          {{- end }}
     {{- end }}
   {{- if kindIs "slice" $tls }}
   tls:

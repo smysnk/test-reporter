@@ -93,6 +93,19 @@ web:
       enabled: true
       maxRequestBodyBytes: 52428800
     host: ""
+    paths:
+      - path: /api/auth
+        pathType: Prefix
+      - path: /api/healthz
+        pathType: Prefix
+      - path: /api/badges
+        pathType: Prefix
+      - path: /api/graphql-proxy
+        pathType: Prefix
+      - path: /api/runs
+        pathType: Prefix
+      - path: /
+        pathType: Prefix
     path: /
     pathType: Prefix
     hosts: []
