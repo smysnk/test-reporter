@@ -21,7 +21,7 @@ By default:
 
 - `web.ingress.enabled` is `true` via `fleet.yaml`
 - `server.existingSecret` and `web.existingSecret` both point at `test-station-runtime-secret` via `fleet.yaml`
-- `https://test-station.smysnk.com/api/ingest` is routed through the shared ingress to the `server` service
+- `https://test-station.smysnk.com/api/ingest` is routed through a dedicated ingress to the `server` service
 - the shared ingress also lists the web-owned API prefixes explicitly:
   - `/api/auth`
   - `/api/healthz`
@@ -31,7 +31,7 @@ By default:
   - plus `/` as the final web catch-all
 - `web.ingress.annotations.cert-manager.io/cluster-issuer` is `letsencrypt-prod`
 - `web.ingress.tls.enabled` is `true`
-- `/api/ingest` is configured for a `50 MB` request-body limit in both the server app config and the Traefik ingress middleware
+- `/api/ingest` is configured for a `50 MB` request-body limit in both the server app config and the dedicated Traefik ingest ingress middleware
 - generated ConfigMaps stay enabled unless you explicitly switch to `existingConfigMap`
 
 This Fleet cluster rejects `GitRepo.spec.helm`, so repo-specific Helm overrides live in `fleet.yaml` instead of `fleet/gitrepo.yml`.

@@ -23,6 +23,7 @@ test('fleet bundle files exist for unified web and server deployment', () => {
     'scripts/recycle-and-monitor.sh',
     'scripts/lib/fleet-defaults.sh',
     'fleet/test-station/templates/server-deployment.yaml',
+    'fleet/test-station/templates/server-ingress.yaml',
     'fleet/test-station/templates/server-service.yaml',
     'fleet/test-station/templates/web-deployment.yaml',
     'fleet/test-station/templates/web-service.yaml',
@@ -41,6 +42,7 @@ test('fleet values and workflow use the unified image contract without stray ref
   const gitRepoYaml = fs.readFileSync(path.join(repoRoot, 'fleet/gitrepo.yml'), 'utf8');
   const valuesYaml = fs.readFileSync(path.join(repoRoot, 'fleet/test-station/values.yaml'), 'utf8');
   const webIngressYaml = fs.readFileSync(path.join(repoRoot, 'fleet/test-station/templates/web-ingress.yaml'), 'utf8');
+  const serverIngressYaml = fs.readFileSync(path.join(repoRoot, 'fleet/test-station/templates/server-ingress.yaml'), 'utf8');
   const webConfigMapYaml = fs.readFileSync(path.join(repoRoot, 'fleet/test-station/templates/web-configmap.yaml'), 'utf8');
   const serverConfigMapYaml = fs.readFileSync(path.join(repoRoot, 'fleet/test-station/templates/server-configmap.yaml'), 'utf8');
   const fleetReadme = fs.readFileSync(path.join(repoRoot, 'fleet/README.md'), 'utf8');
@@ -81,10 +83,12 @@ test('fleet values and workflow use the unified image contract without stray ref
   assert.match(valuesYaml, /readinessProbe:\s*\n\s*path:\s*\/api\/healthz/);
   assert.match(webIngressYaml, /test-station\.publicDomain/);
   assert.match(webIngressYaml, /Values\.web\.ingress\.paths/);
-  assert.match(webIngressYaml, /router\.middlewares/);
-  assert.match(webIngressYaml, /webIngressBufferingMiddlewareName/);
+  assert.doesNotMatch(webIngressYaml, /router\.middlewares/);
+  assert.doesNotMatch(webIngressYaml, /webIngressBufferingMiddlewareName/);
+  assert.match(serverIngressYaml, /router\.middlewares/);
+  assert.match(serverIngressYaml, /webIngressBufferingMiddlewareName/);
+  assert.match(serverIngressYaml, /test-station\.serverName/);
   assert.match(webIngressYaml, /test-station\.defaultTlsSecretName/);
-  assert.match(webIngressYaml, /test-station\.serverName/);
   assert.match(webIngressYaml, /kindIs "map"/);
   assert.match(webConfigMapYaml, /NEXTAUTH_URL/);
   assert.match(serverConfigMapYaml, /WEB_URL/);
