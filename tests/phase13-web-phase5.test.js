@@ -266,6 +266,10 @@ test('formatDateTime supports millisecond timestamp strings from GraphQL payload
   assert.equal(formatDateTime('1774302510000'), formatDateTime(1774302510000));
 });
 
+test('formatDateTime renders in a fixed timezone to avoid hydration mismatches', () => {
+  assert.equal(formatDateTime('1774302510000'), 'Mar 23, 2026, 9:48 PM');
+});
+
 test('web auth logger redacts sensitive OAuth callback metadata', async () => {
   const authOptions = createAuthOptions({
     secret: 'test-secret',
