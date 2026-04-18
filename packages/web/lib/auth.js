@@ -59,15 +59,21 @@ export function createAuthOptions(options = {}) {
 
         if (sanitizedUser) {
           token.sub = sanitizedUser.id || token.sub || crypto.randomUUID();
+          token.email = typeof sanitizedUser.email === 'string' && sanitizedUser.email.trim()
+            ? sanitizedUser.email.trim()
+            : null;
+          token.name = typeof sanitizedUser.name === 'string' && sanitizedUser.name.trim()
+            ? sanitizedUser.name.trim()
+            : null;
           token.role = sanitizedUser.role || resolveRole(sanitizedUser.email, adminEmails);
         } else {
           token.sub = typeof token.sub === 'string' && token.sub.trim() ? token.sub : 'web-user';
+          token.email = typeof token.email === 'string' && token.email.trim() ? token.email.trim() : null;
+          token.name = typeof token.name === 'string' && token.name.trim() ? token.name.trim() : null;
           token.role = typeof token.role === 'string' && token.role.trim() ? token.role : 'member';
         }
 
         delete token.userId;
-        delete token.email;
-        delete token.name;
         delete token.picture;
         delete token.image;
         delete token.user;
@@ -85,8 +91,11 @@ export function createAuthOptions(options = {}) {
           ...session,
           userId: token.sub || null,
           role: typeof token.role === 'string' ? token.role : 'member',
+          user: {
+            email: typeof token.email === 'string' ? token.email : null,
+            name: typeof token.name === 'string' ? token.name : null,
+          },
         };
-        delete nextSession.user;
         delete nextSession.providers;
 
         writeNextAuthLog('debug', 'SESSION_CALLBACK_OUTPUT', buildSessionPreview(nextSession));
@@ -147,8 +156,8 @@ export function buildWebActorHeaders(session) {
 
   return {
     'x-test-station-actor-id': session.userId || 'web-user',
-    'x-test-station-actor-email': '',
-    'x-test-station-actor-name': session.userId || 'Web User',
+    'x-test-station-actor-email': session.user?.email || '',
+    'x-test-station-actor-name': session.user?.name || session.userId || 'Web User',
     'x-test-station-actor-role': session.role || 'member',
   };
 }
