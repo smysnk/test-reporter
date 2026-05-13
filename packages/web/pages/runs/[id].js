@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { BenchmarkExplorer, RunBenchmarkSummary } from '../../components/BenchmarkBits.js';
+import { BenchmarkExplorer, PerformanceDomainSummary, RunBenchmarkSummary } from '../../components/BenchmarkBits.js';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, InlineList, MetricGrid, RunSourceLink, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, formatSignedDelta } from '../../lib/format.js';
@@ -126,9 +126,9 @@ function RunHistoricalSignals({ data, run }) {
     React.createElement(
       SectionCard,
       {
-        eyebrow: 'Historical Benchmarks',
-        title: 'Benchmark graphs',
-        copy: 'Review recent benchmark movement for this project directly from the run page.',
+        eyebrow: 'Historical Performance',
+        title: 'Performance graphs',
+        copy: 'Review recent performance movement for this project directly from the run page.',
         compact: true,
       },
       benchmarkPanels.length > 0
@@ -213,11 +213,14 @@ function OperationsRunDetail({ data }) {
       React.createElement(
         SectionCard,
         {
-          eyebrow: 'Benchmarks',
-          title: 'Recorded benchmark stats',
-          copy: 'Namespaced benchmark rows from the run are grouped here so the operator can inspect the exact values behind the trend charts.',
+          eyebrow: 'Performance',
+          title: 'Recorded performance stats',
+          copy: 'Namespaced performance rows from the run are grouped here so the operator can inspect the exact values behind the trend charts.',
           compact: true,
         },
+        React.createElement(PerformanceDomainSummary, {
+          stats: runPerformanceStats,
+        }),
         React.createElement(RunBenchmarkSummary, {
           stats: runPerformanceStats,
         }),

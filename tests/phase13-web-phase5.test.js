@@ -63,7 +63,7 @@ import { createBadgeHandler, resolveRequestedBadgeType, sanitizeBadgeSummary } f
 import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
-import { BenchmarkExplorer, RunBenchmarkSummary } from '../packages/web/components/BenchmarkBits.js';
+import { BenchmarkExplorer, PerformanceDomainSummary, RunBenchmarkSummary } from '../packages/web/components/BenchmarkBits.js';
 import { RunBuildChip, RunSourceLink } from '../packages/web/components/WebBits.js';
 import { buildHomeExplorerModel } from '../packages/web/lib/homeExplorer.js';
 
@@ -2391,6 +2391,9 @@ test('run benchmark summary groups benchmark rows by namespace', () => {
         metadata: {
           profileMode: 'ci-smoke',
           budgetStatus: 'warn',
+          route: '/varcad-io/justinsdk-example-gallery',
+          exampleName: 'examples/caterpillar',
+          widgetName: 'track_width',
         },
       },
       {
@@ -2422,6 +2425,37 @@ test('run benchmark summary groups benchmark rows by namespace', () => {
   assert.match(html, /57.5 ms/);
   assert.match(html, /404.6 ops\/s/);
   assert.match(html, /suite scope/);
+  assert.match(html, /route: \/varcad-io\/justinsdk-example-gallery/);
+  assert.match(html, /example: examples\/caterpillar/);
+  assert.match(html, /widget: track_width/);
+});
+
+test('performance domain summary renders route and gallery domains as first-class cards', () => {
+  const html = renderToStaticMarkup(React.createElement(PerformanceDomainSummary, {
+    stats: [
+      {
+        statGroup: 'benchmark.varcad.route.justinsdk_example_gallery',
+        statName: 'dashboard_ready_ms',
+        numericValue: 1024,
+        runnerKey: 'github-linux-x64-ci-smoke',
+        seriesId: 'route-gallery',
+        metadata: { budgetStatus: 'passed' },
+      },
+      {
+        statGroup: 'benchmark.varcad.gallery.examples.caterpillar',
+        statName: 'widget_rerender_ms',
+        numericValue: 402,
+        runnerKey: 'remote-192-168-1-250-gallery',
+        seriesId: 'examples/caterpillar:track_width',
+        metadata: { budgetStatus: 'warn' },
+      },
+    ],
+  }));
+
+  assert.match(html, /route/);
+  assert.match(html, /gallery/);
+  assert.match(html, /namespaces/);
+  assert.match(html, /warnings/);
 });
 
 test('web home explorer model sorts sidebar projects by activity and filters the selected project feed', () => {

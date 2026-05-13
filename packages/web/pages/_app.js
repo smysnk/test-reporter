@@ -877,6 +877,12 @@ const GlobalStyle = createGlobalStyle`
     border: 1px solid ${(props) => props.theme.colors.border};
     background: ${(props) => props.theme.colors.panelSoft};
   }
+  .web-benchmark-metadata {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+  }
   .web-chip--release {
     background: rgba(107, 178, 255, 0.12);
   }

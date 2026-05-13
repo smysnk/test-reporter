@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'next/router';
-import { BenchmarkExplorer } from '../../components/BenchmarkBits.js';
+import { BenchmarkExplorer, PerformanceDomainSummary } from '../../components/BenchmarkBits.js';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCoveragePct, formatDateTime, formatDuration, formatRunBuildLabel, resolveRunBuildNumber } from '../../lib/format.js';
@@ -280,8 +280,8 @@ export default function ProjectExplorerPage({ data }) {
       SectionCard,
       {
         eyebrow: 'Analysis Views',
-        title: 'Coverage and benchmark explorer',
-        copy: 'Switch between coverage trends and benchmark performance for this project.',
+        title: 'Coverage and performance explorer',
+        copy: 'Switch between coverage trends and performance metrics for this project.',
         compact: true,
       },
       React.createElement(
@@ -308,7 +308,7 @@ export default function ProjectExplorerPage({ data }) {
             onClick: () => setAnalysisTab('benchmarks'),
             disabled: benchmarkPanels.length === 0,
           },
-          'Benchmarks',
+          'Performance',
         ),
       ),
     ),
@@ -399,11 +399,14 @@ export default function ProjectExplorerPage({ data }) {
       : React.createElement(
         SectionCard,
         {
-          eyebrow: 'Benchmark Explorer',
-          title: 'Historical benchmark movement',
+          eyebrow: 'Performance Explorer',
+          title: 'Historical performance movement',
           copy: 'Track one namespace and one metric at a time, then toggle visible series to compare engines, browsers, or runner lanes.',
           compact: true,
         },
+        React.createElement(PerformanceDomainSummary, {
+          benchmarkPanels,
+        }),
         React.createElement(BenchmarkExplorer, {
           benchmarkPanels,
         }),

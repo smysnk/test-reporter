@@ -5,6 +5,7 @@ import * as accessControlMigration from '../packages/server/migrations/20260314_
 import * as benchmarkIndexesMigration from '../packages/server/migrations/20260319_0004_benchmark_indexes.js';
 import * as coverageTrendMigration from '../packages/server/migrations/20260309_0002_coverage_trend_points.js';
 import * as initialMigration from '../packages/server/migrations/20260309_0001_initial_reporting_schema.js';
+import * as performanceQueryIndexesMigration from '../packages/server/migrations/20260513_0005_performance_query_indexes.js';
 import { loadMigrations, runMigrations } from '../packages/server/migrations/runMigrations.js';
 import {
   Artifact,
@@ -37,6 +38,7 @@ test('loadMigrations includes the initial reporting schema migration', async () 
   assert.ok(migrations.some((migration) => migration.id === coverageTrendMigration.id));
   assert.ok(migrations.some((migration) => migration.id === accessControlMigration.id));
   assert.ok(migrations.some((migration) => migration.id === benchmarkIndexesMigration.id));
+  assert.ok(migrations.some((migration) => migration.id === performanceQueryIndexesMigration.id));
   assert.deepEqual(
     migrations.map((migration) => migration.id),
     [
@@ -44,6 +46,7 @@ test('loadMigrations includes the initial reporting schema migration', async () 
       coverageTrendMigration.id,
       accessControlMigration.id,
       benchmarkIndexesMigration.id,
+      performanceQueryIndexesMigration.id,
     ],
   );
 });
@@ -57,6 +60,7 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
       coverageTrendMigration,
       accessControlMigration,
       benchmarkIndexesMigration,
+      performanceQueryIndexesMigration,
     ],
   });
 
@@ -85,14 +89,17 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
   assert.ok(state.indexes.some((entry) => entry.options?.name === 'project_role_access_project_id_role_id_unique'));
   assert.ok(state.indexes.some((entry) => entry.options?.name === 'project_group_access_project_id_group_id_unique'));
   assert.ok(state.indexes.some((entry) => entry.options?.name === 'performance_stats_stat_group_stat_name_idx'));
+  assert.ok(state.indexes.some((entry) => entry.options?.name === 'performance_stats_run_group_name_idx'));
+  assert.ok(state.indexes.some((entry) => entry.options?.name === 'performance_stats_group_name_created_at_idx'));
   assert.ok(state.indexes.some((entry) => entry.options?.name === 'runs_project_id_completed_at_idx'));
   assert.deepEqual(state.insertedMigrations, [
     initialMigration.id,
     coverageTrendMigration.id,
     accessControlMigration.id,
     benchmarkIndexesMigration.id,
+    performanceQueryIndexesMigration.id,
   ]);
-  assert.equal(state.transactions.length, 4);
+  assert.equal(state.transactions.length, 5);
   assert.equal(state.transactions.every((entry) => entry.committed === true), true);
   assert.equal(state.transactions.every((entry) => entry.rolledBack === false), true);
 
@@ -101,6 +108,7 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
     coverageTrendMigration.id,
     accessControlMigration.id,
     benchmarkIndexesMigration.id,
+    performanceQueryIndexesMigration.id,
   ]);
   await runMigrations(rerunState.sequelize, {
     migrations: [
@@ -108,6 +116,7 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
       coverageTrendMigration,
       accessControlMigration,
       benchmarkIndexesMigration,
+      performanceQueryIndexesMigration,
     ],
   });
   assert.equal(rerunState.createdTables.length, 0);

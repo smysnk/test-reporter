@@ -248,6 +248,16 @@ export function BenchmarkExplorer({ benchmarkPanels = [] }) {
   );
 }
 
+export function PerformanceDomainSummary({ stats = [], benchmarkPanels = [] }) {
+  const items = buildPerformanceDomainSummaryItems({ stats, benchmarkPanels });
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return React.createElement(MetricGrid, { items });
+}
+
 export function RunBenchmarkSummary({ stats = [] }) {
   const groups = buildRunBenchmarkGroups(stats);
 
@@ -301,6 +311,7 @@ export function RunBenchmarkSummary({ stats = [] }) {
             { className: 'web-list__meta' },
             `${formatDateTime(stat.completedAt)} • ${stat.branch || 'no branch'} • ${formatCommitSha(stat.commitSha)}`,
           ),
+          renderBenchmarkMetadataInspector(stat),
         )),
       ),
     )),
@@ -500,6 +511,86 @@ function buildPerformanceSummaryItems({ points, series, selectedMetric }) {
   ];
 }
 
+function buildPerformanceDomainSummaryItems({ stats, benchmarkPanels }) {
+  const domainMap = new Map();
+
+  for (const stat of Array.isArray(stats) ? stats : []) {
+    addPerformanceDomainEntry(domainMap, {
+      statGroup: stat?.statGroup,
+      statName: stat?.statName,
+      numericValue: stat?.numericValue,
+      runnerKey: stat?.runnerKey,
+      seriesId: stat?.seriesId,
+      budgetWarning: hasBudgetWarning(stat),
+    });
+  }
+
+  for (const panel of Array.isArray(benchmarkPanels) ? benchmarkPanels : []) {
+    for (const metric of Array.isArray(panel?.metrics) ? panel.metrics : []) {
+      for (const point of Array.isArray(metric?.points) ? metric.points : []) {
+        addPerformanceDomainEntry(domainMap, {
+          statGroup: point?.statGroup || panel.statGroup,
+          statName: point?.statName || metric.statName,
+          numericValue: point?.numericValue,
+          runnerKey: point?.runnerKey,
+          seriesId: point?.seriesId,
+          budgetWarning: hasBudgetWarning(point),
+        });
+      }
+    }
+  }
+
+  return Array.from(domainMap.values())
+    .filter((entry) => entry.pointCount > 0)
+    .sort((left, right) => right.pointCount - left.pointCount || left.domain.localeCompare(right.domain))
+    .slice(0, 6)
+    .map((entry) => ({
+      label: entry.domain,
+      value: String(entry.pointCount),
+      copy: [
+        `${entry.statGroups.size} namespaces`,
+        `${entry.statNames.size} metrics`,
+        `${entry.runnerKeys.size} runners`,
+        entry.budgetWarningCount > 0 ? `${entry.budgetWarningCount} warnings` : null,
+      ].filter(Boolean).join(' / '),
+    }));
+}
+
+function addPerformanceDomainEntry(domainMap, entry) {
+  if (!entry?.statGroup) {
+    return;
+  }
+
+  const domain = resolvePerformanceDomain(entry.statGroup);
+  if (!domainMap.has(domain)) {
+    domainMap.set(domain, {
+      domain,
+      pointCount: 0,
+      statGroups: new Set(),
+      statNames: new Set(),
+      runnerKeys: new Set(),
+      seriesIds: new Set(),
+      budgetWarningCount: 0,
+    });
+  }
+
+  const bucket = domainMap.get(domain);
+  bucket.pointCount += Number.isFinite(entry.numericValue) ? 1 : 0;
+  bucket.statGroups.add(entry.statGroup);
+  if (entry.statName) {
+    bucket.statNames.add(entry.statName);
+  }
+  if (entry.runnerKey) {
+    bucket.runnerKeys.add(entry.runnerKey);
+  }
+  if (entry.seriesId) {
+    bucket.seriesIds.add(entry.seriesId);
+  }
+  if (entry.budgetWarning) {
+    bucket.budgetWarningCount += 1;
+  }
+}
+
 function summarizeSeriesComparisons(series, statName) {
   const summary = {
     comparedSeries: 0,
@@ -623,6 +714,41 @@ function resolveBenchmarkScopeLabel(stat) {
     return 'suite scope';
   }
   return 'run scope';
+}
+
+function renderBenchmarkMetadataInspector(stat) {
+  const rows = buildBenchmarkMetadataRows(stat);
+  if (rows.length === 0) {
+    return null;
+  }
+
+  return React.createElement(
+    'div',
+    { className: 'web-benchmark-metadata', 'aria-label': 'Performance metric metadata' },
+    ...rows.map((row) => React.createElement(
+      'span',
+      { className: 'web-chip web-chip--muted', key: row.label },
+      `${row.label}: ${row.value}`,
+    )),
+  );
+}
+
+function buildBenchmarkMetadataRows(stat) {
+  const metadata = stat && typeof stat.metadata === 'object' && stat.metadata !== null ? stat.metadata : {};
+  const candidates = [
+    ['route', metadata.route || metadata.pathname],
+    ['example', metadata.example || metadata.exampleName || metadata.galleryExample],
+    ['widget', metadata.widget || metadata.widgetName || metadata.controlName],
+    ['step', metadata.step || metadata.phase],
+    ['profile', metadata.profileMode || stat?.profileMode],
+    ['artifact', metadata.artifactName || metadata.sourceArtifactDir],
+    ['budget', metadata.budgetStatus || metadata.budget_status],
+  ];
+
+  return candidates
+    .map(([label, value]) => ({ label, value: normalizeString(value) }))
+    .filter((row) => row.value)
+    .slice(0, 6);
 }
 
 function resolveTimeframeCutoff(points, timeframe) {
