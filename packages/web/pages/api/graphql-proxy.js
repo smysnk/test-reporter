@@ -39,6 +39,7 @@ export function createGraphqlProxyHandler({ getSession = getWebSession, fetchImp
       method: 'POST',
       headers: {
         'content-type': 'application/json',
+        ...buildForwardedServiceAuthHeaders(req),
         ...buildWebActorHeaders(session),
         ...buildTraceHeaders(upstreamTrace),
       },
@@ -63,6 +64,29 @@ export function createGraphqlProxyHandler({ getSession = getWebSession, fetchImp
     }
     res.send(responseText);
   };
+}
+
+function buildForwardedServiceAuthHeaders(req) {
+  const headers = {};
+  const authorization = readHeader(req, 'authorization');
+  const apiKey = readHeader(req, 'x-api-key');
+
+  if (authorization) {
+    headers.authorization = authorization;
+  }
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
+  }
+
+  return headers;
+}
+
+function readHeader(req, headerName) {
+  const value = req?.headers?.[headerName];
+  if (Array.isArray(value)) {
+    return value[0] || '';
+  }
+  return typeof value === 'string' ? value : '';
 }
 
 export default createGraphqlProxyHandler();

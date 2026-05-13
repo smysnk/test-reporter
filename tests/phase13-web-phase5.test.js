@@ -1587,6 +1587,8 @@ test('web GraphQL helpers and proxy allow anonymous public reads without actor h
     method: 'POST',
     headers: {
       'x-request-id': 'proxy-guest',
+      authorization: 'Bearer shared-secret',
+      'x-api-key': 'shared-api-key',
     },
     body: {
       query: '{ projects { key } }',
@@ -1602,6 +1604,8 @@ test('web GraphQL helpers and proxy allow anonymous public reads without actor h
   assert.equal(responseState.headers['x-request-id'], 'proxy-guest');
   assert.equal(responseState.headers['x-test-station-trace-id'], 'proxy-guest');
   assert.equal(requests[1].headers['x-test-station-actor-id'], undefined);
+  assert.equal(requests[1].headers.authorization, 'Bearer shared-secret');
+  assert.equal(requests[1].headers['x-api-key'], 'shared-api-key');
   assert.match(requests[1].headers['x-request-id'], /^webproxy-/);
   assert.equal(requests[1].headers['x-test-station-trace-id'], 'proxy-guest');
   assert.equal(requests[1].headers['x-test-station-parent-request-id'], 'proxy-guest');
