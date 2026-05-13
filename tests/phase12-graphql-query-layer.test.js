@@ -1293,6 +1293,110 @@ test('GraphQL ingest mutation accepts shared-key service auth', async () => {
   await closeServer(server);
 });
 
+test('GraphQL shared-key service auth can read back private performance runs', async () => {
+  const server = await createServer({
+    port: 0,
+    corsOrigin: 'http://localhost:3001',
+    ingestSharedKeys: ['phase4-secret'],
+    models: createGraphqlModels(),
+  });
+
+  await listen(server);
+  const response = await graphqlRequest(server, {
+    query: `
+      query SharedKeyPerformanceReadback($externalKey: String!) {
+        viewer {
+          id
+          role
+          isAdmin
+          isGuest
+        }
+        privateProject: project(key: "workspace") {
+          key
+          slug
+        }
+        runById: run(id: "run-1") {
+          id
+          externalKey
+          project {
+            key
+          }
+        }
+        runByExternalKey: run(externalKey: $externalKey) {
+          id
+          externalKey
+        }
+        runPerformanceStats(runId: "run-1", statGroupPrefix: "benchmark.node.engine") {
+          statGroup
+          statName
+          numericValue
+          seriesId
+          runnerKey
+        }
+        benchmarkCatalog(projectKey: "workspace") {
+          statGroup
+          statNames
+          pointCount
+        }
+        performanceTrend(
+          projectKey: "workspace"
+          statGroup: "benchmark.node.engine.nibbles.intro"
+          statName: "elapsed_ms"
+          limit: 4
+        ) {
+          runId
+          statGroup
+          statName
+          numericValue
+        }
+      }
+    `,
+    variables: {
+      externalKey: 'workspace:github-actions:1001',
+    },
+  }, {
+    authorization: 'Bearer phase4-secret',
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(response.payload.errors, undefined);
+  assert.deepEqual(response.payload.data.viewer, {
+    id: 'shared-key',
+    role: 'admin',
+    isAdmin: true,
+    isGuest: false,
+  });
+  assert.deepEqual(response.payload.data.privateProject, {
+    key: 'workspace',
+    slug: 'workspace',
+  });
+  assert.equal(response.payload.data.runById.externalKey, 'workspace:github-actions:1001');
+  assert.deepEqual(response.payload.data.runById.project, {
+    key: 'workspace',
+  });
+  assert.deepEqual(response.payload.data.runByExternalKey, {
+    id: 'run-1',
+    externalKey: 'workspace:github-actions:1001',
+  });
+  assert.equal(response.payload.data.runPerformanceStats.length, 4);
+  const reduxElapsed = response.payload.data.runPerformanceStats.find((stat) => stat.seriesId === 'interpreter-redux' && stat.statName === 'elapsed_ms');
+  assert.deepEqual(reduxElapsed, {
+    statGroup: 'benchmark.node.engine.nibbles.intro',
+    statName: 'elapsed_ms',
+    numericValue: 57.54,
+    seriesId: 'interpreter-redux',
+    runnerKey: 'gha-ubuntu-latest-node20',
+  });
+  assert.deepEqual(response.payload.data.benchmarkCatalog.map((entry) => entry.statGroup), [
+    'benchmark.node.engine.nibbles.intro',
+    'benchmark.node.engine.shared.tight_arithmetic_loop',
+  ]);
+  assert.equal(response.payload.data.performanceTrend.length, 3);
+  assert.equal(response.payload.data.performanceTrend[0].runId, 'run-1');
+
+  await closeServer(server);
+});
+
 test('resolveActorFromRequest returns a guest actor when no identity headers are present', async () => {
   const actor = await resolveActorFromRequest({
     headers: {},

@@ -6,7 +6,7 @@ import {
   formatCommitSha,
   formatDateTime,
 } from '../lib/format.js';
-import { EmptyState } from './WebBits.js';
+import { EmptyState, MetricGrid } from './WebBits.js';
 
 const SERIES_COLORS = ['#6bb2ff', '#4ee38b', '#ffd166', '#ff6b9a', '#c792ea', '#7dd3fc'];
 
@@ -20,9 +20,11 @@ export function BenchmarkExplorer({ benchmarkPanels = [] }) {
   const allPoints = Array.isArray(selectedMetric?.points) ? selectedMetric.points.filter((point) => Number.isFinite(point.numericValue)) : [];
   const runnerKeys = uniqueStrings(allPoints.map((point) => point.runnerKey));
   const branches = uniqueStrings(allPoints.map((point) => point.branch));
+  const profileModes = uniqueStrings(allPoints.map((point) => resolveProfileMode(point)));
   const seriesIds = uniqueStrings(allPoints.map((point) => point.seriesId || 'default'));
   const [runnerFilter, setRunnerFilter] = React.useState('all');
   const [branchFilter, setBranchFilter] = React.useState('all');
+  const [profileModeFilter, setProfileModeFilter] = React.useState('all');
   const [timeframeFilter, setTimeframeFilter] = React.useState('all');
   const [visibleSeriesIds, setVisibleSeriesIds] = React.useState(seriesIds.slice(0, 4));
 
@@ -60,6 +62,12 @@ export function BenchmarkExplorer({ benchmarkPanels = [] }) {
   }, [branchFilter, branches]);
 
   React.useEffect(() => {
+    if (profileModeFilter !== 'all' && !profileModes.includes(profileModeFilter)) {
+      setProfileModeFilter('all');
+    }
+  }, [profileModeFilter, profileModes]);
+
+  React.useEffect(() => {
     const defaults = seriesIds.slice(0, Math.min(4, seriesIds.length));
     const preserved = visibleSeriesIds.filter((seriesId) => seriesIds.includes(seriesId));
     const nextVisible = preserved.length > 0 ? preserved : defaults;
@@ -70,8 +78,8 @@ export function BenchmarkExplorer({ benchmarkPanels = [] }) {
 
   if (panels.length === 0) {
     return React.createElement(EmptyState, {
-      title: 'No benchmark trends',
-      copy: 'Benchmark charts will appear once benchmark suites begin publishing namespaced performance stats.',
+      title: 'No performance trends',
+      copy: 'Performance charts will appear once suites begin publishing namespaced performance stats.',
     });
   }
 
@@ -79,11 +87,17 @@ export function BenchmarkExplorer({ benchmarkPanels = [] }) {
   const filteredPoints = allPoints.filter((point) => (
     (runnerFilter === 'all' || point.runnerKey === runnerFilter)
     && (branchFilter === 'all' || point.branch === branchFilter)
+    && (profileModeFilter === 'all' || resolveProfileMode(point) === profileModeFilter)
     && (!timeframeCutoff || new Date(point.completedAt || 0).valueOf() >= timeframeCutoff)
   ));
   const visiblePoints = filteredPoints.filter((point) => visibleSeriesIds.includes(point.seriesId || 'default'));
   const visibleSeries = buildBenchmarkSeries(visiblePoints);
   const latestPoint = visiblePoints[0] || null;
+  const summaryItems = buildPerformanceSummaryItems({
+    points: visiblePoints,
+    series: visibleSeries,
+    selectedMetric,
+  });
 
   return React.createElement(
     'div',
@@ -152,6 +166,21 @@ export function BenchmarkExplorer({ benchmarkPanels = [] }) {
       React.createElement(
         'label',
         { className: 'web-field' },
+        React.createElement('span', { className: 'web-field__label' }, 'Profile mode'),
+        React.createElement(
+          'select',
+          {
+            className: 'web-field__input',
+            value: profileModeFilter,
+            onChange: (event) => setProfileModeFilter(event.target.value),
+          },
+          React.createElement('option', { value: 'all' }, 'All modes'),
+          ...profileModes.map((profileMode) => React.createElement('option', { key: profileMode, value: profileMode }, profileMode)),
+        ),
+      ),
+      React.createElement(
+        'label',
+        { className: 'web-field' },
         React.createElement('span', { className: 'web-field__label' }, 'Timeframe'),
         React.createElement(
           'select',
@@ -201,6 +230,7 @@ export function BenchmarkExplorer({ benchmarkPanels = [] }) {
         }),
       )
       : null,
+    React.createElement(MetricGrid, { items: summaryItems }),
     latestPoint
       ? React.createElement(
         'div',
@@ -223,8 +253,8 @@ export function RunBenchmarkSummary({ stats = [] }) {
 
   if (groups.length === 0) {
     return React.createElement(EmptyState, {
-      title: 'No benchmark stats recorded',
-      copy: 'This run does not include benchmark metrics yet.',
+      title: 'No performance stats recorded',
+      copy: 'This run does not include performance metrics yet.',
     });
   }
 
@@ -241,7 +271,12 @@ export function RunBenchmarkSummary({ stats = [] }) {
         React.createElement(
           'div',
           { className: 'web-inline-list' },
+          React.createElement('span', { className: 'web-chip' }, group.domain),
           ...uniqueStrings(group.stats.map((stat) => stat.seriesId)).map((seriesId) => React.createElement('span', { className: 'web-chip web-chip--muted', key: `${group.statGroup}:${seriesId}` }, seriesId)),
+          ...uniqueStrings(group.stats.map((stat) => resolveProfileMode(stat))).map((profileMode) => React.createElement('span', { className: 'web-chip web-chip--muted', key: `${group.statGroup}:profile:${profileMode}` }, profileMode)),
+          group.budgetWarningCount > 0
+            ? React.createElement('span', { className: 'web-chip web-chip--muted' }, `${group.budgetWarningCount} budget warnings`)
+            : null,
         ),
       ),
       React.createElement(
@@ -259,7 +294,7 @@ export function RunBenchmarkSummary({ stats = [] }) {
           React.createElement(
             'div',
             { className: 'web-list__meta' },
-            `${stat.seriesId || 'default'} • ${stat.runnerKey || 'runner unavailable'} • ${resolveBenchmarkScopeLabel(stat)}`,
+            `${stat.seriesId || 'default'} • ${resolveProfileMode(stat)} • ${stat.runnerKey || 'runner unavailable'} • ${resolveBenchmarkScopeLabel(stat)}`,
           ),
           React.createElement(
             'div',
@@ -277,7 +312,7 @@ function BenchmarkTrendCard({ title, subtitle, unit, series }) {
 
   if (normalizedSeries.length === 0) {
     return React.createElement(EmptyState, {
-      title: 'No benchmark points in view',
+      title: 'No performance points in view',
       copy: 'Try widening the timeframe or clearing branch and runner filters.',
     });
   }
@@ -415,6 +450,108 @@ function buildBenchmarkChartModel(series) {
   };
 }
 
+function buildPerformanceSummaryItems({ points, series, selectedMetric }) {
+  const orderedPoints = [...(Array.isArray(points) ? points : [])].sort(compareBenchmarkPointsDescending);
+  const latestPoint = orderedPoints[0] || null;
+  const previousPoint = latestPoint
+    ? orderedPoints.find((point) => point !== latestPoint && (point.seriesId || 'default') === (latestPoint.seriesId || 'default')) || orderedPoints[1] || null
+    : null;
+  const unit = selectedMetric?.unit || latestPoint?.unit || null;
+  const delta = latestPoint && previousPoint && Number.isFinite(previousPoint.numericValue) && previousPoint.numericValue !== 0
+    ? ((latestPoint.numericValue - previousPoint.numericValue) / Math.abs(previousPoint.numericValue)) * 100
+    : null;
+  const comparisons = summarizeSeriesComparisons(series, selectedMetric?.statName);
+  const budgetWarningCount = orderedPoints.filter(hasBudgetWarning).length;
+  const slowestPoint = orderedPoints
+    .filter((point) => Number.isFinite(point.numericValue))
+    .sort((left, right) => right.numericValue - left.numericValue)[0] || null;
+
+  return [
+    {
+      label: 'Latest',
+      value: latestPoint ? formatBenchmarkValue(latestPoint.numericValue, unit) : 'n/a',
+      copy: latestPoint ? `${latestPoint.seriesId || 'default'} at ${formatDateTime(latestPoint.completedAt)}` : 'No point in view',
+    },
+    {
+      label: 'Delta',
+      value: Number.isFinite(delta) ? `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%` : 'n/a',
+      copy: describeDelta(latestPoint, previousPoint, delta, selectedMetric?.statName),
+    },
+    {
+      label: 'Regressions',
+      value: String(comparisons.regressions),
+      copy: `${comparisons.comparedSeries} series compared`,
+    },
+    {
+      label: 'Improvements',
+      value: String(comparisons.improvements),
+      copy: `${comparisons.stable} stable`,
+    },
+    {
+      label: 'Budget warnings',
+      value: String(budgetWarningCount),
+      copy: budgetWarningCount > 0 ? 'Current view includes warning-only budget misses' : 'No warning-only budget misses in view',
+    },
+    {
+      label: 'Slowest current',
+      value: slowestPoint ? formatBenchmarkValue(slowestPoint.numericValue, slowestPoint.unit || unit) : 'n/a',
+      copy: slowestPoint ? `${formatBenchmarkMetricLabel(slowestPoint.statName)} / ${slowestPoint.seriesId || 'default'}` : 'No current metric',
+    },
+  ];
+}
+
+function summarizeSeriesComparisons(series, statName) {
+  const summary = {
+    comparedSeries: 0,
+    regressions: 0,
+    improvements: 0,
+    stable: 0,
+  };
+
+  for (const entry of Array.isArray(series) ? series : []) {
+    if (!Array.isArray(entry.points) || entry.points.length < 2) {
+      continue;
+    }
+
+    const latest = entry.points[entry.points.length - 1];
+    const previous = entry.points[entry.points.length - 2];
+    if (!Number.isFinite(latest.numericValue) || !Number.isFinite(previous.numericValue)) {
+      continue;
+    }
+
+    summary.comparedSeries += 1;
+    const delta = latest.numericValue - previous.numericValue;
+    if (Math.abs(delta) < 0.000001) {
+      summary.stable += 1;
+      continue;
+    }
+
+    const lowerIsBetter = resolveLowerIsBetter(latest, statName);
+    const improved = lowerIsBetter ? delta < 0 : delta > 0;
+    if (improved) {
+      summary.improvements += 1;
+    } else {
+      summary.regressions += 1;
+    }
+  }
+
+  return summary;
+}
+
+function describeDelta(latestPoint, previousPoint, delta, statName) {
+  if (!latestPoint || !previousPoint || !Number.isFinite(delta)) {
+    return 'No previous point for comparison';
+  }
+
+  if (Math.abs(delta) < 0.000001) {
+    return 'Stable versus previous point';
+  }
+
+  const lowerIsBetter = resolveLowerIsBetter(latestPoint, statName);
+  const improved = lowerIsBetter ? delta < 0 : delta > 0;
+  return `${improved ? 'Improvement' : 'Regression'} versus previous ${latestPoint.seriesId || 'default'} point`;
+}
+
 function buildRunBenchmarkGroups(stats) {
   const grouped = new Map();
 
@@ -432,9 +569,50 @@ function buildRunBenchmarkGroups(stats) {
   return Array.from(grouped.entries())
     .map(([statGroup, groupedStats]) => ({
       statGroup,
+      domain: resolvePerformanceDomain(statGroup),
+      budgetWarningCount: groupedStats.filter(hasBudgetWarning).length,
       stats: [...groupedStats].sort(compareRunBenchmarkStats),
     }))
     .sort((left, right) => left.statGroup.localeCompare(right.statGroup));
+}
+
+function resolvePerformanceDomain(statGroup) {
+  const group = typeof statGroup === 'string' ? statGroup : '';
+  if (group.includes('.route.')) return 'route';
+  if (group.includes('.gallery.')) return 'gallery';
+  if (group.includes('.scad.')) return 'SCAD';
+  if (group.includes('.jscad.')) return 'JSCAD';
+  if (group.includes('.library.')) return 'library';
+  if (group.includes('.render.')) return 'renderer';
+  if (group.includes('.module_interpreter.') || group.includes('.interpreter.')) return 'interpreter';
+  if (group.includes('.node.engine.')) return 'interpreter';
+  return 'performance';
+}
+
+function resolveProfileMode(point) {
+  const metadata = point && typeof point.metadata === 'object' && point.metadata !== null ? point.metadata : {};
+  return normalizeString(metadata.profileMode) || normalizeString(point?.profileMode) || 'unknown';
+}
+
+function resolveLowerIsBetter(point, statName) {
+  const metadata = point && typeof point.metadata === 'object' && point.metadata !== null ? point.metadata : {};
+  if (typeof metadata.lowerIsBetter === 'boolean') {
+    return metadata.lowerIsBetter;
+  }
+
+  const normalizedName = normalizeString(statName || point?.statName) || '';
+  const normalizedUnit = normalizeString(point?.unit) || '';
+  if (normalizedName.includes('per_second') || normalizedName.includes('ops_per_sec') || normalizedUnit === 'ops_per_sec') {
+    return false;
+  }
+
+  return true;
+}
+
+function hasBudgetWarning(point) {
+  const metadata = point && typeof point.metadata === 'object' && point.metadata !== null ? point.metadata : {};
+  const status = normalizeString(metadata.budgetStatus || metadata.budget_status);
+  return Boolean(status && status !== 'passed' && status !== 'ok');
 }
 
 function resolveBenchmarkScopeLabel(stat) {
@@ -477,6 +655,10 @@ function compareBenchmarkPointsAscending(left, right) {
   return new Date(left.completedAt || 0).valueOf() - new Date(right.completedAt || 0).valueOf();
 }
 
+function compareBenchmarkPointsDescending(left, right) {
+  return new Date(right.completedAt || 0).valueOf() - new Date(left.completedAt || 0).valueOf();
+}
+
 function compareRunBenchmarkStats(left, right) {
   return left.statName.localeCompare(right.statName)
     || String(left.seriesId || '').localeCompare(String(right.seriesId || ''))
@@ -487,6 +669,10 @@ function uniqueStrings(values) {
   return Array.from(new Set((Array.isArray(values) ? values : [])
     .filter((value) => typeof value === 'string' && value.trim() !== '')
     .map((value) => value.trim())));
+}
+
+function normalizeString(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function arraysEqual(left, right) {

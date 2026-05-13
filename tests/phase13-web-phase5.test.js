@@ -2310,6 +2310,11 @@ test('benchmark explorer renders namespace controls, series toggles, and chart c
             unit: 'ms',
             seriesId: 'interpreter',
             runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {
+              profileMode: 'ci-smoke',
+              lowerIsBetter: true,
+              budgetStatus: 'passed',
+            },
           },
           {
             id: 'perf-run-1',
@@ -2321,6 +2326,11 @@ test('benchmark explorer renders namespace controls, series toggles, and chart c
             unit: 'ms',
             seriesId: 'interpreter',
             runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {
+              profileMode: 'ci-smoke',
+              lowerIsBetter: true,
+              budgetStatus: 'passed',
+            },
           },
           {
             id: 'perf-run-1-redux',
@@ -2332,6 +2342,11 @@ test('benchmark explorer renders namespace controls, series toggles, and chart c
             unit: 'ms',
             seriesId: 'interpreter-redux',
             runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {
+              profileMode: 'baseline',
+              lowerIsBetter: true,
+              budgetStatus: 'warn',
+            },
           },
         ],
       }],
@@ -2340,9 +2355,16 @@ test('benchmark explorer renders namespace controls, series toggles, and chart c
 
   assert.match(html, /Namespace/);
   assert.match(html, /Metric/);
+  assert.match(html, /Profile mode/);
+  assert.match(html, /ci-smoke/);
+  assert.match(html, /baseline/);
   assert.match(html, /interpreter-redux/);
   assert.match(html, /Node \/ Engine \/ Nibbles \/ Intro/);
   assert.match(html, /Elapsed Ms/);
+  assert.match(html, /Regressions/);
+  assert.match(html, /Improvements/);
+  assert.match(html, /Budget warnings/);
+  assert.match(html, /Slowest current/);
   assert.match(html, /svg/);
 });
 
@@ -2362,6 +2384,10 @@ test('run benchmark summary groups benchmark rows by namespace', () => {
         commitSha: 'abc123',
         suiteRunId: null,
         testExecutionId: null,
+        metadata: {
+          profileMode: 'ci-smoke',
+          budgetStatus: 'warn',
+        },
       },
       {
         id: 'perf-suite-1',
@@ -2376,12 +2402,19 @@ test('run benchmark summary groups benchmark rows by namespace', () => {
         commitSha: 'abc123',
         suiteRunId: 'suite-1',
         testExecutionId: null,
+        metadata: {
+          profileMode: 'ci-smoke',
+          budgetStatus: 'passed',
+        },
       },
     ],
   }));
 
   assert.match(html, /Node \/ Engine \/ Nibbles \/ Intro/);
   assert.match(html, /Shared \/ Tight Arithmetic Loop/);
+  assert.match(html, /interpreter/);
+  assert.match(html, /ci-smoke/);
+  assert.match(html, /1 budget warnings/);
   assert.match(html, /57.5 ms/);
   assert.match(html, /404.6 ops\/s/);
   assert.match(html, /suite scope/);

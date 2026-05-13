@@ -5,12 +5,13 @@ import { resolveServerRequestTrace } from '../requestTrace.js';
 
 export async function createGraphqlContext({ req, res, options = {}, queryService, ingestionService, accessService, adminService }) {
   const requestTrace = req?.testStationTrace || resolveServerRequestTrace(req);
-  const actor = await resolveActorFromRequest(req, options);
+  const requestActor = await resolveActorFromRequest(req, options);
   const auth = authenticateSharedKeyRequest(req, options, {
     allowMissing: true,
     allowInvalid: true,
     ignoreMissingConfig: true,
   });
+  const actor = resolveGraphqlActor(requestActor, auth);
 
   return {
     requestId: requestTrace.requestId,
@@ -23,6 +24,30 @@ export async function createGraphqlContext({ req, res, options = {}, queryServic
     queryService,
     ingestionService,
   };
+}
+
+function resolveGraphqlActor(actor, auth) {
+  if (auth?.subject === 'shared-key' && (!actor || actor.isGuest === true)) {
+    return createSharedKeyServiceActor(auth);
+  }
+
+  return actor || createGuestActor();
+}
+
+function createSharedKeyServiceActor(auth) {
+  return normalizeActor({
+    id: 'shared-key',
+    userId: null,
+    email: null,
+    name: 'Shared Key Service',
+    role: 'admin',
+    isAdmin: true,
+    isGuest: false,
+    roleKeys: [],
+    groupKeys: [],
+    authSubject: auth.subject,
+    authMethod: auth.method,
+  });
 }
 
 export async function resolveActorFromRequest(req, options = {}) {
