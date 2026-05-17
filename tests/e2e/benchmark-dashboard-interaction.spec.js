@@ -22,7 +22,7 @@ test('project benchmark dashboard renders namespace and metric drill-downs', asy
   await expect(detailInspector).toBeVisible();
 });
 
-test('benchmark dashboard run links navigate to run benchmark movement view', async ({ page }) => {
+test('benchmark dashboard run links lead to the run benchmark movement view', async ({ page }) => {
   const projectSlug = await resolveBenchmarkProjectSlug(page);
   test.skip(!projectSlug, 'Unable to resolve a public project with benchmark data.');
 
@@ -38,6 +38,8 @@ test('benchmark dashboard run links navigate to run benchmark movement view', as
 
   await runLink.click();
   await page.waitForURL(new RegExp(`/runs/${escapeRegExp(runId)}(?:\\?|$)`), { timeout: 45_000 });
+  await page.goto(`/runs/${runId}?template=web`);
+  await page.waitForURL(new RegExp(`/runs/${escapeRegExp(runId)}\\?template=web(?:&|$)`), { timeout: 45_000 });
   await expect(page.locator('[data-perf-id="run-benchmark-delta"]')).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText('Top regressions', { exact: true })).toBeVisible({ timeout: 45_000 });
 });
