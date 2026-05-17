@@ -75,7 +75,7 @@ export function ProjectBenchmarkExplorer({ benchmarkSummary = null, benchmarkPan
     React.createElement(MetricGrid, { items: summaryItems }),
     React.createElement(
       'section',
-      { className: 'web-benchmark-section' },
+      { className: 'web-benchmark-section', 'data-perf-id': 'benchmark-top-changes' },
       React.createElement(
         'div',
         { className: 'web-benchmark-section__header' },
@@ -178,6 +178,7 @@ export function ProjectBenchmarkExplorer({ benchmarkSummary = null, benchmarkPan
             {
               type: 'button',
               key: card.statGroup,
+              'data-perf-id': `benchmark-namespace:${card.statGroup}`,
               className: card.statGroup === (selectedPanel?.statGroup || '')
                 ? 'web-benchmark-namespace-card web-benchmark-namespace-card--active'
                 : 'web-benchmark-namespace-card',
@@ -219,6 +220,7 @@ export function ProjectBenchmarkExplorer({ benchmarkSummary = null, benchmarkPan
               {
                 type: 'button',
                 key: card.statName,
+                'data-perf-id': `benchmark-metric:${card.statName}`,
                 className: card.statName === (selectedMetric?.statName || '')
                   ? 'web-benchmark-metric-card web-benchmark-metric-card--active'
                   : 'web-benchmark-metric-card',
@@ -252,7 +254,7 @@ export function ProjectBenchmarkExplorer({ benchmarkSummary = null, benchmarkPan
     ),
     React.createElement(
       'section',
-      { className: 'web-benchmark-section' },
+      { className: 'web-benchmark-section', 'data-perf-id': 'benchmark-detail-inspector' },
       React.createElement(
         'div',
         { className: 'web-benchmark-section__header' },
@@ -724,6 +726,7 @@ function buildBenchmarkChangeEntries(panels) {
         const latestPoint = orderedPoints[0] || null;
         const previousPoint = orderedPoints.find((point) => point !== latestPoint) || null;
         const classification = classifyBenchmarkComparison({
+          projectKey: latestPoint?.projectKey || previousPoint?.projectKey || panel.projectKey || null,
           latestPoint,
           previousPoint,
           statGroup: panel.statGroup,
@@ -922,7 +925,7 @@ export function RunBenchmarkDeltaSummary({ stats = [], benchmarkPanels = [], his
 
   return React.createElement(
     'div',
-    { className: 'web-stack web-stack--tight' },
+    { className: 'web-stack web-stack--tight', 'data-perf-id': 'run-benchmark-delta' },
     React.createElement(MetricGrid, { items: summaryItems }),
     React.createElement(
       'div',
@@ -1359,6 +1362,7 @@ function summarizeSeriesComparisons(series, statName) {
 
     summary.comparedSeries += 1;
     const classification = classifyBenchmarkComparison({
+      projectKey: latest.projectKey || previous.projectKey || null,
       latestPoint: latest,
       previousPoint: previous,
       statGroup: latest.statGroup || previous.statGroup || null,
@@ -1383,6 +1387,7 @@ function describeDelta(latestPoint, previousPoint, delta, statName) {
     return 'No previous point for comparison';
   }
   const classification = classifyBenchmarkComparison({
+    projectKey: latestPoint.projectKey || previousPoint.projectKey || null,
     latestPoint,
     previousPoint,
     statGroup: latestPoint.statGroup || previousPoint.statGroup || null,
@@ -1432,6 +1437,7 @@ function buildRunBenchmarkDeltaEntries({ stats, benchmarkPanels }) {
         : null;
       const previousPoint = resolvePreviousBenchmarkPoint(stat, metric?.points || []);
       const classification = classifyBenchmarkComparison({
+        projectKey: stat.projectKey || previousPoint?.projectKey || panel?.projectKey || null,
         latestPoint: stat,
         previousPoint,
         statGroup: stat.statGroup,
@@ -1508,6 +1514,7 @@ function resolveProfileMode(point) {
 
 function resolveBenchmarkSemanticsForPoint(point, statName, unit = null) {
   return resolveBenchmarkSemantics({
+    projectKey: point?.projectKey || null,
     statGroup: point?.statGroup || null,
     statName: statName || point?.statName || null,
     unit: unit || point?.unit || null,
@@ -1521,6 +1528,7 @@ function resolveMetricStatusFromPoint(point, statName) {
   }
 
   const classification = classifyBenchmarkComparison({
+    projectKey: point?.projectKey || null,
     latestPoint: point,
     previousPoint: null,
     statGroup: point.statGroup || null,

@@ -24,6 +24,7 @@ import {
   compareBenchmarkStatusRank,
   isBenchmarkRegressionStatus,
 } from '../../core/src/benchmark-semantics.js';
+import { getDefaultBenchmarkQueryCache } from '../benchmark-query-cache.js';
 
 const DEFAULT_LIMIT = 125;
 const MAX_LIMIT = 1000;
@@ -44,6 +45,24 @@ const RUN_LIST_ATTRIBUTES = [
   'status',
   'reportSchemaVersion',
   'summary',
+];
+const BENCHMARK_RUN_ATTRIBUTES = [
+  'id',
+  'projectId',
+  'projectVersionId',
+  'externalKey',
+  'branch',
+  'startedAt',
+  'completedAt',
+];
+const BENCHMARK_STAT_ATTRIBUTES = [
+  'id',
+  'runId',
+  'statGroup',
+  'statName',
+  'unit',
+  'numericValue',
+  'metadata',
 ];
 
 const BADGE_SUMMARY_DEFAULT = {
@@ -76,6 +95,9 @@ export function createGraphqlQueryService(options = {}) {
     TestExecution,
   };
   const accessService = options.accessService || createProjectAccessService({ models });
+  const benchmarkQueryCache = options.benchmarkQueryCache === false
+    ? null
+    : options.benchmarkQueryCache || getDefaultBenchmarkQueryCache();
 
   return {
     async listProjects({ actor }) {
@@ -603,15 +625,33 @@ export function createGraphqlQueryService(options = {}) {
       if (scopedProjects.length === 0) {
         return [];
       }
+      const singleProject = scopedProjects.length === 1 ? scopedProjects[0] : null;
+      const cachedCatalog = singleProject
+        ? benchmarkQueryCache?.readCatalog({
+          projectId: singleProject.id,
+          projectKey: singleProject.key,
+        }) || null
+        : null;
+      if (cachedCatalog) {
+        return cachedCatalog;
+      }
 
       const projectMap = mapBy(scopedProjects, 'id');
       const runs = (await loadAll(models.Run, {
         where: {
           projectId: Array.from(projectMap.keys()),
         },
+        attributes: BENCHMARK_RUN_ATTRIBUTES,
       })).filter((run) => projectMap.has(run.projectId));
       if (runs.length === 0) {
-        return [];
+        const emptyCatalog = [];
+        if (singleProject) {
+          benchmarkQueryCache?.writeCatalog({
+            projectId: singleProject.id,
+            projectKey: singleProject.key,
+          }, emptyCatalog);
+        }
+        return emptyCatalog;
       }
 
       const runMap = mapBy(runs, 'id');
@@ -619,6 +659,7 @@ export function createGraphqlQueryService(options = {}) {
         where: {
           runId: Array.from(runMap.keys()),
         },
+        attributes: BENCHMARK_STAT_ATTRIBUTES,
       });
       const entries = new Map();
 
@@ -666,7 +707,7 @@ export function createGraphqlQueryService(options = {}) {
         }
       }
 
-      return Array.from(entries.values())
+      const catalog = Array.from(entries.values())
         .map((entry) => ({
           projectId: entry.projectId,
           projectKey: entry.projectKey,
@@ -679,6 +720,15 @@ export function createGraphqlQueryService(options = {}) {
           pointCount: entry.pointCount,
         }))
         .sort(compareBenchmarkCatalogEntries);
+
+      if (singleProject) {
+        benchmarkQueryCache?.writeCatalog({
+          projectId: singleProject.id,
+          projectKey: singleProject.key,
+        }, catalog);
+      }
+
+      return catalog;
     },
 
     async getBenchmarkSummary({ actor, projectId = null, projectKey = null }) {
@@ -694,21 +744,39 @@ export function createGraphqlQueryService(options = {}) {
           projectKey,
         });
       }
+      const singleProject = scopedProjects.length === 1 ? scopedProjects[0] : null;
+      const cachedSummary = singleProject
+        ? benchmarkQueryCache?.readSummary({
+          projectId: singleProject.id,
+          projectKey: singleProject.key,
+        }) || null
+        : null;
+      if (cachedSummary) {
+        return cachedSummary;
+      }
 
       const projectMap = mapBy(scopedProjects, 'id');
       const runs = (await loadAll(models.Run, {
         where: {
           projectId: Array.from(projectMap.keys()),
         },
+        attributes: BENCHMARK_RUN_ATTRIBUTES,
       }))
         .filter((run) => projectMap.has(run.projectId))
         .sort(compareRunsNewestFirst);
 
       if (runs.length === 0) {
-        return createEmptyBenchmarkSummary({
+        const emptySummary = createEmptyBenchmarkSummary({
           projectId: scopedProjects.length === 1 ? scopedProjects[0].id : null,
           projectKey: scopedProjects.length === 1 ? scopedProjects[0].key : projectKey,
         });
+        if (singleProject) {
+          benchmarkQueryCache?.writeSummary({
+            projectId: singleProject.id,
+            projectKey: singleProject.key,
+          }, emptySummary);
+        }
+        return emptySummary;
       }
 
       const runMap = mapBy(runs, 'id');
@@ -722,6 +790,7 @@ export function createGraphqlQueryService(options = {}) {
         where: {
           runId: Array.from(runMap.keys()),
         },
+        attributes: BENCHMARK_STAT_ATTRIBUTES,
       });
 
       const decoratedStats = stats
@@ -736,12 +805,21 @@ export function createGraphqlQueryService(options = {}) {
         })
         .sort(comparePerformanceStatsNewestFirst);
 
-      return buildBenchmarkSummary({
+      const summary = buildBenchmarkSummary({
         projects: scopedProjects,
         runs,
         projectVersions: versionMap,
         stats: decoratedStats,
       });
+
+      if (singleProject) {
+        benchmarkQueryCache?.writeSummary({
+          projectId: singleProject.id,
+          projectKey: singleProject.key,
+        }, summary);
+      }
+
+      return summary;
     },
 
     async getRunCoverageComparison({ actor, runId }) {
@@ -990,6 +1068,7 @@ function buildBenchmarkSummaryChangeEntries(namespaces) {
         const latestPoint = orderedPoints[0] || null;
         const previousPoint = orderedPoints.find((point) => point !== latestPoint) || null;
         const classification = classifyBenchmarkComparison({
+          projectKey: latestPoint?.projectKey || previousPoint?.projectKey || null,
           latestPoint,
           previousPoint,
           statGroup: namespace.statGroup,

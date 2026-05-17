@@ -1,3 +1,5 @@
+import { BENCHMARK_SEMANTIC_OVERRIDES } from './benchmark-semantics-overrides.js';
+
 const DEFAULT_BENCHMARK_THRESHOLDS = {
   warningDeltaPct: 5,
   severeDeltaPct: 10,
@@ -31,10 +33,18 @@ const BENCHMARK_SEMANTIC_RULES = [
   },
 ];
 
-export function resolveBenchmarkSemantics({ statGroup = null, statName = null, unit = null, metadata = null } = {}) {
+export function resolveBenchmarkSemantics({ projectKey = null, statGroup = null, statName = null, unit = null, metadata = null } = {}) {
   const normalizedMetadata = normalizeMetadata(metadata);
+  const normalizedProjectKey = normalizeString(projectKey) || '';
   const normalizedStatName = normalizeString(statName) || '';
   const normalizedUnit = normalizeString(unit) || '';
+  const matchedOverride = BENCHMARK_SEMANTIC_OVERRIDES.find((rule) => rule.test({
+    projectKey: normalizedProjectKey,
+    statGroup: normalizeString(statGroup) || '',
+    statName: normalizedStatName,
+    unit: normalizedUnit,
+    metadata: normalizedMetadata,
+  })) || null;
   const matchedRule = BENCHMARK_SEMANTIC_RULES.find((rule) => rule.test({
     statGroup: normalizeString(statGroup) || '',
     statName: normalizedStatName,
@@ -42,39 +52,47 @@ export function resolveBenchmarkSemantics({ statGroup = null, statName = null, u
     metadata: normalizedMetadata,
   })) || null;
 
+  const comparisonMode = resolveComparisonMode(normalizedMetadata) || matchedOverride?.comparisonMode || 'directional';
   const lowerIsBetter = typeof normalizedMetadata.lowerIsBetter === 'boolean'
     ? normalizedMetadata.lowerIsBetter
-    : matchedRule?.lowerIsBetter ?? true;
+    : typeof matchedOverride?.lowerIsBetter === 'boolean'
+      ? matchedOverride.lowerIsBetter
+      : matchedRule?.lowerIsBetter ?? true;
   const warningDeltaPct = coercePositiveNumber(
     normalizedMetadata.warningDeltaPct
     ?? normalizedMetadata.warning_delta_pct
     ?? normalizedMetadata.budgetWarningDeltaPct
     ?? normalizedMetadata.budget_warning_delta_pct,
-  ) ?? matchedRule?.warningDeltaPct ?? DEFAULT_BENCHMARK_THRESHOLDS.warningDeltaPct;
+  ) ?? matchedOverride?.warningDeltaPct ?? matchedRule?.warningDeltaPct ?? DEFAULT_BENCHMARK_THRESHOLDS.warningDeltaPct;
   const severeDeltaPct = coercePositiveNumber(
     normalizedMetadata.severeDeltaPct
     ?? normalizedMetadata.severe_delta_pct
     ?? normalizedMetadata.budgetSevereDeltaPct
     ?? normalizedMetadata.budget_severe_delta_pct,
-  ) ?? matchedRule?.severeDeltaPct ?? Math.max(warningDeltaPct, DEFAULT_BENCHMARK_THRESHOLDS.severeDeltaPct);
+  ) ?? matchedOverride?.severeDeltaPct ?? matchedRule?.severeDeltaPct ?? Math.max(warningDeltaPct, DEFAULT_BENCHMARK_THRESHOLDS.severeDeltaPct);
   const budgetStatus = resolveBenchmarkBudgetStatus(normalizedMetadata);
+  const hasMetadataOverrides = resolveComparisonMode(normalizedMetadata) != null
+    || typeof normalizedMetadata.lowerIsBetter === 'boolean'
+    || coercePositiveNumber(
+      normalizedMetadata.warningDeltaPct
+      ?? normalizedMetadata.warning_delta_pct
+      ?? normalizedMetadata.budgetWarningDeltaPct
+      ?? normalizedMetadata.budget_warning_delta_pct
+      ?? normalizedMetadata.severeDeltaPct
+      ?? normalizedMetadata.severe_delta_pct
+      ?? normalizedMetadata.budgetSevereDeltaPct
+      ?? normalizedMetadata.budget_severe_delta_pct,
+    ) != null;
 
   return {
+    comparisonMode,
     lowerIsBetter,
     warningDeltaPct,
     severeDeltaPct: Math.max(warningDeltaPct, severeDeltaPct),
-    semanticsSource: typeof normalizedMetadata.lowerIsBetter === 'boolean'
-      || coercePositiveNumber(
-        normalizedMetadata.warningDeltaPct
-        ?? normalizedMetadata.warning_delta_pct
-        ?? normalizedMetadata.budgetWarningDeltaPct
-        ?? normalizedMetadata.budget_warning_delta_pct
-        ?? normalizedMetadata.severeDeltaPct
-        ?? normalizedMetadata.severe_delta_pct
-        ?? normalizedMetadata.budgetSevereDeltaPct
-        ?? normalizedMetadata.budget_severe_delta_pct,
-      ) != null
+    semanticsSource: hasMetadataOverrides
       ? 'metadata'
+      : matchedOverride
+        ? 'override'
       : matchedRule
         ? 'rule'
         : 'default',
@@ -106,10 +124,19 @@ export function resolveBenchmarkBudgetStatus(metadata) {
   return null;
 }
 
-export function classifyBenchmarkComparison({ latestPoint = null, previousPoint = null, statGroup = null, statName = null, unit = null, metadata = null } = {}) {
+export function classifyBenchmarkComparison({
+  latestPoint = null,
+  previousPoint = null,
+  projectKey = null,
+  statGroup = null,
+  statName = null,
+  unit = null,
+  metadata = null,
+} = {}) {
   const latestValue = toFiniteNumber(latestPoint?.numericValue);
   const previousValue = toFiniteNumber(previousPoint?.numericValue);
   const semantics = resolveBenchmarkSemantics({
+    projectKey: projectKey ?? latestPoint?.projectKey ?? previousPoint?.projectKey ?? null,
     statGroup: statGroup ?? latestPoint?.statGroup ?? previousPoint?.statGroup ?? null,
     statName: statName ?? latestPoint?.statName ?? previousPoint?.statName ?? null,
     unit: unit ?? latestPoint?.unit ?? previousPoint?.unit ?? null,
@@ -135,6 +162,16 @@ export function classifyBenchmarkComparison({ latestPoint = null, previousPoint 
       directionStatus: 'stable',
       deltaValue,
       deltaPercent: 0,
+      ...semantics,
+    };
+  }
+
+  if (semantics.comparisonMode === 'neutral') {
+    return {
+      status: budgetStatus || 'stable',
+      directionStatus: 'neutral',
+      deltaValue,
+      deltaPercent,
       ...semantics,
     };
   }
@@ -198,6 +235,25 @@ function normalizeString(value) {
 function coercePositiveNumber(value) {
   const normalized = toFiniteNumber(value);
   return Number.isFinite(normalized) && normalized > 0 ? normalized : null;
+}
+
+function resolveComparisonMode(metadata) {
+  const rawMode = normalizeString(
+    metadata?.comparisonMode
+    ?? metadata?.comparison_mode
+    ?? metadata?.directionMode
+    ?? metadata?.direction_mode,
+  );
+
+  if (!rawMode) {
+    return null;
+  }
+
+  if (['neutral', 'none', 'informational'].includes(rawMode)) {
+    return 'neutral';
+  }
+
+  return 'directional';
 }
 
 function toFiniteNumber(value) {

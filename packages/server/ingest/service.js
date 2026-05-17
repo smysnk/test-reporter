@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import sequelize from '../db.js';
+import { invalidateProjectBenchmarkQueryCache } from '../benchmark-query-cache.js';
 import {
   Artifact,
   CoverageFile,
@@ -24,7 +25,12 @@ export function createIngestionService(options = {}) {
   return {
     async ingest(payload, context = {}) {
       const normalized = normalizeIngestPayload(payload, context);
-      return persistence.persistRun(normalized, context);
+      const persisted = await persistence.persistRun(normalized, context);
+      invalidateProjectBenchmarkQueryCache({
+        projectId: persisted?.projectId || null,
+        projectKey: normalized?.project?.key || null,
+      });
+      return persisted;
     },
   };
 }
