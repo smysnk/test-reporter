@@ -119,7 +119,9 @@ jobs:
           fi
           export TEST_STATION_BUILD_COMPLETED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           export S3_STORAGE_PREFIX="${S3_STORAGE_PREFIX:-ci/${GITHUB_REPOSITORY}/${GITHUB_RUN_ID}/${GITHUB_RUN_ATTEMPT}}"
-          node ./scripts/publish-ingest-report.mjs --input ./.test-results/self-test-report/report.json
+          if ! node ./scripts/publish-ingest-report.mjs --input ./.test-results/self-test-report/report.json; then
+            echo "Self-test ingest publish failed; continuing because report delivery should not block the release pipeline."
+          fi
 
       - name: Assert self-test pass
         if: always()
