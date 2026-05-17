@@ -23,7 +23,7 @@ import {
   classifyBenchmarkComparison,
   compareBenchmarkStatusRank,
   isBenchmarkRegressionStatus,
-} from '@test-station/core';
+} from '../../core/src/benchmark-semantics.js';
 import { getDefaultBenchmarkQueryCache } from '../benchmark-query-cache.js';
 
 const DEFAULT_LIMIT = 125;

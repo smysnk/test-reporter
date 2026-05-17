@@ -29,6 +29,7 @@ COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn ./.yarn
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/config ./config
+COPY --from=build /app/packages/core ./packages/core
 COPY --from=build /app/packages/server ./packages/server
 COPY --from=build /app/packages/web ./packages/web
 COPY docker/docker-entrypoint.sh ./docker/docker-entrypoint.sh

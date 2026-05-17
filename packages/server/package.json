@@ -17,7 +17,6 @@
   "dependencies": {
     "@apollo/server": "^4.12.2",
     "@as-integrations/express5": "^1.1.0",
-    "@test-station/core": "workspace:*",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "env-var": "^7.3.1",
