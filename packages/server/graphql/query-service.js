@@ -19,6 +19,11 @@ import {
   TestExecution,
 } from '../models/index.js';
 import { createProjectAccessService } from './access-service.js';
+import {
+  classifyBenchmarkComparison,
+  compareBenchmarkStatusRank,
+  isBenchmarkRegressionStatus,
+} from '../../core/src/benchmark-semantics.js';
 
 const DEFAULT_LIMIT = 125;
 const MAX_LIMIT = 1000;
@@ -676,6 +681,69 @@ export function createGraphqlQueryService(options = {}) {
         .sort(compareBenchmarkCatalogEntries);
     },
 
+    async getBenchmarkSummary({ actor, projectId = null, projectKey = null }) {
+      const projects = await this.listProjects({ actor });
+      const scopedProjects = projects.filter((project) => (
+        (projectId ? project.id === projectId : true)
+        && (projectKey ? project.key === projectKey : true)
+      ));
+
+      if (scopedProjects.length === 0) {
+        return createEmptyBenchmarkSummary({
+          projectId,
+          projectKey,
+        });
+      }
+
+      const projectMap = mapBy(scopedProjects, 'id');
+      const runs = (await loadAll(models.Run, {
+        where: {
+          projectId: Array.from(projectMap.keys()),
+        },
+      }))
+        .filter((run) => projectMap.has(run.projectId))
+        .sort(compareRunsNewestFirst);
+
+      if (runs.length === 0) {
+        return createEmptyBenchmarkSummary({
+          projectId: scopedProjects.length === 1 ? scopedProjects[0].id : null,
+          projectKey: scopedProjects.length === 1 ? scopedProjects[0].key : projectKey,
+        });
+      }
+
+      const runMap = mapBy(runs, 'id');
+      const versionIds = Array.from(new Set(runs.map((run) => run.projectVersionId).filter(Boolean)));
+      const versionMap = mapBy(versionIds.length > 0
+        ? await loadAll(models.ProjectVersion, {
+          where: { id: versionIds },
+        })
+        : [], 'id');
+      const stats = await loadAll(models.PerformanceStat, {
+        where: {
+          runId: Array.from(runMap.keys()),
+        },
+      });
+
+      const decoratedStats = stats
+        .filter((stat) => runMap.has(stat.runId))
+        .map((stat) => {
+          const run = runMap.get(stat.runId) || null;
+          return decoratePerformanceStat(stat, {
+            project: projectMap.get(run?.projectId) || null,
+            run,
+            projectVersion: versionMap.get(run?.projectVersionId) || null,
+          });
+        })
+        .sort(comparePerformanceStatsNewestFirst);
+
+      return buildBenchmarkSummary({
+        projects: scopedProjects,
+        runs,
+        projectVersions: versionMap,
+        stats: decoratedStats,
+      });
+    },
+
     async getRunCoverageComparison({ actor, runId }) {
       const currentRun = await this.findRun({ id: runId, actor });
       if (!currentRun) {
@@ -786,6 +854,208 @@ function decoratePerformanceStat(stat, related) {
     buildNumber: toInteger(related.projectVersion?.buildNumber),
     seriesId: metadata.seriesId || null,
     runnerKey: metadata.runnerKey || null,
+  };
+}
+
+function createEmptyBenchmarkSummary({ projectId = null, projectKey = null } = {}) {
+  return {
+    projectId: projectId || null,
+    projectKey: projectKey || null,
+    latestRunId: null,
+    latestExternalKey: null,
+    latestVersionKey: null,
+    latestCompletedAt: null,
+    namespaceCount: 0,
+    metricCount: 0,
+    seriesCount: 0,
+    latestRunRegressionCount: 0,
+    topChanges: [],
+    topRegressions: [],
+    topImprovements: [],
+    namespaces: [],
+  };
+}
+
+function buildBenchmarkSummary({ projects = [], runs = [], projectVersions = new Map(), stats = [] }) {
+  if (!Array.isArray(runs) || runs.length === 0) {
+    return createEmptyBenchmarkSummary({
+      projectId: projects.length === 1 ? projects[0].id : null,
+      projectKey: projects.length === 1 ? projects[0].key : null,
+    });
+  }
+
+  const latestRun = [...runs].sort(compareRunsNewestFirst)[0] || null;
+  const namespaces = new Map();
+
+  for (const stat of Array.isArray(stats) ? stats : []) {
+    if (!stat?.statGroup || !stat?.statName || !Number.isFinite(stat?.numericValue)) {
+      continue;
+    }
+
+    if (!namespaces.has(stat.statGroup)) {
+      namespaces.set(stat.statGroup, {
+        statGroup: stat.statGroup,
+        metrics: new Map(),
+      });
+    }
+
+    const namespace = namespaces.get(stat.statGroup);
+    if (!namespace.metrics.has(stat.statName)) {
+      namespace.metrics.set(stat.statName, {
+        statName: stat.statName,
+        unit: stat.unit || null,
+        points: [],
+        seriesIds: new Set(),
+      });
+    }
+
+    const metric = namespace.metrics.get(stat.statName);
+    metric.points.push(stat);
+    if (!metric.unit && stat.unit) {
+      metric.unit = stat.unit;
+    }
+    if (normalizeString(stat.seriesId)) {
+      metric.seriesIds.add(normalizeString(stat.seriesId));
+    }
+  }
+
+  if (namespaces.size === 0) {
+    return createEmptyBenchmarkSummary({
+      projectId: projects.length === 1 ? projects[0].id : null,
+      projectKey: projects.length === 1 ? projects[0].key : null,
+    });
+  }
+
+  const namespaceStates = Array.from(namespaces.values()).map((namespace) => ({
+    statGroup: namespace.statGroup,
+    metrics: Array.from(namespace.metrics.values()).map((metric) => ({
+      statName: metric.statName,
+      unit: metric.unit,
+      points: [...metric.points].sort(comparePerformanceStatsNewestFirst),
+      seriesIds: Array.from(metric.seriesIds).sort(),
+    })).sort((left, right) => right.points.length - left.points.length || left.statName.localeCompare(right.statName)),
+  }));
+
+  const benchmarkChanges = buildBenchmarkSummaryChangeEntries(namespaceStates);
+  const namespaceSummaries = namespaceStates
+    .map((namespace) => buildBenchmarkNamespaceSummary(namespace, benchmarkChanges))
+    .sort(compareBenchmarkNamespaceSummaries);
+
+  return {
+    projectId: projects.length === 1 ? projects[0].id : null,
+    projectKey: projects.length === 1 ? projects[0].key : null,
+    latestRunId: latestRun?.id || null,
+    latestExternalKey: latestRun?.externalKey || null,
+    latestVersionKey: projectVersions.get(latestRun?.projectVersionId)?.versionKey || null,
+    latestCompletedAt: latestRun?.completedAt || null,
+    namespaceCount: namespaceStates.length,
+    metricCount: namespaceStates.reduce((total, namespace) => total + namespace.metrics.length, 0),
+    seriesCount: uniqueStrings(namespaceStates.flatMap((namespace) => namespace.metrics.flatMap((metric) => metric.seriesIds || []))).length,
+    latestRunRegressionCount: benchmarkChanges.filter((entry) => isBenchmarkRegressionStatus(entry.status) && entry.latestRunId === latestRun?.id).length,
+    topChanges: benchmarkChanges.filter((entry) => Number.isFinite(entry.deltaPercent)),
+    topRegressions: benchmarkChanges.filter((entry) => isBenchmarkRegressionStatus(entry.status)),
+    topImprovements: benchmarkChanges.filter((entry) => entry.status === 'improved'),
+    namespaces: namespaceSummaries,
+  };
+}
+
+function buildBenchmarkSummaryChangeEntries(namespaces) {
+  const changes = [];
+
+  for (const namespace of Array.isArray(namespaces) ? namespaces : []) {
+    const metricCount = Array.isArray(namespace.metrics) ? namespace.metrics.length : 0;
+
+    for (const metric of Array.isArray(namespace.metrics) ? namespace.metrics : []) {
+      const groups = new Map();
+
+      for (const point of Array.isArray(metric.points) ? metric.points : []) {
+        if (!Number.isFinite(point?.numericValue)) {
+          continue;
+        }
+
+        const groupKey = [
+          point.seriesId || 'default',
+          point.runnerKey || 'runner unavailable',
+          point.branch || 'no branch',
+        ].join('::');
+
+        if (!groups.has(groupKey)) {
+          groups.set(groupKey, []);
+        }
+        groups.get(groupKey).push(point);
+      }
+
+      for (const points of groups.values()) {
+        const orderedPoints = [...points].sort(comparePerformanceStatsNewestFirst);
+        const latestPoint = orderedPoints[0] || null;
+        const previousPoint = orderedPoints.find((point) => point !== latestPoint) || null;
+        const classification = classifyBenchmarkComparison({
+          latestPoint,
+          previousPoint,
+          statGroup: namespace.statGroup,
+          statName: metric.statName,
+          unit: metric.unit || latestPoint?.unit || null,
+        });
+
+        changes.push({
+          statGroup: namespace.statGroup,
+          statName: metric.statName,
+          unit: metric.unit || latestPoint?.unit || null,
+          metricCount,
+          status: classification.status,
+          directionStatus: classification.directionStatus,
+          budgetStatus: classification.budgetStatus,
+          lowerIsBetter: classification.lowerIsBetter,
+          warningThresholdPct: classification.warningDeltaPct,
+          severeThresholdPct: classification.severeDeltaPct,
+          semanticsSource: classification.semanticsSource,
+          latestRunId: latestPoint?.runId || null,
+          latestExternalKey: latestPoint?.externalKey || null,
+          latestVersionKey: latestPoint?.versionKey || null,
+          latestCompletedAt: latestPoint?.completedAt || null,
+          latestBranch: latestPoint?.branch || null,
+          latestRunnerKey: latestPoint?.runnerKey || null,
+          latestSeriesId: latestPoint?.seriesId || null,
+          latestValue: Number.isFinite(latestPoint?.numericValue) ? latestPoint.numericValue : null,
+          previousRunId: previousPoint?.runId || null,
+          previousExternalKey: previousPoint?.externalKey || null,
+          previousVersionKey: previousPoint?.versionKey || null,
+          previousCompletedAt: previousPoint?.completedAt || null,
+          previousValue: Number.isFinite(previousPoint?.numericValue) ? previousPoint.numericValue : null,
+          deltaValue: classification.deltaValue,
+          deltaPercent: classification.deltaPercent,
+        });
+      }
+    }
+  }
+
+  return changes.sort(compareBenchmarkSummaryChanges);
+}
+
+function buildBenchmarkNamespaceSummary(namespace, benchmarkChanges) {
+  const metrics = Array.isArray(namespace?.metrics) ? namespace.metrics : [];
+  const primaryMetric = metrics[0] || null;
+  const latestCompletedAt = metrics
+    .flatMap((metric) => metric.points || [])
+    .map((point) => point.completedAt || null)
+    .sort(compareIsoDatesDescending)[0] || null;
+  const namespaceChanges = benchmarkChanges.filter((entry) => entry.statGroup === namespace.statGroup);
+  const regressionCount = namespaceChanges.filter((entry) => isBenchmarkRegressionStatus(entry.status)).length;
+  const warningCount = namespaceChanges.filter((entry) => entry.status === 'warning').length;
+  const severeRegressionCount = namespaceChanges.filter((entry) => entry.status === 'severe-regression').length;
+  const status = namespaceChanges.find((entry) => entry.status)?.status || 'insufficient-baseline';
+
+  return {
+    statGroup: namespace.statGroup,
+    primaryMetricName: primaryMetric?.statName || null,
+    status,
+    latestCompletedAt,
+    metricCount: metrics.length,
+    seriesCount: uniqueStrings(metrics.flatMap((metric) => metric.seriesIds || [])).length,
+    pointCount: metrics.reduce((total, metric) => total + ((metric.points || []).length), 0),
+    regressionCount,
+    warningCount,
+    severeRegressionCount,
   };
 }
 
@@ -1062,6 +1332,16 @@ function toNumber(value) {
   return Number.isFinite(value) ? Number(value) : null;
 }
 
+function normalizeString(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function uniqueStrings(values) {
+  return Array.from(new Set((Array.isArray(values) ? values : [])
+    .map((value) => normalizeString(value))
+    .filter(Boolean)));
+}
+
 function detectLanguage(filePath) {
   const match = /\.([a-z0-9]+)$/i.exec(filePath || '');
   return match ? match[1].toLowerCase() : null;
@@ -1092,6 +1372,29 @@ function comparePerformanceStatsNewestFirst(left, right) {
 function compareBenchmarkCatalogEntries(left, right) {
   return String(left.projectKey || '').localeCompare(String(right.projectKey || ''))
     || String(left.statGroup || '').localeCompare(String(right.statGroup || ''));
+}
+
+function compareBenchmarkSummaryChanges(left, right) {
+  return compareBenchmarkStatusRank(left.status, right.status)
+    || compareNullableNumbersDesc(Math.abs(left.deltaPercent || 0), Math.abs(right.deltaPercent || 0))
+    || compareIsoDatesDescending(left.latestCompletedAt, right.latestCompletedAt)
+    || String(left.statGroup || '').localeCompare(String(right.statGroup || ''))
+    || String(left.statName || '').localeCompare(String(right.statName || ''));
+}
+
+function compareBenchmarkNamespaceSummaries(left, right) {
+  return compareIsoDatesDescending(left.latestCompletedAt, right.latestCompletedAt)
+    || String(left.statGroup || '').localeCompare(String(right.statGroup || ''));
+}
+
+function compareNullableNumbersDesc(left, right) {
+  const leftValue = Number.isFinite(left) ? left : -Infinity;
+  const rightValue = Number.isFinite(right) ? right : -Infinity;
+  return rightValue - leftValue;
+}
+
+function compareIsoDatesDescending(left, right) {
+  return compareIsoDates(right, left);
 }
 
 function compareCoverageChanges(left, right) {

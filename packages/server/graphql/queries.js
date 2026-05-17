@@ -282,6 +282,65 @@ export const queryTypeDefs = `#graphql
     pointCount: Int!
   }
 
+  type BenchmarkChangeSummary {
+    statGroup: String!
+    statName: String!
+    unit: String
+    metricCount: Int!
+    status: String!
+    directionStatus: String!
+    budgetStatus: String
+    lowerIsBetter: Boolean!
+    warningThresholdPct: Float!
+    severeThresholdPct: Float!
+    semanticsSource: String!
+    latestRunId: ID
+    latestExternalKey: String
+    latestVersionKey: String
+    latestCompletedAt: String
+    latestBranch: String
+    latestRunnerKey: String
+    latestSeriesId: String
+    latestValue: Float
+    previousRunId: ID
+    previousExternalKey: String
+    previousVersionKey: String
+    previousCompletedAt: String
+    previousValue: Float
+    deltaValue: Float
+    deltaPercent: Float
+  }
+
+  type BenchmarkNamespaceSummary {
+    statGroup: String!
+    primaryMetricName: String
+    status: String!
+    latestCompletedAt: String
+    metricCount: Int!
+    seriesCount: Int!
+    pointCount: Int!
+    regressionCount: Int!
+    warningCount: Int!
+    severeRegressionCount: Int!
+  }
+
+  type BenchmarkSummary {
+    projectId: ID
+    projectKey: String
+    latestRunId: ID
+    latestExternalKey: String
+    latestVersionKey: String
+    latestCompletedAt: String
+    namespaceCount: Int!
+    metricCount: Int!
+    seriesCount: Int!
+    latestRunRegressionCount: Int!
+    topChanges(limit: Int): [BenchmarkChangeSummary!]!
+    topRegressions(limit: Int): [BenchmarkChangeSummary!]!
+    topImprovements(limit: Int): [BenchmarkChangeSummary!]!
+    namespaces: [BenchmarkNamespaceSummary!]!
+  }
+
   type RunCoverageComparison {
     runId: ID!
     previousRunId: ID
@@ -361,6 +420,7 @@ export const queryTypeDefs = `#graphql
     runPerformanceStats(runId: ID!, statGroupPrefix: String, statNames: [String!], seriesIds: [String!]): [PerformanceStatRecord!]!
     performanceTrend(projectId: ID, projectKey: String, statGroup: String!, statName: String!, seriesIds: [String!], runnerKey: String, limit: Int): [PerformanceStatRecord!]!
     benchmarkCatalog(projectId: ID, projectKey: String): [BenchmarkCatalogEntry!]!
+    benchmarkSummary(projectId: ID, projectKey: String): BenchmarkSummary!
     coverageTrend(projectId: ID, projectKey: String, packageName: String, moduleName: String, filePath: String, limit: Int): [CoverageTrendPoint!]!
     runCoverageComparison(runId: ID!): RunCoverageComparison
     artifacts(runId: ID, suiteRunId: ID, testExecutionId: ID): [Artifact!]!
@@ -393,6 +453,7 @@ export const queryResolvers = {
     runPerformanceStats: (_root, args, context) => context.queryService.listRunPerformanceStats({ ...args, actor: context.actor }),
     performanceTrend: (_root, args, context) => context.queryService.listPerformanceTrend({ ...args, actor: context.actor }),
     benchmarkCatalog: (_root, args, context) => context.queryService.listBenchmarkCatalog({ ...args, actor: context.actor }),
+    benchmarkSummary: (_root, args, context) => context.queryService.getBenchmarkSummary({ ...args, actor: context.actor }),
     coverageTrend: (_root, args, context) => context.queryService.listCoverageTrend({ ...args, actor: context.actor }),
     runCoverageComparison: (_root, args, context) => context.queryService.getRunCoverageComparison({ ...args, actor: context.actor }),
     artifacts: (_root, args, context) => context.queryService.listArtifacts({ ...args, actor: context.actor }),
@@ -422,6 +483,11 @@ export const queryResolvers = {
       return context.adminService.getProjectAccess(args);
     },
   },
+  BenchmarkSummary: {
+    topChanges: (summary, args) => limitSummaryEntries(summary?.topChanges, args?.limit),
+    topRegressions: (summary, args) => limitSummaryEntries(summary?.topRegressions, args?.limit),
+    topImprovements: (summary, args) => limitSummaryEntries(summary?.topImprovements, args?.limit),
+  },
   Run: {
     suites: (run, _args, context) => context.queryService.listSuitesForRun({ runId: run.id, actor: context.actor }),
     coverageSnapshot: (run, _args, context) => (
@@ -434,6 +500,12 @@ export const queryResolvers = {
     tests: (suite, _args, context) => context.queryService.listTestsForSuiteRun({ suiteRunId: suite.id, actor: context.actor }),
   },
 };
+
+function limitSummaryEntries(entries, limit) {
+  const normalized = Number.isInteger(limit) && limit > 0 ? limit : null;
+  const items = Array.isArray(entries) ? entries : [];
+  return normalized ? items.slice(0, normalized) : items;
+}
 
 function resolveViewer(context) {
   return context?.actor && context.actor.isGuest !== true

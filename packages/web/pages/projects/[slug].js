@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'next/router';
-import { BenchmarkExplorer, PerformanceDomainSummary } from '../../components/BenchmarkBits.js';
+import { ProjectBenchmarkExplorer } from '../../components/BenchmarkBits.js';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, MetricGrid, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCoveragePct, formatDateTime, formatDuration, formatRunBuildLabel, resolveRunBuildNumber } from '../../lib/format.js';
@@ -192,6 +192,9 @@ export default function ProjectExplorerPage({ data }) {
   const coverageTrend = Array.isArray(data?.coverageTrend) ? data.coverageTrend : [];
   const releaseNotes = Array.isArray(data?.releaseNotes) ? data.releaseNotes : [];
   const benchmarkPanels = Array.isArray(data?.benchmarkPanels) ? data.benchmarkPanels : [];
+  const benchmarkSummary = data?.benchmarkSummary && typeof data.benchmarkSummary === 'object'
+    ? data.benchmarkSummary
+    : null;
   const trendPanels = data?.trendPanels || {};
   const [analysisTab, setAnalysisTab] = React.useState(benchmarkPanels.length > 0 ? 'benchmarks' : 'coverage');
 
@@ -399,15 +402,13 @@ export default function ProjectExplorerPage({ data }) {
       : React.createElement(
         SectionCard,
         {
-          eyebrow: 'Performance Explorer',
-          title: 'Historical performance movement',
-          copy: 'Track one namespace and one metric at a time, then toggle visible series to compare engines, browsers, or runner lanes.',
+          eyebrow: 'Benchmark Explorer',
+          title: 'Performance movement',
+          copy: 'Start from the biggest benchmark changes, then drill into exact series history only where it matters.',
           compact: true,
         },
-        React.createElement(PerformanceDomainSummary, {
-          benchmarkPanels,
-        }),
-        React.createElement(BenchmarkExplorer, {
+        React.createElement(ProjectBenchmarkExplorer, {
+          benchmarkSummary,
           benchmarkPanels,
         }),
       ),

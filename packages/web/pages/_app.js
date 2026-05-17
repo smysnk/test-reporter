@@ -811,6 +811,117 @@ const GlobalStyle = createGlobalStyle`
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     margin-top: 8px;
   }
+  .web-benchmark-dashboard {
+    margin-top: 8px;
+  }
+  .web-benchmark-section {
+    display: grid;
+    gap: 16px;
+    padding: 18px;
+    border-radius: 20px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    background: rgba(11, 20, 36, 0.42);
+  }
+  .web-benchmark-section__header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: baseline;
+  }
+  .web-benchmark-table th,
+  .web-benchmark-table td {
+    vertical-align: top;
+  }
+  .web-benchmark-namespace-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .web-benchmark-namespace-card,
+  .web-benchmark-metric-card {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid ${(props) => props.theme.colors.border};
+    background: ${(props) => props.theme.colors.panelSoft};
+    color: ${(props) => props.theme.colors.text};
+    font: inherit;
+    cursor: pointer;
+  }
+  .web-benchmark-namespace-card--active,
+  .web-benchmark-metric-card--active {
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.accent} 40%, ${(props) => props.theme.colors.border});
+    background: color-mix(in srgb, ${(props) => props.theme.colors.accent} 8%, ${(props) => props.theme.colors.panelSoft});
+    box-shadow: 0 0 0 1px color-mix(in srgb, ${(props) => props.theme.colors.accent} 18%, transparent);
+  }
+  .web-benchmark-metric-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .web-benchmark-status {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.72rem;
+  }
+  .web-benchmark-status--regressed {
+    color: ${(props) => props.theme.colors.danger};
+    background: color-mix(in srgb, ${(props) => props.theme.colors.danger} 12%, transparent);
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.danger} 28%, transparent);
+  }
+  .web-benchmark-status--severe-regression {
+    color: #ff4d6d;
+    background: color-mix(in srgb, #ff4d6d 14%, transparent);
+    border-color: color-mix(in srgb, #ff4d6d 34%, transparent);
+  }
+  .web-benchmark-status--warning {
+    color: #ffd166;
+    background: color-mix(in srgb, #ffd166 14%, transparent);
+    border-color: color-mix(in srgb, #ffd166 32%, transparent);
+  }
+  .web-benchmark-status--improved {
+    color: ${(props) => props.theme.colors.success};
+    background: color-mix(in srgb, ${(props) => props.theme.colors.success} 12%, transparent);
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.success} 28%, transparent);
+  }
+  .web-benchmark-status--stable {
+    color: ${(props) => props.theme.colors.accent};
+    background: color-mix(in srgb, ${(props) => props.theme.colors.accent} 12%, transparent);
+    border-color: color-mix(in srgb, ${(props) => props.theme.colors.accent} 28%, transparent);
+  }
+  .web-benchmark-status--insufficient-baseline {
+    color: ${(props) => props.theme.colors.muted};
+    background: rgba(107, 178, 255, 0.06);
+    border-color: ${(props) => props.theme.colors.border};
+  }
+  .web-benchmark-sparkline {
+    width: 100%;
+    height: 48px;
+  }
+  .web-benchmark-sparkline--empty {
+    display: grid;
+    place-items: center;
+    height: 48px;
+    border-radius: 14px;
+    border: 1px dashed ${(props) => props.theme.colors.border};
+    color: ${(props) => props.theme.colors.muted};
+    font-size: 0.82rem;
+  }
+  .web-benchmark-sparkline__axis {
+    fill: none;
+    stroke: rgba(124, 160, 224, 0.18);
+    stroke-width: 1;
+  }
+  .web-benchmark-sparkline__line {
+    fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
   .web-benchmark-series-toggles {
     display: flex;
     flex-wrap: wrap;

@@ -63,7 +63,7 @@ import { createBadgeHandler, resolveRequestedBadgeType, sanitizeBadgeSummary } f
 import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
-import { BenchmarkExplorer, PerformanceDomainSummary, RunBenchmarkSummary } from '../packages/web/components/BenchmarkBits.js';
+import { BenchmarkExplorer, PerformanceDomainSummary, ProjectBenchmarkExplorer, RunBenchmarkDeltaSummary, RunBenchmarkSummary } from '../packages/web/components/BenchmarkBits.js';
 import { RunBuildChip, RunSourceLink } from '../packages/web/components/WebBits.js';
 import { buildHomeExplorerModel } from '../packages/web/lib/homeExplorer.js';
 
@@ -1249,6 +1249,64 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
             latestCompletedAt: '2026-03-09T15:00:00.000Z',
             pointCount: 3,
           }],
+          benchmarkSummary: {
+            projectId: 'project-1',
+            projectKey: 'workspace',
+            latestRunId: 'run-1',
+            latestExternalKey: 'workspace:github-actions:1001',
+            latestVersionKey: 'commit:abc123',
+            latestCompletedAt: '2026-03-09T15:00:00.000Z',
+            namespaceCount: 1,
+            metricCount: 1,
+            seriesCount: 2,
+            latestRunRegressionCount: 1,
+            topChanges: [{
+              statGroup: 'benchmark.node.engine.nibbles.intro',
+              statName: 'elapsed_ms',
+              unit: 'ms',
+              metricCount: 1,
+              status: 'severe-regression',
+              directionStatus: 'regressed',
+              budgetStatus: 'warning',
+              lowerIsBetter: true,
+              warningThresholdPct: 5,
+              severeThresholdPct: 10,
+              semanticsSource: 'rule',
+              latestRunId: 'run-1',
+              latestExternalKey: 'workspace:github-actions:1001',
+              latestVersionKey: 'commit:abc123',
+              latestCompletedAt: '2026-03-09T15:00:00.000Z',
+              latestBranch: 'release',
+              latestRunnerKey: 'gha-ubuntu-latest-node20',
+              latestSeriesId: 'interpreter',
+              latestValue: 82.4,
+              previousRunId: 'run-0',
+              previousExternalKey: 'workspace:github-actions:1000',
+              previousVersionKey: 'commit:zzz999',
+              previousCompletedAt: '2026-03-08T15:00:00.000Z',
+              previousValue: 74.2,
+              deltaValue: 8.2,
+              deltaPercent: 11.05121293800539,
+            }],
+            topRegressions: [{
+              statGroup: 'benchmark.node.engine.nibbles.intro',
+              statName: 'elapsed_ms',
+              deltaPercent: 11.05121293800539,
+            }],
+            topImprovements: [],
+            namespaces: [{
+              statGroup: 'benchmark.node.engine.nibbles.intro',
+              primaryMetricName: 'elapsed_ms',
+              status: 'severe-regression',
+              latestCompletedAt: '2026-03-09T15:00:00.000Z',
+              metricCount: 1,
+              seriesCount: 2,
+              pointCount: 3,
+              regressionCount: 1,
+              warningCount: 0,
+              severeRegressionCount: 1,
+            }],
+          },
         },
       }), {
         status: 200,
@@ -1417,6 +1475,8 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
   assert.equal(project.coverageTrend.length, 2);
   assert.equal(project.releaseNotes.length, 1);
   assert.equal(project.benchmarkCatalog.length, 1);
+  assert.equal(project.benchmarkSummary.projectKey, 'workspace');
+  assert.equal(project.benchmarkSummary.topChanges.length, 1);
   assert.equal(project.benchmarkPanels.length, 1);
   assert.equal(project.benchmarkPanels[0].statGroup, 'benchmark.node.engine.nibbles.intro');
   assert.equal(project.benchmarkPanels[0].metrics[0].points.length, 3);
@@ -2265,6 +2325,10 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceUrl/);
   assert.match(PROJECT_ACTIVITY_QUERY, /buildNumber/);
   assert.match(PROJECT_ACTIVITY_QUERY, /benchmarkCatalog\(projectKey: \$projectKey\)/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /benchmarkSummary\(projectKey: \$projectKey\)/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /topChanges\(limit: 8\)/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /warningThresholdPct/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /severeRegressionCount/);
   assert.match(PERFORMANCE_TREND_QUERY, /performanceTrend\(projectKey: \$projectKey, statGroup: \$statGroup, statName: \$statName, limit: \$limit\)/);
   assert.match(RUN_HEADER_QUERY, /sourceRunId/);
   assert.match(RUN_HEADER_QUERY, /sourceUrl/);
@@ -2370,6 +2434,333 @@ test('benchmark explorer renders namespace controls, series toggles, and chart c
   assert.match(html, /Budget warnings/);
   assert.match(html, /Slowest current/);
   assert.match(html, /svg/);
+});
+
+test('project benchmark explorer renders summary, ranked changes, namespace cards, and metric cards', () => {
+  const html = renderToStaticMarkup(React.createElement(ProjectBenchmarkExplorer, {
+    benchmarkSummary: {
+      projectId: 'project-1',
+      projectKey: 'workspace',
+      latestRunId: 'run-1',
+      latestExternalKey: 'workspace:github-actions:1001',
+      latestVersionKey: 'v1.0.1',
+      latestCompletedAt: '2026-03-09T15:00:00.000Z',
+      namespaceCount: 1,
+      metricCount: 2,
+      seriesCount: 2,
+      latestRunRegressionCount: 1,
+      topChanges: [{
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        statName: 'elapsed_ms',
+        unit: 'ms',
+        metricCount: 2,
+        status: 'severe-regression',
+        directionStatus: 'regressed',
+        budgetStatus: 'warning',
+        lowerIsBetter: true,
+        warningThresholdPct: 5,
+        severeThresholdPct: 10,
+        semanticsSource: 'rule',
+        latestRunId: 'run-1',
+        latestExternalKey: 'workspace:github-actions:1001',
+        latestVersionKey: 'v1.0.1',
+        latestCompletedAt: '2026-03-09T15:00:00.000Z',
+        latestBranch: 'release',
+        latestRunnerKey: 'gha-ubuntu-latest-node20',
+        latestSeriesId: 'interpreter',
+        latestValue: 82.4,
+        previousRunId: 'run-0',
+        previousExternalKey: 'workspace:github-actions:1000',
+        previousVersionKey: 'v1.0.0',
+        previousCompletedAt: '2026-03-08T15:00:00.000Z',
+        previousValue: 74.2,
+        deltaValue: 8.2,
+        deltaPercent: 11.05121293800539,
+      }],
+      topRegressions: [{
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        statName: 'elapsed_ms',
+        deltaPercent: 11.05121293800539,
+      }],
+      topImprovements: [{
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        statName: 'steps_per_second',
+        deltaPercent: 8.757142857142856,
+      }],
+      namespaces: [{
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        primaryMetricName: 'elapsed_ms',
+        status: 'severe-regression',
+        latestCompletedAt: '2026-03-09T15:00:00.000Z',
+        metricCount: 2,
+        seriesCount: 2,
+        pointCount: 5,
+        regressionCount: 1,
+        warningCount: 0,
+        severeRegressionCount: 1,
+      }],
+    },
+    benchmarkPanels: [{
+      projectKey: 'workspace',
+      statGroup: 'benchmark.node.engine.nibbles.intro',
+      statNames: ['elapsed_ms', 'steps_per_second'],
+      units: ['ms', 'ops_per_sec'],
+      seriesIds: ['interpreter', 'interpreter-redux'],
+      runnerKeys: ['gha-ubuntu-latest-node20'],
+      latestCompletedAt: '2026-03-09T15:00:00.000Z',
+      pointCount: 6,
+      metrics: [{
+        statName: 'elapsed_ms',
+        unit: 'ms',
+        points: [
+          {
+            id: 'perf-run-0',
+            runId: 'run-0',
+            externalKey: 'workspace:github-actions:1000',
+            versionKey: 'v1.0.0',
+            completedAt: '2026-03-08T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'zzz999',
+            numericValue: 74.2,
+            unit: 'ms',
+            seriesId: 'interpreter',
+            runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {
+              profileMode: 'ci-smoke',
+              lowerIsBetter: true,
+              budgetStatus: 'passed',
+            },
+          },
+          {
+            id: 'perf-run-1',
+            runId: 'run-1',
+            externalKey: 'workspace:github-actions:1001',
+            versionKey: 'v1.0.1',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'abc123',
+            numericValue: 82.4,
+            unit: 'ms',
+            seriesId: 'interpreter',
+            runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {
+              profileMode: 'ci-smoke',
+              lowerIsBetter: true,
+              budgetStatus: 'warn',
+            },
+          },
+          {
+            id: 'perf-run-1-redux',
+            runId: 'run-1',
+            externalKey: 'workspace:github-actions:1001',
+            versionKey: 'v1.0.1',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'abc123',
+            numericValue: 57.54,
+            unit: 'ms',
+            seriesId: 'interpreter-redux',
+            runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {
+              profileMode: 'baseline',
+              lowerIsBetter: true,
+              budgetStatus: 'passed',
+            },
+          },
+        ],
+      }, {
+        statName: 'steps_per_second',
+        unit: 'ops_per_sec',
+        points: [
+          {
+            id: 'perf-run-0-ops',
+            runId: 'run-0',
+            externalKey: 'workspace:github-actions:1000',
+            versionKey: 'v1.0.0',
+            completedAt: '2026-03-08T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'zzz999',
+            numericValue: 420,
+            unit: 'ops_per_sec',
+            seriesId: 'interpreter',
+            runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {
+              profileMode: 'ci-smoke',
+              lowerIsBetter: false,
+              budgetStatus: 'passed',
+            },
+          },
+          {
+            id: 'perf-run-1-ops',
+            runId: 'run-1',
+            externalKey: 'workspace:github-actions:1001',
+            versionKey: 'v1.0.1',
+            completedAt: '2026-03-09T15:00:00.000Z',
+            branch: 'release',
+            commitSha: 'abc123',
+            numericValue: 456.78,
+            unit: 'ops_per_sec',
+            seriesId: 'interpreter',
+            runnerKey: 'gha-ubuntu-latest-node20',
+            metadata: {
+              profileMode: 'ci-smoke',
+              lowerIsBetter: false,
+              budgetStatus: 'passed',
+            },
+          },
+        ],
+      }],
+    }],
+  }));
+
+  assert.match(html, /Last Benchmarked Run/);
+  assert.match(html, /Tracked Namespaces/);
+  assert.match(html, /Top changes/);
+  assert.match(html, /Namespaces/);
+  assert.match(html, /Metric snapshots/);
+  assert.match(html, /Detailed chart inspector/);
+  assert.match(html, /severe regression/);
+  assert.match(html, /improved/);
+  assert.match(html, /Elapsed Ms/);
+  assert.match(html, /Steps Per Second/);
+  assert.match(html, /href="\/runs\/run-1"/);
+});
+
+test('run benchmark delta summary surfaces regressions and improvements before raw rows', () => {
+  const html = renderToStaticMarkup(React.createElement(RunBenchmarkDeltaSummary, {
+    historyHref: '#run-benchmark-history',
+    stats: [
+      {
+        id: 'perf-run-1-slower',
+        runId: 'run-1',
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        statName: 'elapsed_ms',
+        numericValue: 79.1,
+        unit: 'ms',
+        seriesId: 'interpreter',
+        runnerKey: 'gha-ubuntu-latest-node20',
+        completedAt: '2026-03-09T15:00:00.000Z',
+        branch: 'release',
+        commitSha: 'abc123',
+        metadata: {
+          lowerIsBetter: true,
+          budgetStatus: 'warn',
+        },
+      },
+      {
+        id: 'perf-run-1-faster',
+        runId: 'run-1',
+        statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+        statName: 'steps_per_second',
+        numericValue: 456.78,
+        unit: 'ops_per_sec',
+        seriesId: 'interpreter',
+        runnerKey: 'gha-ubuntu-latest-node20',
+        completedAt: '2026-03-09T15:00:00.000Z',
+        branch: 'release',
+        commitSha: 'abc123',
+        metadata: {
+          lowerIsBetter: false,
+        },
+      },
+    ],
+    benchmarkPanels: [
+      {
+        projectKey: 'workspace',
+        statGroup: 'benchmark.node.engine.nibbles.intro',
+        statNames: ['elapsed_ms'],
+        units: ['ms'],
+        seriesIds: ['interpreter'],
+        runnerKeys: ['gha-ubuntu-latest-node20'],
+        latestCompletedAt: '2026-03-09T15:00:00.000Z',
+        pointCount: 2,
+        metrics: [{
+          statName: 'elapsed_ms',
+          unit: 'ms',
+          points: [
+            {
+              id: 'perf-run-0-slower',
+              runId: 'run-0',
+              completedAt: '2026-03-08T15:00:00.000Z',
+              branch: 'release',
+              numericValue: 74.2,
+              unit: 'ms',
+              seriesId: 'interpreter',
+              runnerKey: 'gha-ubuntu-latest-node20',
+              metadata: {
+                lowerIsBetter: true,
+              },
+            },
+            {
+              id: 'perf-run-1-slower',
+              runId: 'run-1',
+              completedAt: '2026-03-09T15:00:00.000Z',
+              branch: 'release',
+              numericValue: 79.1,
+              unit: 'ms',
+              seriesId: 'interpreter',
+              runnerKey: 'gha-ubuntu-latest-node20',
+              metadata: {
+                lowerIsBetter: true,
+                budgetStatus: 'warn',
+              },
+            },
+          ],
+        }],
+      },
+      {
+        projectKey: 'workspace',
+        statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+        statNames: ['steps_per_second'],
+        units: ['ops_per_sec'],
+        seriesIds: ['interpreter'],
+        runnerKeys: ['gha-ubuntu-latest-node20'],
+        latestCompletedAt: '2026-03-09T15:00:00.000Z',
+        pointCount: 2,
+        metrics: [{
+          statName: 'steps_per_second',
+          unit: 'ops_per_sec',
+          points: [
+            {
+              id: 'perf-run-0-faster',
+              runId: 'run-0',
+              completedAt: '2026-03-08T15:00:00.000Z',
+              branch: 'release',
+              numericValue: 420,
+              unit: 'ops_per_sec',
+              seriesId: 'interpreter',
+              runnerKey: 'gha-ubuntu-latest-node20',
+              metadata: {
+                lowerIsBetter: false,
+              },
+            },
+            {
+              id: 'perf-run-1-faster',
+              runId: 'run-1',
+              completedAt: '2026-03-09T15:00:00.000Z',
+              branch: 'release',
+              numericValue: 456.78,
+              unit: 'ops_per_sec',
+              seriesId: 'interpreter',
+              runnerKey: 'gha-ubuntu-latest-node20',
+              metadata: {
+                lowerIsBetter: false,
+              },
+            },
+          ],
+        }],
+      },
+    ],
+  }));
+
+  assert.match(html, /Compared Metrics/);
+  assert.match(html, /Top regressions/);
+  assert.match(html, /Top improvements/);
+  assert.match(html, /Elapsed Ms/);
+  assert.match(html, /Steps Per Second/);
+  assert.match(html, /Open history chart/);
+  assert.match(html, /warning/);
+  assert.match(html, /improved/);
 });
 
 test('run benchmark summary groups benchmark rows by namespace', () => {

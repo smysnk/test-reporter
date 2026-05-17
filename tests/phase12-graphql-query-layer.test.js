@@ -1338,6 +1338,50 @@ test('GraphQL shared-key service auth can read back private performance runs', a
           statNames
           pointCount
         }
+        benchmarkSummary(projectKey: "workspace") {
+          projectId
+          projectKey
+          latestRunId
+          latestExternalKey
+          latestVersionKey
+          namespaceCount
+          metricCount
+          seriesCount
+          latestRunRegressionCount
+          topChanges(limit: 5) {
+            statGroup
+            statName
+            status
+            directionStatus
+            budgetStatus
+            lowerIsBetter
+            warningThresholdPct
+            severeThresholdPct
+            semanticsSource
+            latestRunId
+            latestSeriesId
+            latestValue
+            previousRunId
+            previousValue
+            deltaPercent
+          }
+          topImprovements(limit: 5) {
+            statGroup
+            statName
+            status
+          }
+          namespaces {
+            statGroup
+            primaryMetricName
+            status
+            metricCount
+            seriesCount
+            pointCount
+            regressionCount
+            warningCount
+            severeRegressionCount
+          }
+        }
         performanceTrend(
           projectKey: "workspace"
           statGroup: "benchmark.node.engine.nibbles.intro"
@@ -1390,6 +1434,63 @@ test('GraphQL shared-key service auth can read back private performance runs', a
   assert.deepEqual(response.payload.data.benchmarkCatalog.map((entry) => entry.statGroup), [
     'benchmark.node.engine.nibbles.intro',
     'benchmark.node.engine.shared.tight_arithmetic_loop',
+  ]);
+  assert.equal(response.payload.data.benchmarkSummary.projectId, 'project-1');
+  assert.equal(response.payload.data.benchmarkSummary.projectKey, 'workspace');
+  assert.equal(response.payload.data.benchmarkSummary.latestRunId, 'run-1');
+  assert.equal(response.payload.data.benchmarkSummary.latestExternalKey, 'workspace:github-actions:1001');
+  assert.equal(response.payload.data.benchmarkSummary.latestVersionKey, 'commit:abc123');
+  assert.equal(response.payload.data.benchmarkSummary.namespaceCount, 2);
+  assert.equal(response.payload.data.benchmarkSummary.metricCount, 3);
+  assert.equal(response.payload.data.benchmarkSummary.seriesCount, 2);
+  assert.equal(response.payload.data.benchmarkSummary.latestRunRegressionCount, 0);
+  assert.equal(response.payload.data.benchmarkSummary.topChanges.length, 1);
+  assert.deepEqual(response.payload.data.benchmarkSummary.topChanges[0], {
+    statGroup: 'benchmark.node.engine.nibbles.intro',
+    statName: 'elapsed_ms',
+    status: 'improved',
+    directionStatus: 'improved',
+    budgetStatus: null,
+    lowerIsBetter: true,
+    warningThresholdPct: 5,
+    severeThresholdPct: 10,
+    semanticsSource: 'rule',
+    latestRunId: 'run-1',
+    latestSeriesId: 'interpreter',
+    latestValue: 62.4,
+    previousRunId: 'run-0',
+    previousValue: 74.2,
+    deltaPercent: response.payload.data.benchmarkSummary.topChanges[0].deltaPercent,
+  });
+  assert.ok(Math.abs(response.payload.data.benchmarkSummary.topChanges[0].deltaPercent - (-15.902964959568733)) < 1e-9);
+  assert.deepEqual(response.payload.data.benchmarkSummary.topImprovements, [{
+    statGroup: 'benchmark.node.engine.nibbles.intro',
+    statName: 'elapsed_ms',
+    status: 'improved',
+  }]);
+  assert.deepEqual(response.payload.data.benchmarkSummary.namespaces, [
+    {
+      statGroup: 'benchmark.node.engine.nibbles.intro',
+      primaryMetricName: 'elapsed_ms',
+      status: 'improved',
+      metricCount: 1,
+      seriesCount: 2,
+      pointCount: 3,
+      regressionCount: 0,
+      warningCount: 0,
+      severeRegressionCount: 0,
+    },
+    {
+      statGroup: 'benchmark.node.engine.shared.tight_arithmetic_loop',
+      primaryMetricName: 'heap_delta_bytes',
+      status: 'insufficient-baseline',
+      metricCount: 2,
+      seriesCount: 1,
+      pointCount: 2,
+      regressionCount: 0,
+      warningCount: 0,
+      severeRegressionCount: 0,
+    },
   ]);
   assert.equal(response.payload.data.performanceTrend.length, 3);
   assert.equal(response.payload.data.performanceTrend[0].runId, 'run-1');

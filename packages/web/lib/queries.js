@@ -105,6 +105,68 @@ export const PROJECT_ACTIVITY_QUERY = `
       latestCompletedAt
       pointCount
     }
+    benchmarkSummary(projectKey: $projectKey) {
+      projectId
+      projectKey
+      latestRunId
+      latestExternalKey
+      latestVersionKey
+      latestCompletedAt
+      namespaceCount
+      metricCount
+      seriesCount
+      latestRunRegressionCount
+      topChanges(limit: 8) {
+        statGroup
+        statName
+        unit
+        metricCount
+        status
+        directionStatus
+        budgetStatus
+        lowerIsBetter
+        warningThresholdPct
+        severeThresholdPct
+        semanticsSource
+        latestRunId
+        latestExternalKey
+        latestVersionKey
+        latestCompletedAt
+        latestBranch
+        latestRunnerKey
+        latestSeriesId
+        latestValue
+        previousRunId
+        previousExternalKey
+        previousVersionKey
+        previousCompletedAt
+        previousValue
+        deltaValue
+        deltaPercent
+      }
+      topRegressions(limit: 1) {
+        statGroup
+        statName
+        deltaPercent
+      }
+      topImprovements(limit: 1) {
+        statGroup
+        statName
+        deltaPercent
+      }
+      namespaces {
+        statGroup
+        primaryMetricName
+        status
+        latestCompletedAt
+        metricCount
+        seriesCount
+        pointCount
+        regressionCount
+        warningCount
+        severeRegressionCount
+      }
+    }
   }
 `;
 

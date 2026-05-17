@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { BenchmarkExplorer, PerformanceDomainSummary, RunBenchmarkSummary } from '../../components/BenchmarkBits.js';
+import { BenchmarkExplorer, PerformanceDomainSummary, RunBenchmarkDeltaSummary, RunBenchmarkSummary } from '../../components/BenchmarkBits.js';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, InlineList, MetricGrid, RunSourceLink, SectionCard, StatusPill } from '../../components/WebBits.js';
 import { formatCommitSha, formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, formatSignedDelta } from '../../lib/format.js';
@@ -124,21 +124,25 @@ function RunHistoricalSignals({ data, run }) {
         }),
     ),
     React.createElement(
-      SectionCard,
-      {
-        eyebrow: 'Historical Performance',
-        title: 'Performance graphs',
-        copy: 'Review recent performance movement for this project directly from the run page.',
-        compact: true,
-      },
-      benchmarkPanels.length > 0
-        ? React.createElement(BenchmarkExplorer, {
-          benchmarkPanels,
-        })
-        : React.createElement(EmptyState, {
-          title: 'No benchmark history yet',
-          copy: 'Benchmark charts appear once this project begins publishing benchmark trend data.',
-        }),
+      'div',
+      { id: 'run-benchmark-history' },
+      React.createElement(
+        SectionCard,
+        {
+          eyebrow: 'Historical Performance',
+          title: 'Performance graphs',
+          copy: 'Review recent performance movement for this project directly from the run page.',
+          compact: true,
+        },
+        benchmarkPanels.length > 0
+          ? React.createElement(BenchmarkExplorer, {
+            benchmarkPanels,
+          })
+          : React.createElement(EmptyState, {
+            title: 'No benchmark history yet',
+            copy: 'Benchmark charts appear once this project begins publishing benchmark trend data.',
+          }),
+      ),
     ),
   );
 }
@@ -213,9 +217,23 @@ function OperationsRunDetail({ data }) {
       React.createElement(
         SectionCard,
         {
-          eyebrow: 'Performance',
+          eyebrow: 'Performance Delta',
+          title: 'Run benchmark movement',
+          copy: 'This run is compared against the most recent matching benchmark history before raw metric rows are shown.',
+          compact: true,
+        },
+        React.createElement(RunBenchmarkDeltaSummary, {
+          stats: runPerformanceStats,
+          benchmarkPanels: Array.isArray(data?.benchmarkPanels) ? data.benchmarkPanels : [],
+          historyHref: '#run-benchmark-history',
+        }),
+      ),
+      React.createElement(
+        SectionCard,
+        {
+          eyebrow: 'Performance Rows',
           title: 'Recorded performance stats',
-          copy: 'Namespaced performance rows from the run are grouped here so the operator can inspect the exact values behind the trend charts.',
+          copy: 'Namespaced performance rows remain available when you need the exact stored values behind the delta summaries.',
           compact: true,
         },
         React.createElement(PerformanceDomainSummary, {
@@ -223,6 +241,7 @@ function OperationsRunDetail({ data }) {
         }),
         React.createElement(RunBenchmarkSummary, {
           stats: runPerformanceStats,
+          historyHref: '#run-benchmark-history',
         }),
       ),
       React.createElement(

@@ -6,3 +6,11 @@ export { preparePolicyContext, applyPolicyPipeline, collectCoverageAttribution, 
 export { writeReportArtifacts } from './artifacts.js';
 export { formatConsoleSummary, createConsoleProgressReporter } from './console.js';
 export { runReport } from './run-report.js';
+export {
+  resolveBenchmarkSemantics,
+  resolveBenchmarkBudgetStatus,
+  classifyBenchmarkComparison,
+  isBenchmarkRegressionStatus,
+  compareBenchmarkStatusRank,
+  benchmarkStatusRank,
+} from './benchmark-semantics.js';

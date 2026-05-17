@@ -257,6 +257,9 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
   const overallTrend = Array.isArray(activity.coverageTrend) ? activity.coverageTrend : [];
   const releaseNotes = Array.isArray(activity.releaseNotes) ? activity.releaseNotes : [];
   const benchmarkCatalog = Array.isArray(activity.benchmarkCatalog) ? activity.benchmarkCatalog : [];
+  const benchmarkSummary = activity.benchmarkSummary && typeof activity.benchmarkSummary === 'object'
+    ? activity.benchmarkSummary
+    : null;
   let trendPanels;
   let benchmarkPanels;
 
@@ -305,6 +308,7 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
     coverageTrend: overallTrend,
     releaseNotes,
     benchmarkCatalog,
+    benchmarkSummary,
     benchmarkPanels,
     trendPanels,
   };
