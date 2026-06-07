@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { ProjectBenchmarkExplorer } from '../../components/BenchmarkBits.js';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
@@ -115,11 +116,19 @@ function ProjectRunTable({ runs }) {
               React.createElement(
                 'div',
                 { className: 'web-explorer-table__entity' },
-                React.createElement('span', { className: 'web-explorer-table__primary' }, formatDateTime(run.completedAt)),
                 React.createElement(
-                  'div',
-                  { className: 'web-explorer-table__meta-row' },
-                  React.createElement('span', { className: 'web-explorer-table__meta' }, formatProjectRunSummary(run)),
+                  Link,
+                  {
+                    href: runHref,
+                    className: 'web-explorer-table__row-link',
+                    'data-perf-id': `project-run-link:${run.id}`,
+                  },
+                  React.createElement('span', { className: 'web-explorer-table__primary' }, formatDateTime(run.completedAt)),
+                  React.createElement(
+                    'div',
+                    { className: 'web-explorer-table__meta-row' },
+                    React.createElement('span', { className: 'web-explorer-table__meta' }, formatProjectRunSummary(run)),
+                  ),
                 ),
               ),
             ),

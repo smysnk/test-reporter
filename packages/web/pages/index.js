@@ -4,7 +4,11 @@ import { useRouter } from 'next/router';
 import { useDispatch, useSelector } from 'react-redux';
 import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/WebBits.js';
 import { formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, resolveRunBuildNumber } from '../lib/format.js';
-import { buildHomeExplorerModel } from '../lib/homeExplorer.js';
+import {
+  buildHomeExplorerModel,
+  resolveInitialVisibleRunCount,
+  resolveNextVisibleRunCount,
+} from '../lib/homeExplorer.js';
 import { getWebSession, logWebSessionProbe } from '../lib/auth.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../lib/requestTrace.js';
 import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../lib/pageProfiling.js';
@@ -170,11 +174,19 @@ function RunTable({ runs, selectedProject }) {
               React.createElement(
                 'div',
                 { className: 'web-explorer-table__entity' },
-                React.createElement('span', { className: 'web-explorer-table__primary' }, primaryLabel),
                 React.createElement(
-                  'div',
-                  { className: 'web-explorer-table__meta-row' },
-                  React.createElement('span', { className: 'web-explorer-table__meta' }, metaLabel),
+                  Link,
+                  {
+                    href: runHref,
+                    className: 'web-explorer-table__row-link',
+                    'data-perf-id': `run-row-link:${run.id}`,
+                  },
+                  React.createElement('span', { className: 'web-explorer-table__primary' }, primaryLabel),
+                  React.createElement(
+                    'div',
+                    { className: 'web-explorer-table__meta-row' },
+                    React.createElement('span', { className: 'web-explorer-table__meta' }, metaLabel),
+                  ),
                 ),
               ),
             ),
@@ -249,6 +261,9 @@ export default function WebIndexPage({ data }) {
     runs: data?.runs,
     selectedProjectSlug,
   });
+  const feedScopeKey = model.selectedProject?.slug || '__all__';
+  const [visibleRunCount, setVisibleRunCount] = React.useState(() => resolveInitialVisibleRunCount(model.visibleRuns.length));
+  const loadMoreAnchorRef = React.useRef(null);
 
   React.useEffect(() => {
     if (selectedProjectSlug && !model.selectedProject) {
@@ -257,13 +272,52 @@ export default function WebIndexPage({ data }) {
   }, [dispatch, model.selectedProject, selectedProjectSlug]);
 
   React.useEffect(() => {
+    setVisibleRunCount(resolveInitialVisibleRunCount(model.visibleRuns.length));
+  }, [feedScopeKey, model.visibleRuns.length]);
+
+  const loadMoreRuns = React.useCallback(() => {
+    setVisibleRunCount((currentVisibleRuns) => resolveNextVisibleRunCount(currentVisibleRuns, model.visibleRuns.length));
+  }, [model.visibleRuns.length]);
+
+  const visibleRuns = React.useMemo(
+    () => model.visibleRuns.slice(0, visibleRunCount),
+    [model.visibleRuns, visibleRunCount],
+  );
+  const hasMoreRuns = visibleRunCount < model.visibleRuns.length;
+
+  React.useEffect(() => {
+    if (!hasMoreRuns || typeof IntersectionObserver !== 'function') {
+      return undefined;
+    }
+
+    const node = loadMoreAnchorRef.current;
+    if (!node) {
+      return undefined;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) {
+        return;
+      }
+
+      loadMoreRuns();
+    }, {
+      rootMargin: '280px 0px',
+    });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMoreRuns, loadMoreRuns, visibleRunCount]);
+
+  React.useEffect(() => {
     recordClientPageMark('overview-page-ready', {
       focusMode: model.selectedProject ? 'project' : 'all-runs',
       selectedProjectSlug: model.selectedProject?.slug || null,
       visibleProjectCount: model.totalProjects,
-      visibleRunCount: model.visibleRuns.length,
+      visibleRunCount: visibleRuns.length,
+      totalRunCount: model.visibleRuns.length,
     });
-  }, [model.selectedProject?.slug, model.totalProjects, model.visibleRuns.length]);
+  }, [model.selectedProject?.slug, model.totalProjects, model.visibleRuns.length, visibleRuns.length]);
 
   const sectionTitle = model.selectedProject
     ? model.selectedProject.name
@@ -397,9 +451,43 @@ export default function WebIndexPage({ data }) {
             ),
           ),
           React.createElement(RunTable, {
-            runs: model.visibleRuns,
+            runs: visibleRuns,
             selectedProject: model.selectedProject,
           }),
+          model.visibleRuns.length > 0
+            ? React.createElement(
+              'div',
+              { className: 'web-explorer__feed-footer' },
+              React.createElement(
+                'span',
+                { className: 'web-explorer__feed-count' },
+                `Showing ${visibleRuns.length} of ${model.visibleRuns.length} runs`,
+              ),
+              hasMoreRuns
+                ? React.createElement(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'web-button web-button--ghost',
+                    onClick: loadMoreRuns,
+                    'data-perf-id': 'home-runs-load-more',
+                  },
+                  `Load ${Math.min(model.visibleRuns.length - visibleRuns.length, 30)} more`,
+                )
+                : React.createElement(
+                  'span',
+                  { className: 'web-explorer__feed-status' },
+                  'All visible runs loaded',
+                ),
+            )
+            : null,
+          hasMoreRuns
+            ? React.createElement('div', {
+              ref: loadMoreAnchorRef,
+              className: 'web-explorer__feed-sentinel',
+              'aria-hidden': 'true',
+            })
+            : null,
         ),
       ),
     ),

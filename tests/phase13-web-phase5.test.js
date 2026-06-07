@@ -66,7 +66,11 @@ import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/repo
 import nextConfig from '../packages/web/next.config.mjs';
 import { BenchmarkExplorer, PerformanceDomainSummary, ProjectBenchmarkExplorer, RunBenchmarkDeltaSummary, RunBenchmarkSummary } from '../packages/web/components/BenchmarkBits.js';
 import { RunBuildChip, RunSourceLink } from '../packages/web/components/WebBits.js';
-import { buildHomeExplorerModel } from '../packages/web/lib/homeExplorer.js';
+import {
+  buildHomeExplorerModel,
+  resolveInitialVisibleRunCount,
+  resolveNextVisibleRunCount,
+} from '../packages/web/lib/homeExplorer.js';
 
 test('web auth options expose the sign-in page and session actor metadata', async () => {
   const originalGoogleClientId = process.env.GOOGLE_CLIENT_ID;
@@ -2919,6 +2923,19 @@ test('web home explorer model sorts sidebar projects by activity and filters the
 
   assert.equal(allRuns.selectedProject, null);
   assert.deepEqual(allRuns.visibleRuns.map((run) => run.id), ['run-beta-1', 'run-alpha-1']);
+});
+
+test('web home explorer run window helpers cap the initial slice and grow incrementally', () => {
+  assert.equal(resolveInitialVisibleRunCount(0), 0);
+  assert.equal(resolveInitialVisibleRunCount(12), 12);
+  assert.equal(resolveInitialVisibleRunCount(80), 30);
+  assert.equal(resolveInitialVisibleRunCount(80, 18), 18);
+
+  assert.equal(resolveNextVisibleRunCount(0, 0), 0);
+  assert.equal(resolveNextVisibleRunCount(12, 12), 12);
+  assert.equal(resolveNextVisibleRunCount(30, 80), 60);
+  assert.equal(resolveNextVisibleRunCount(60, 80), 80);
+  assert.equal(resolveNextVisibleRunCount(18, 80, 12), 30);
 });
 
 test('web can render the runner report template from stored raw report data', async () => {

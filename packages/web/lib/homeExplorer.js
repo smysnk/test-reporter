@@ -12,6 +12,27 @@ function compareProjectsByActivity(left, right) {
   return left.name.localeCompare(right.name);
 }
 
+export const HOME_RUNS_INITIAL_BATCH = 30;
+export const HOME_RUNS_BATCH_SIZE = 30;
+
+export function resolveInitialVisibleRunCount(totalRuns, initialBatch = HOME_RUNS_INITIAL_BATCH) {
+  const safeTotal = Number.isFinite(totalRuns) ? Math.max(0, Math.trunc(totalRuns)) : 0;
+  const safeInitialBatch = Number.isFinite(initialBatch) ? Math.max(1, Math.trunc(initialBatch)) : HOME_RUNS_INITIAL_BATCH;
+  return Math.min(safeTotal, safeInitialBatch);
+}
+
+export function resolveNextVisibleRunCount(currentVisibleRuns, totalRuns, batchSize = HOME_RUNS_BATCH_SIZE) {
+  const safeCurrent = Number.isFinite(currentVisibleRuns) ? Math.max(0, Math.trunc(currentVisibleRuns)) : 0;
+  const safeTotal = Number.isFinite(totalRuns) ? Math.max(0, Math.trunc(totalRuns)) : 0;
+  const safeBatchSize = Number.isFinite(batchSize) ? Math.max(1, Math.trunc(batchSize)) : HOME_RUNS_BATCH_SIZE;
+
+  if (safeTotal === 0) {
+    return 0;
+  }
+
+  return Math.min(safeTotal, safeCurrent + safeBatchSize);
+}
+
 export function buildHomeExplorerModel({ projects, runs, selectedProjectSlug = null }) {
   const projectList = Array.isArray(projects) ? projects : [];
   const runList = Array.isArray(runs) ? runs : [];

@@ -417,6 +417,21 @@ const GlobalStyle = createGlobalStyle`
     margin-top: 24px;
     min-width: 0;
   }
+  .web-explorer__feed-footer {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+  .web-explorer__feed-count,
+  .web-explorer__feed-status {
+    color: ${(props) => props.theme.colors.muted};
+    font-size: 0.9rem;
+  }
+  .web-explorer__feed-sentinel {
+    height: 1px;
+  }
   .web-explorer__section-heading {
     display: grid;
     gap: 8px;
@@ -489,6 +504,17 @@ const GlobalStyle = createGlobalStyle`
     transition: color 160ms ease;
     font-weight: 700;
     overflow-wrap: anywhere;
+  }
+  .web-explorer-table__row-link {
+    display: grid;
+    gap: 6px;
+    color: inherit;
+    text-decoration: none;
+    min-width: 0;
+  }
+  .web-explorer-table__row-link:hover .web-explorer-table__primary,
+  .web-explorer-table__row-link:focus .web-explorer-table__primary {
+    color: ${(props) => props.theme.colors.accent};
   }
   .web-explorer-table__meta {
     color: ${(props) => props.theme.colors.muted};
