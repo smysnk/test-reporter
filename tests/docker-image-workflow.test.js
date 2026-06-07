@@ -38,16 +38,16 @@ test('image build workflow is reusable and uses the unified Dockerfile', () => {
   assert.match(workflow, /type=raw,value=\$\{\{ inputs\.image_tag \}\}/);
 });
 
-test('ci workflow only runs test validation for pull requests', () => {
+test('ci workflow runs test validation for pull requests and main pushes', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
 
+  assert.match(workflow, /push:\s*\n\s*branches:\s*\n\s*-\s*main/);
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /yarn install --immutable/);
   assert.match(workflow, /yarn test:node/);
   assert.match(workflow, /yarn test:coverage/);
   assert.match(workflow, /tee "\$log_path"/);
   assert.match(workflow, /Captured log:/);
-  assert.doesNotMatch(workflow, /push:\s*\n\s*branches:/);
   assert.doesNotMatch(workflow, /publish-ingest-report\.mjs/);
   assert.doesNotMatch(workflow, /docker build --file docker\/Dockerfile --tag test-station-ci \./);
 });
