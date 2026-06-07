@@ -11,6 +11,10 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/badges/:badge.json',
+        destination: '/api/badges/:badge',
+      },
+      {
         source: '/graphql',
         destination: '/api/graphql-proxy',
       },

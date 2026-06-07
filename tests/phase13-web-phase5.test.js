@@ -59,10 +59,11 @@ import {
   resolveNextAuthHandler,
 } from '../packages/web/pages/api/auth/[...nextauth].js';
 import WebAuthErrorPage from '../packages/web/pages/auth/error.js';
-import { createBadgeHandler, resolveRequestedBadgeType, sanitizeBadgeSummary } from '../packages/web/pages/api/badges/[badge].json.js';
+import { createBadgeHandler, resolveRequestedBadgeType, sanitizeBadgeSummary } from '../packages/web/pages/api/badges/[badge].js';
 import webHealthzHandler from '../packages/web/pages/api/healthz.js';
 import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-proxy.js';
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
+import nextConfig from '../packages/web/next.config.mjs';
 import { BenchmarkExplorer, PerformanceDomainSummary, ProjectBenchmarkExplorer, RunBenchmarkDeltaSummary, RunBenchmarkSummary } from '../packages/web/components/BenchmarkBits.js';
 import { RunBuildChip, RunSourceLink } from '../packages/web/components/WebBits.js';
 import { buildHomeExplorerModel } from '../packages/web/lib/homeExplorer.js';
@@ -1020,6 +1021,15 @@ test('web badge endpoint resolves latest run badges from the reporting backend',
     label: 'health',
     message: '91%',
     color: 'brightgreen',
+  });
+});
+
+test('web badge json URLs rewrite to the registered dynamic API route', async () => {
+  const rewrites = await nextConfig.rewrites();
+
+  assert.deepEqual(rewrites[0], {
+    source: '/api/badges/:badge.json',
+    destination: '/api/badges/:badge',
   });
 });
 
