@@ -2,7 +2,7 @@ import {
   createCoverageBadgePayload,
   createHealthBadgePayload,
   createTestsBadgePayload,
-} from '@test-station/render-html';
+} from '@test-station/render-html/badges';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../../../lib/requestTrace.js';
 import { loadProjectBadgeSummary } from '../../../lib/serverGraphql.js';
 

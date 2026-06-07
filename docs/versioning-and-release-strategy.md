@@ -78,7 +78,7 @@ Internal source layout inside `packages/*/src` is not a compatibility promise.
 6. Verify the generated output contains `report.json`, `modules.json`, `ownership.json`, `index.html`, and expected raw artifacts.
 7. Verify the generated HTML report opens and renders module/package drilldown correctly.
 8. If the release touched thresholds, diagnostics, or adapter-specific coverage paths, verify those surfaces in the generated report and console summary.
-9. Push the validated release commit to the `main` branch.
+9. Push the validated release commit to the `publish` branch.
 10. Let the main release workflow compute the npm package version from the GitHub Actions build number.
 11. Let the main release workflow run the npm release helper, build the container image, and deploy the Fleet bundle in order.
 

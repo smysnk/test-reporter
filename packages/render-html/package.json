@@ -6,7 +6,8 @@
   },
   "type": "module",
   "exports": {
-    ".": "./src/index.js"
+    ".": "./src/index.js",
+    "./badges": "./src/badges.js"
   },
   "scripts": {
     "build": "node ../../scripts/check-package.mjs ./src/index.js",

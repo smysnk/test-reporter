@@ -3,7 +3,7 @@ name: Main Release Pipeline
 on:
   push:
     branches:
-      - main
+      - publish
   workflow_dispatch:
     inputs:
       publish_npm:
@@ -192,7 +192,7 @@ jobs:
       - name: Validate and optionally publish npm packages
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_PUBLISH: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || inputs.publish_npm) && '1' || '0' }}
+          NPM_PUBLISH: ${{ ((github.event_name == 'push' && github.ref_name == 'publish') || inputs.publish_npm) && '1' || '0' }}
         run: ./scripts/release/release-npm-packages.sh
 
   docker-image:

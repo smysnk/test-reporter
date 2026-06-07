@@ -4,7 +4,7 @@ import { buildSignInRedirectUrl, isProtectedWebPath } from './lib/routeProtectio
 
 const FALLBACK_SECRET = 'test-station-web-development-secret';
 
-export async function middleware(req) {
+export async function proxy(req) {
   if (!isProtectedWebPath(req.nextUrl.pathname)) {
     return NextResponse.next();
   }

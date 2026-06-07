@@ -52,16 +52,16 @@ test('ci workflow only runs test validation for pull requests', () => {
   assert.doesNotMatch(workflow, /docker build --file docker\/Dockerfile --tag test-station-ci \./);
 });
 
-test('main release workflow gates npm publish, image build, and fleet deployment behind validation', () => {
+test('publish release workflow gates npm publish, image build, and fleet deployment behind validation', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'publish.yml'), 'utf8');
 
   assert.match(workflow, /name:\s*Main Release Pipeline/);
-  assert.match(workflow, /branches:\s*\n\s*-\s*main/);
+  assert.match(workflow, /branches:\s*\n\s*-\s*publish/);
   assert.match(workflow, /needs:\s*validate/);
   assert.match(workflow, /needs:\s*npm-publish/);
   assert.match(workflow, /uses:\s*\.\/\.github\/workflows\/image-build\.yml/);
   assert.match(workflow, /image_tag:\s*main/);
-  assert.match(workflow, /NPM_PUBLISH:\s*\$\{\{ \(\(github\.event_name == 'push' && github\.ref_name == 'main'\) \|\| inputs\.publish_npm\) && '1' \|\| '0' \}\}/);
+  assert.match(workflow, /NPM_PUBLISH:\s*\$\{\{ \(\(github\.event_name == 'push' && github\.ref_name == 'publish'\) \|\| inputs\.publish_npm\) && '1' \|\| '0' \}\}/);
   assert.match(workflow, /TEST_STATION_INGEST_SHARED_KEY/);
   assert.match(workflow, /S3_BUCKET/);
   assert.match(workflow, /tee "\$log_path"/);
