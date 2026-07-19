@@ -1,6 +1,11 @@
 {
   "name": "@test-station/adapter-shell",
   "version": "0.2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smysnk/test-station.git",
+    "directory": "packages/adapter-shell"
+  },
   "publishConfig": {
     "access": "public"
   },

@@ -1,6 +1,11 @@
 {
   "name": "@test-station/adapter-node-test",
   "version": "0.2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/smysnk/test-station.git",
+    "directory": "packages/adapter-node-test"
+  },
   "publishConfig": {
     "access": "public"
   },

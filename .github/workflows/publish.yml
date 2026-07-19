@@ -3,7 +3,7 @@ name: Main Release Pipeline
 on:
   push:
     branches:
-      - publish
+      - main
   workflow_dispatch:
     inputs:
       publish_npm:
@@ -162,6 +162,9 @@ jobs:
   npm-publish:
     needs: validate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Check out repository
@@ -171,8 +174,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
           cache: yarn
+
+      - name: Upgrade npm for trusted publishing
+        run: npm install --global npm@11.16.0
 
       - name: Enable Corepack
         run: corepack enable
@@ -191,12 +196,11 @@ jobs:
 
       - name: Validate and optionally publish npm packages
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_PUBLISH: ${{ ((github.event_name == 'push' && github.ref_name == 'publish') || inputs.publish_npm) && '1' || '0' }}
+          NPM_PUBLISH: ${{ ((github.event_name == 'push' && github.ref_name == 'main') || inputs.publish_npm) && '1' || '0' }}
         run: ./scripts/release/release-npm-packages.sh
 
   docker-image:
-    needs: npm-publish
+    needs: validate
     permissions:
       contents: read
       packages: write

@@ -52,16 +52,21 @@ test('ci workflow runs test validation for pull requests and main pushes', () =>
   assert.doesNotMatch(workflow, /docker build --file docker\/Dockerfile --tag test-station-ci \./);
 });
 
-test('publish release workflow gates npm publish, image build, and fleet deployment behind validation', () => {
+test('publish release workflow uses npm trusted publishing and gates releases behind validation', () => {
   const workflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'publish.yml'), 'utf8');
 
   assert.match(workflow, /name:\s*Main Release Pipeline/);
-  assert.match(workflow, /branches:\s*\n\s*-\s*publish/);
+  assert.match(workflow, /branches:\s*\n\s*-\s*main/);
   assert.match(workflow, /needs:\s*validate/);
-  assert.match(workflow, /needs:\s*npm-publish/);
+  assert.doesNotMatch(workflow, /docker-image:\s*\n\s*needs:\s*npm-publish/);
+  assert.match(workflow, /docker-image:\s*\n\s*needs:\s*validate/);
   assert.match(workflow, /uses:\s*\.\/\.github\/workflows\/image-build\.yml/);
   assert.match(workflow, /image_tag:\s*main/);
-  assert.match(workflow, /NPM_PUBLISH:\s*\$\{\{ \(\(github\.event_name == 'push' && github\.ref_name == 'publish'\) \|\| inputs\.publish_npm\) && '1' \|\| '0' \}\}/);
+  assert.match(workflow, /id-token:\s*write/);
+  assert.match(workflow, /npm install --global npm@11\.16\.0/);
+  assert.doesNotMatch(workflow, /secrets\.NPM_TOKEN/);
+  assert.doesNotMatch(workflow, /registry-url:\s*https:\/\/registry\.npmjs\.org/);
+  assert.match(workflow, /NPM_PUBLISH:\s*\$\{\{ \(\(github\.event_name == 'push' && github\.ref_name == 'main'\) \|\| inputs\.publish_npm\) && '1' \|\| '0' \}\}/);
   assert.match(workflow, /TEST_STATION_INGEST_SHARED_KEY/);
   assert.match(workflow, /S3_BUCKET/);
   assert.match(workflow, /tee "\$log_path"/);
@@ -69,4 +74,25 @@ test('publish release workflow gates npm publish, image build, and fleet deploym
   assert.match(workflow, /azure\/setup-kubectl@v4/);
   assert.match(workflow, /FLEET_KUBECONFIG/);
   assert.match(workflow, /deploy-fleet\.sh --kubeconfig "\$KUBECONFIG_PATH" --restart/);
+});
+
+test('every publishable npm package identifies the trusted GitHub repository', () => {
+  const packageDirectories = [
+    'adapter-jest',
+    'adapter-node-test',
+    'adapter-playwright',
+    'adapter-shell',
+    'adapter-vitest',
+    'cli',
+    'core',
+    'plugin-source-analysis',
+    'render-html',
+  ];
+
+  for (const directory of packageDirectories) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(repoRoot, 'packages', directory, 'package.json'), 'utf8'));
+    const repository = typeof manifest.repository === 'string' ? manifest.repository : manifest.repository?.url;
+    assert.equal(repository, 'git+https://github.com/smysnk/test-station.git', manifest.name);
+    assert.equal(manifest.repository.directory, `packages/${directory}`, manifest.name);
+  }
 });

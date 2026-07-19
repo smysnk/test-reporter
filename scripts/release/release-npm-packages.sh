@@ -69,14 +69,12 @@ for pkg_dir in "${selected_dirs[@]}"; do
 done
 
 if [[ "$NPM_RELEASE_MODE" == "1" ]]; then
-  step "5/6 Authenticate and preflight npm registry checks"
-  configure_npm_auth_token "${NPM_TOKEN:-}"
-  verify_npm_auth
+  step "5/6 Preflight npm package visibility"
   for pkg_name in "${selected_names[@]}"; do
     check_npm_package_visibility "$pkg_name"
   done
 
-  step "6/6 Publish npm packages"
+  step "6/6 Publish npm packages with trusted publishing"
   for pkg_dir in "${selected_dirs[@]}"; do
     run_npm_no_workspace publish --ignore-scripts --access public "$pkg_dir"
   done
