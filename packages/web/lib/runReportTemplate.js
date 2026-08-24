@@ -48,7 +48,7 @@ const EMBED_RESIZE_SCRIPT = `<script>
 })();
 </script>`;
 
-export function prepareEmbeddedRunnerReport(report) {
+export function prepareEmbeddedRunnerReport(report, { maxTestsPerSuite = null } = {}) {
   const clonedReport = cloneJson(report);
   if (!clonedReport || typeof clonedReport !== 'object') {
     return report;
@@ -58,6 +58,14 @@ export function prepareEmbeddedRunnerReport(report) {
   for (const packageEntry of packages) {
     const suites = Array.isArray(packageEntry?.suites) ? packageEntry.suites : [];
     for (const suite of suites) {
+      if (Number.isFinite(maxTestsPerSuite) && maxTestsPerSuite > 0 && Array.isArray(suite?.tests) && suite.tests.length > maxTestsPerSuite) {
+        const totalTests = suite.tests.length;
+        suite.tests = suite.tests.slice(0, maxTestsPerSuite);
+        suite.warnings = [
+          ...(Array.isArray(suite.warnings) ? suite.warnings : []),
+          `Embedded preview shows ${maxTestsPerSuite} of ${totalTests} tests. Open the full runner report for every row.`,
+        ];
+      }
       suite.rawArtifacts = Array.isArray(suite?.rawArtifacts)
         ? suite.rawArtifacts.map((artifact) => normalizeEmbeddedArtifact(artifact))
         : [];

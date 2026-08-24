@@ -22,6 +22,7 @@ export function createRunReportHandler({ getSession = getWebSession, loadReportH
     const requestTrace = resolveWebRequestTrace(req);
     applyTraceHeadersToNextResponse(res, requestTrace);
     const runId = typeof req.query.id === 'string' ? req.query.id : '';
+    const compact = req.query.view === 'compact';
     if (!runId) {
       renderHtmlResponse(res, 400, renderStatusHtml({
         title: 'Run report unavailable',
@@ -34,6 +35,7 @@ export function createRunReportHandler({ getSession = getWebSession, loadReportH
       const result = await loadReportHtml({
         session,
         runId,
+        compact,
         requestId: typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : null,
         requestTrace,
       });

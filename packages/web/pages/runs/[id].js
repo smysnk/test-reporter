@@ -777,10 +777,24 @@ function TemplateSwitch({ runId, activeTemplate }) {
 }
 
 function RunnerReportSection({ runId, externalKey }) {
-  return React.createElement(RunnerReportFrame, {
-    runId,
-    title: `${externalKey} runner report`,
-  });
+  return React.createElement(
+    React.Fragment,
+    null,
+    React.createElement(
+      'a',
+      {
+        href: `/api/runs/${encodeURIComponent(runId)}/report`,
+        target: '_blank',
+        rel: 'noreferrer',
+        className: 'web-button web-button--ghost',
+      },
+      'Open full runner report',
+    ),
+    React.createElement(RunnerReportFrame, {
+      runId,
+      title: `${externalKey} runner report preview`,
+    }),
+  );
 }
 
 function RunnerReportFrame({ runId, title }) {
@@ -820,7 +834,7 @@ function RunnerReportFrame({ runId, title }) {
 
   return React.createElement('iframe', {
     ref: iframeRef,
-    src: `/api/runs/${encodeURIComponent(runId)}/report`,
+    src: `/api/runs/${encodeURIComponent(runId)}/report?view=compact`,
     title,
     className: 'web-runner-frame',
     scrolling: 'no',

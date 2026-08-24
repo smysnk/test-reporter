@@ -103,7 +103,7 @@ test('web pagination loaders use one-row lookahead and return stable cursors', a
 import { buildRunTemplateHref, resolveRunTemplateMode } from '../packages/web/lib/runTemplateRouting.js';
 import { buildSignInRedirectUrl, isProtectedWebPath, normalizeCallbackTarget } from '../packages/web/lib/routeProtection.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
-import { decorateEmbeddedRunnerReportHtml } from '../packages/web/lib/runReportTemplate.js';
+import { decorateEmbeddedRunnerReportHtml, prepareEmbeddedRunnerReport } from '../packages/web/lib/runReportTemplate.js';
 import {
   createWebAuthHandler,
   handleRecoverableOAuthCallbackError,
@@ -3085,6 +3085,15 @@ test('web runner report embed script measures the report content instead of the 
   assert.doesNotMatch(html, /body\?\.scrollHeight/);
 });
 
+test('web embedded runner preview bounds test rows without mutating the full report', () => {
+  const report = { packages: [{ suites: [{ tests: [{ id: '1' }, { id: '2' }, { id: '3' }] }] }] };
+  const preview = prepareEmbeddedRunnerReport(report, { maxTestsPerSuite: 2 });
+
+  assert.equal(preview.packages[0].suites[0].tests.length, 2);
+  assert.match(preview.packages[0].suites[0].warnings[0], /2 of 3 tests/);
+  assert.equal(report.packages[0].suites[0].tests.length, 3);
+});
+
 test('web focused run view avoids nested scroll containers around the report', () => {
   const appStylesSource = fs.readFileSync(new URL('../packages/web/pages/_app.js', import.meta.url), 'utf8');
   const runPageSource = fs.readFileSync(new URL('../packages/web/pages/runs/[id].js', import.meta.url), 'utf8');
@@ -3093,7 +3102,8 @@ test('web focused run view avoids nested scroll containers around the report', (
   assert.doesNotMatch(appStylesSource, /\.web-table-wrap\s*\{[\s\S]*overflow-x:\s*auto;/);
   assert.match(runPageSource, /scrolling:\s*'no'/);
   assert.doesNotMatch(runPageSource, /Exact runner HTML report/);
-  assert.match(runPageSource, /function RunnerReportSection[\s\S]*return React\.createElement\(RunnerReportFrame/);
+  assert.match(runPageSource, /Open full runner report/);
+  assert.match(runPageSource, /report\?view=compact/);
 });
 
 test('web run template routing defaults to the runner report and keeps the operations view addressable', () => {

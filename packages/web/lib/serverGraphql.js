@@ -520,7 +520,7 @@ export async function loadSuiteTests({ session, runId, suiteRunId, limit = 100, 
   };
 }
 
-async function loadRunReportHtmlResult({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
+async function loadRunReportHtmlResult({ session, runId, compact = false, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
   const result = await measureProfileStep(profiler, 'run-report-query', () => executeWebGraphqlRequest({
     session,
     query: RUN_REPORT_QUERY,
@@ -545,7 +545,7 @@ async function loadRunReportHtmlResult({ session, runId, fetchImpl = fetch, requ
     && /^https?:\/\//i.test(artifact.sourceUrl)
     && (artifact.relativePath === 'index.html' || artifact.relativePath?.endsWith('/index.html'))
   ));
-  if (storedHtmlArtifact) {
+  if (storedHtmlArtifact && !compact) {
     return {
       redirectUrl: storedHtmlArtifact.sourceUrl,
       etag: storedHtmlArtifact.metadata?.contentHash || null,
@@ -554,7 +554,7 @@ async function loadRunReportHtmlResult({ session, runId, fetchImpl = fetch, requ
     };
   }
 
-  const reportHash = crypto.createHash('sha256').update(JSON.stringify(run.rawReport)).digest('hex');
+  const reportHash = crypto.createHash('sha256').update(`${compact ? 'compact:' : 'full:'}${JSON.stringify(run.rawReport)}`).digest('hex');
   const diskCachePath = path.join(renderedReportCacheDirectory, `${reportHash}.html`);
   if (renderedReportCache.has(reportHash)) {
     return {
@@ -579,7 +579,9 @@ async function loadRunReportHtmlResult({ session, runId, fetchImpl = fetch, requ
 
   const html = await measureProfileStep(profiler, 'run-report-render', async () => {
     const { renderHtmlReport } = await import('@test-station/render-html');
-    const embeddedReport = prepareEmbeddedRunnerReport(run.rawReport);
+    const embeddedReport = prepareEmbeddedRunnerReport(run.rawReport, {
+      maxTestsPerSuite: compact ? 100 : null,
+    });
     return renderHtmlReport(embeddedReport, {
       title: `${run.project?.name || 'Test Station'} Report - ${run.externalKey}`,
     });
