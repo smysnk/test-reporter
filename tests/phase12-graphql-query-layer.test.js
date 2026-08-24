@@ -786,6 +786,26 @@ test('GraphQL exposes project, run, file, test, artifact, trend, and release-not
   assert.equal(response.payload.data.artifacts.length, 1);
   assert.equal(response.payload.data.releaseNotes[0].title, '0.1.0 release');
 
+  const leanFiles = await graphqlRequest(server, {
+    query: `
+      query LeanRunFiles {
+        runFiles(runId: "run-1") {
+          path
+          status
+          testCount
+          failedTestCount
+        }
+      }
+    `,
+  }, {
+    'x-test-station-actor-id': 'user-1',
+    'x-test-station-actor-email': 'user-1@example.com',
+    'x-test-station-actor-role': 'member',
+  });
+  assert.equal(leanFiles.payload.errors, undefined);
+  assert.equal(leanFiles.payload.data.runFiles[0].testCount, 2);
+  assert.equal(leanFiles.payload.data.runFiles[0].failedTestCount, 1);
+
   await closeServer(server);
 });
 

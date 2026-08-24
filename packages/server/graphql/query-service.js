@@ -664,7 +664,7 @@ export function createGraphqlQueryService(options = {}) {
       }
 
       return Array.from(files.values())
-        .map((file) => finalizeRunFile(file))
+        .map((file) => finalizeRunFile(file, { includeTests }))
         .filter((file) => (packageName ? file.packageName === packageName : true))
         .filter((file) => (moduleName ? file.moduleName === moduleName : true))
         .filter((file) => (status ? file.status === status : true))
@@ -1647,7 +1647,7 @@ function ensureRunFile(files, filePath) {
   return files.get(filePath);
 }
 
-function finalizeRunFile(file) {
+function finalizeRunFile(file, { includeTests = true } = {}) {
   const failedTestCount = file.tests.filter((test) => test.status === 'failed').length;
   const status = failedTestCount > 0
     ? 'failed'
@@ -1662,7 +1662,7 @@ function finalizeRunFile(file) {
     status,
     testCount: file.tests.length,
     failedTestCount,
-    tests: file.tests.sort(compareTests),
+    tests: includeTests ? file.tests.sort(compareTests) : [],
   };
 }
 
