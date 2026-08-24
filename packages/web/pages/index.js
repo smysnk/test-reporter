@@ -252,6 +252,7 @@ function RunTable({ runs, selectedProject }) {
 export default function WebIndexPage({ data }) {
   const dispatch = useDispatch();
   const selectedProjectSlug = useSelector((state) => state.explorer.selectedProjectSlug);
+  const [isHydrated, setIsHydrated] = React.useState(false);
   const [loadedRuns, setLoadedRuns] = React.useState(() => Array.isArray(data?.runs) ? data.runs : []);
   const [hasMoreByScope, setHasMoreByScope] = React.useState(() => ({ __all__: Boolean(data?.hasMoreRuns) }));
   const [feedLoading, setFeedLoading] = React.useState(false);
@@ -263,6 +264,10 @@ export default function WebIndexPage({ data }) {
   });
   const feedScopeKey = model.selectedProject?.slug || '__all__';
   const loadMoreAnchorRef = React.useRef(null);
+
+  React.useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   React.useEffect(() => {
     if (selectedProjectSlug && !model.selectedProject) {
@@ -366,7 +371,10 @@ export default function WebIndexPage({ data }) {
 
   return React.createElement(
     'div',
-    { className: 'web-explorer' },
+    {
+      className: 'web-explorer',
+      'data-page-interactive': isHydrated ? 'true' : 'false',
+    },
     React.createElement(
       'aside',
       { className: 'web-card web-card--compact web-explorer__sidebar' },

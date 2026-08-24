@@ -3021,6 +3021,13 @@ test('web home explorer run window helpers cap the initial slice and grow increm
   assert.equal(resolveNextVisibleRunCount(18, 80, 12), 30);
 });
 
+test('web home exposes an explicit interactive hydration marker', () => {
+  const homePageSource = fs.readFileSync(new URL('../packages/web/pages/index.js', import.meta.url), 'utf8');
+
+  assert.match(homePageSource, /data-page-interactive/);
+  assert.match(homePageSource, /setIsHydrated\(true\)/);
+});
+
 test('web can render the runner report template from stored raw report data', async () => {
   const session = {
     userId: 'user-1',
