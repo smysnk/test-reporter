@@ -20,6 +20,10 @@ const CoverageTrendPoint = sequelize.define('CoverageTrendPoint', {
     type: DataTypes.UUID,
     allowNull: false,
   },
+  reportSubmissionId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
   projectPackageId: {
     type: DataTypes.UUID,
     allowNull: true,
@@ -119,7 +123,7 @@ const CoverageTrendPoint = sequelize.define('CoverageTrendPoint', {
   },
 }, {
   indexes: [
-    { unique: true, fields: ['run_id', 'scope_type', 'scope_hash'] },
+    { unique: true, fields: ['report_submission_id', 'scope_type', 'scope_hash'] },
     { fields: ['project_id', 'scope_type', 'recorded_at'] },
     { fields: ['project_id', 'package_name', 'scope_type', 'recorded_at'] },
     { fields: ['project_id', 'module_name', 'scope_type', 'recorded_at'] },

@@ -12,6 +12,10 @@ const SuiteRun = sequelize.define('SuiteRun', {
     type: DataTypes.UUID,
     allowNull: false,
   },
+  reportSubmissionId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
   projectPackageId: {
     type: DataTypes.UUID,
     allowNull: true,
@@ -76,7 +80,8 @@ const SuiteRun = sequelize.define('SuiteRun', {
   },
 }, {
   indexes: [
-    { unique: true, fields: ['run_id', 'suite_identifier'] },
+    { fields: ['run_id', 'suite_identifier'] },
+    { unique: true, fields: ['report_submission_id', 'suite_identifier'] },
   ],
 });
 

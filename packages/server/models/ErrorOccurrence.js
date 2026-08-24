@@ -12,6 +12,10 @@ const ErrorOccurrence = sequelize.define('ErrorOccurrence', {
     type: DataTypes.UUID,
     allowNull: true,
   },
+  reportSubmissionId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
   suiteRunId: {
     type: DataTypes.UUID,
     allowNull: true,
@@ -54,6 +58,7 @@ const ErrorOccurrence = sequelize.define('ErrorOccurrence', {
 }, {
   indexes: [
     { fields: ['run_id'] },
+    { fields: ['report_submission_id'] },
     { fields: ['suite_run_id'] },
     { fields: ['test_execution_id'] },
   ],

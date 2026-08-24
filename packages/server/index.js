@@ -7,7 +7,7 @@ import { expressMiddleware } from '@as-integrations/express5';
 import cors from 'cors';
 import express from 'express';
 import env from '../../config/env.mjs';
-import { dbReady } from './db.js';
+import { checkDatabaseReadiness, dbReady } from './db.js';
 import { buildGraphqlContext, resolvers, schemaVersion, typeDefs } from './graphql/index.js';
 import { InvalidJsonError, toErrorResponse } from './ingest/errors.js';
 import { createIngestRouter } from './ingest/index.js';
@@ -16,6 +16,11 @@ import {
   createGraphqlTracePlugin,
   resolveServerRequestTrace,
 } from './requestTrace.js';
+import {
+  finalizeRequestProfile,
+  renderPrometheusMetrics,
+  runWithRequestProfile,
+} from './profiling/requestProfile.js';
 import './models/index.js';
 
 export async function createServer(options = {}) {
@@ -23,6 +28,7 @@ export async function createServer(options = {}) {
   const httpServer = http.createServer(app);
   const serverJsonLimit = resolveServerJsonLimit(options);
   const ingestJsonLimit = resolveIngestJsonLimit(options);
+  const serverRole = resolveServerRole(options);
   const graphqlServer = new ApolloServer({
     typeDefs,
     resolvers,
@@ -42,7 +48,20 @@ export async function createServer(options = {}) {
     const requestTrace = resolveServerRequestTrace(req);
     req.testStationTrace = requestTrace;
     applyTraceHeadersToNodeResponse(res, requestTrace);
-    next();
+    runWithRequestProfile({
+      requestId: requestTrace.requestId,
+      traceId: requestTrace.traceId,
+      method: req.method,
+      route: req.path || req.url,
+    }, () => {
+      res.once('finish', () => {
+        finalizeRequestProfile({
+          statusCode: res.statusCode,
+          responseBytes: Number(res.getHeader('content-length')),
+        });
+      });
+      next();
+    });
   });
 
   app.get('/healthz', (_req, res) => {
@@ -50,11 +69,38 @@ export async function createServer(options = {}) {
       status: 'ok',
       schemaVersion,
       service: 'test-station-server',
+      role: serverRole,
+      revision: process.env.TEST_STATION_APP_REVISION || 'unknown',
     });
   });
 
-  const ingestJsonParser = express.json({ limit: ingestJsonLimit });
-  app.use('/api/ingest', (req, res, next) => {
+  app.get('/readyz', async (_req, res) => {
+    try {
+      const readiness = await checkDatabaseReadiness();
+      res.status(readiness.ready ? 200 : 503).json({
+        status: readiness.ready ? 'ready' : 'not-ready',
+        service: 'test-station-server',
+        role: serverRole,
+        revision: process.env.TEST_STATION_APP_REVISION || 'unknown',
+        ...readiness,
+      });
+    } catch (error) {
+      res.status(503).json({
+        status: 'not-ready',
+        service: 'test-station-server',
+        revision: process.env.TEST_STATION_APP_REVISION || 'unknown',
+        error: error?.name || 'DatabaseReadinessError',
+      });
+    }
+  });
+
+  app.get('/metrics', (_req, res) => {
+    res.type('text/plain; version=0.0.4').send(renderPrometheusMetrics());
+  });
+
+  if (serverRole !== 'read') {
+    const ingestJsonParser = express.json({ limit: ingestJsonLimit });
+    app.use('/api/ingest', (req, res, next) => {
     ingestJsonParser(req, res, (error) => {
       if (!error) {
         next();
@@ -82,17 +128,20 @@ export async function createServer(options = {}) {
       logIngestError(error, req);
       next(error);
     });
-  }, createIngestRouter(options));
+    }, createIngestRouter(options));
+  }
 
   app.use(express.json({ limit: serverJsonLimit }));
 
-  app.use('/graphql', expressMiddleware(graphqlServer, {
-    context: async ({ req, res }) => buildGraphqlContext({
-      req,
-      res,
-      options,
-    }),
-  }));
+  if (serverRole !== 'ingest') {
+    app.use('/graphql', expressMiddleware(graphqlServer, {
+      context: async ({ req, res }) => buildGraphqlContext({
+        req,
+        res,
+        options,
+      }),
+    }));
+  }
 
   return {
     app,
@@ -100,6 +149,14 @@ export async function createServer(options = {}) {
     graphqlServer,
     port: resolvePort(options),
   };
+}
+
+export function resolveServerRole(options = {}) {
+  const role = String(options.serverRole || process.env.SERVER_ROLE || 'all').trim().toLowerCase();
+  if (!['all', 'read', 'ingest'].includes(role)) {
+    throw new Error(`SERVER_ROLE must be all, read, or ingest; received ${role}`);
+  }
+  return role;
 }
 
 function logIngestError(error, req) {
@@ -111,6 +168,7 @@ function logIngestError(error, req) {
 export async function startServer(options = {}) {
   await dbReady({
     skipMigrations: options.skipMigrations,
+    runMigrations: options.runMigrations,
     skipAuthenticate: options.skipAuthenticate,
   });
   const server = await createServer(options);

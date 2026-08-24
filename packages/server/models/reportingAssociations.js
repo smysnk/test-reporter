@@ -12,9 +12,13 @@ import ProjectModule from './ProjectModule.js';
 import ProjectPackage from './ProjectPackage.js';
 import ProjectRoleAccess from './ProjectRoleAccess.js';
 import ProjectVersion from './ProjectVersion.js';
+import ProjectOverview from './ProjectOverview.js';
 import ReleaseNote from './ReleaseNote.js';
+import ReportSubmission from './ReportSubmission.js';
 import Role from './Role.js';
 import Run from './Run.js';
+import RunActiveSubmission from './RunActiveSubmission.js';
+import RunOverview from './RunOverview.js';
 import SuiteRun from './SuiteRun.js';
 import TestExecution from './TestExecution.js';
 import User from './User.js';
@@ -83,15 +87,30 @@ ProjectFile.belongsTo(ProjectModule, { foreignKey: 'projectModuleId', as: 'proje
 
 Project.hasMany(Run, { foreignKey: 'projectId', as: 'runs' });
 Run.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+Project.hasOne(ProjectOverview, { foreignKey: 'projectId', as: 'overview' });
+ProjectOverview.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+Project.hasMany(RunOverview, { foreignKey: 'projectId', as: 'runOverviews' });
+RunOverview.belongsTo(Project, { foreignKey: 'projectId', as: 'project' });
+Run.hasOne(RunOverview, { foreignKey: 'runId', as: 'overview' });
+RunOverview.belongsTo(Run, { foreignKey: 'runId', as: 'run' });
 
 ProjectVersion.hasMany(Run, { foreignKey: 'projectVersionId', as: 'runs' });
 Run.belongsTo(ProjectVersion, { foreignKey: 'projectVersionId', as: 'projectVersion' });
+
+Run.hasMany(ReportSubmission, { foreignKey: 'runId', as: 'reportSubmissions' });
+ReportSubmission.belongsTo(Run, { foreignKey: 'runId', as: 'run' });
+Run.hasMany(RunActiveSubmission, { foreignKey: 'runId', as: 'activeSubmissions' });
+RunActiveSubmission.belongsTo(Run, { foreignKey: 'runId', as: 'run' });
+ReportSubmission.hasMany(RunActiveSubmission, { foreignKey: 'reportSubmissionId', as: 'activeSelections' });
+RunActiveSubmission.belongsTo(ReportSubmission, { foreignKey: 'reportSubmissionId', as: 'reportSubmission' });
 
 ProjectVersion.hasMany(CoverageTrendPoint, { foreignKey: 'projectVersionId', as: 'coverageTrendPoints' });
 CoverageTrendPoint.belongsTo(ProjectVersion, { foreignKey: 'projectVersionId', as: 'projectVersion' });
 
 Run.hasMany(SuiteRun, { foreignKey: 'runId', as: 'suiteRuns' });
 SuiteRun.belongsTo(Run, { foreignKey: 'runId', as: 'run' });
+ReportSubmission.hasMany(SuiteRun, { foreignKey: 'reportSubmissionId', as: 'suiteRuns' });
+SuiteRun.belongsTo(ReportSubmission, { foreignKey: 'reportSubmissionId', as: 'reportSubmission' });
 
 ProjectPackage.hasMany(SuiteRun, { foreignKey: 'projectPackageId', as: 'suiteRuns' });
 SuiteRun.belongsTo(ProjectPackage, { foreignKey: 'projectPackageId', as: 'projectPackage' });
@@ -110,6 +129,8 @@ TestExecution.belongsTo(ProjectFile, { foreignKey: 'projectFileId', as: 'project
 
 Run.hasOne(CoverageSnapshot, { foreignKey: 'runId', as: 'coverageSnapshot' });
 CoverageSnapshot.belongsTo(Run, { foreignKey: 'runId', as: 'run' });
+ReportSubmission.hasMany(CoverageSnapshot, { foreignKey: 'reportSubmissionId', as: 'coverageSnapshots' });
+CoverageSnapshot.belongsTo(ReportSubmission, { foreignKey: 'reportSubmissionId', as: 'reportSubmission' });
 
 CoverageSnapshot.hasMany(CoverageFile, { foreignKey: 'coverageSnapshotId', as: 'coverageFiles' });
 CoverageFile.belongsTo(CoverageSnapshot, { foreignKey: 'coverageSnapshotId', as: 'coverageSnapshot' });
@@ -131,6 +152,8 @@ CoverageTrendPoint.belongsTo(ProjectModule, { foreignKey: 'projectModuleId', as:
 
 Run.hasMany(ErrorOccurrence, { foreignKey: 'runId', as: 'errorOccurrences' });
 ErrorOccurrence.belongsTo(Run, { foreignKey: 'runId', as: 'run' });
+ReportSubmission.hasMany(ErrorOccurrence, { foreignKey: 'reportSubmissionId', as: 'errorOccurrences' });
+ErrorOccurrence.belongsTo(ReportSubmission, { foreignKey: 'reportSubmissionId', as: 'reportSubmission' });
 
 SuiteRun.hasMany(ErrorOccurrence, { foreignKey: 'suiteRunId', as: 'errorOccurrences' });
 ErrorOccurrence.belongsTo(SuiteRun, { foreignKey: 'suiteRunId', as: 'suiteRun' });
@@ -140,6 +163,8 @@ ErrorOccurrence.belongsTo(TestExecution, { foreignKey: 'testExecutionId', as: 't
 
 Run.hasMany(PerformanceStat, { foreignKey: 'runId', as: 'performanceStats' });
 PerformanceStat.belongsTo(Run, { foreignKey: 'runId', as: 'run' });
+ReportSubmission.hasMany(PerformanceStat, { foreignKey: 'reportSubmissionId', as: 'performanceStats' });
+PerformanceStat.belongsTo(ReportSubmission, { foreignKey: 'reportSubmissionId', as: 'reportSubmission' });
 
 SuiteRun.hasMany(PerformanceStat, { foreignKey: 'suiteRunId', as: 'performanceStats' });
 PerformanceStat.belongsTo(SuiteRun, { foreignKey: 'suiteRunId', as: 'suiteRun' });
@@ -149,9 +174,13 @@ PerformanceStat.belongsTo(TestExecution, { foreignKey: 'testExecutionId', as: 't
 
 Run.hasMany(Artifact, { foreignKey: 'runId', as: 'artifacts' });
 Artifact.belongsTo(Run, { foreignKey: 'runId', as: 'run' });
+ReportSubmission.hasMany(Artifact, { foreignKey: 'reportSubmissionId', as: 'artifacts' });
+Artifact.belongsTo(ReportSubmission, { foreignKey: 'reportSubmissionId', as: 'reportSubmission' });
 
 Run.hasMany(CoverageTrendPoint, { foreignKey: 'runId', as: 'coverageTrendPoints' });
 CoverageTrendPoint.belongsTo(Run, { foreignKey: 'runId', as: 'run' });
+ReportSubmission.hasMany(CoverageTrendPoint, { foreignKey: 'reportSubmissionId', as: 'coverageTrendPoints' });
+CoverageTrendPoint.belongsTo(ReportSubmission, { foreignKey: 'reportSubmissionId', as: 'reportSubmission' });
 
 SuiteRun.hasMany(Artifact, { foreignKey: 'suiteRunId', as: 'artifacts' });
 Artifact.belongsTo(SuiteRun, { foreignKey: 'suiteRunId', as: 'suiteRun' });
@@ -180,9 +209,13 @@ export {
   ProjectPackage,
   ProjectRoleAccess,
   ProjectVersion,
+  ProjectOverview,
   ReleaseNote,
+  ReportSubmission,
   Role,
   Run,
+  RunActiveSubmission,
+  RunOverview,
   SuiteRun,
   TestExecution,
   User,

@@ -6,6 +6,8 @@ import * as benchmarkIndexesMigration from '../packages/server/migrations/202603
 import * as coverageTrendMigration from '../packages/server/migrations/20260309_0002_coverage_trend_points.js';
 import * as initialMigration from '../packages/server/migrations/20260309_0001_initial_reporting_schema.js';
 import * as performanceQueryIndexesMigration from '../packages/server/migrations/20260513_0005_performance_query_indexes.js';
+import * as reportSubmissionsMigration from '../packages/server/migrations/20260722_0006_report_submissions_and_read_indexes.js';
+import * as boundedReadIndexesMigration from '../packages/server/migrations/20260824_0007_bounded_read_indexes.js';
 import { loadMigrations, runMigrations } from '../packages/server/migrations/runMigrations.js';
 import {
   Artifact,
@@ -23,8 +25,12 @@ import {
   ProjectRoleAccess,
   ProjectVersion,
   ReleaseNote,
+  ReportSubmission,
   Role,
   Run,
+  RunActiveSubmission,
+  RunOverview,
+  ProjectOverview,
   SuiteRun,
   TestExecution,
   User,
@@ -47,6 +53,8 @@ test('loadMigrations includes the initial reporting schema migration', async () 
       accessControlMigration.id,
       benchmarkIndexesMigration.id,
       performanceQueryIndexesMigration.id,
+      reportSubmissionsMigration.id,
+      boundedReadIndexesMigration.id,
     ],
   );
 });
@@ -61,15 +69,22 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
       accessControlMigration,
       benchmarkIndexesMigration,
       performanceQueryIndexesMigration,
+      reportSubmissionsMigration,
+      boundedReadIndexesMigration,
     ],
   });
 
-  assert.equal(state.createdTables.length, 22);
+  assert.equal(state.createdTables.length, 27);
   assert.ok(state.createdTables.some((entry) => entry.tableName === 'projects'));
   assert.ok(state.createdTables.some((entry) => entry.tableName === 'runs'));
   assert.ok(state.createdTables.some((entry) => entry.tableName === 'coverage_files'));
   assert.ok(state.createdTables.some((entry) => entry.tableName === 'artifacts'));
   assert.ok(state.createdTables.some((entry) => entry.tableName === 'coverage_trend_points'));
+  assert.ok(state.createdTables.some((entry) => entry.tableName === 'report_submissions'));
+  assert.ok(state.createdTables.some((entry) => entry.tableName === 'run_active_submissions'));
+  assert.ok(state.createdTables.some((entry) => entry.tableName === 'run_overviews'));
+  assert.ok(state.createdTables.some((entry) => entry.tableName === 'project_overviews'));
+  assert.ok(state.createdTables.some((entry) => entry.tableName === 'backfill_checkpoints'));
   assert.ok(state.createdTables.some((entry) => entry.tableName === 'users'));
   assert.ok(state.createdTables.some((entry) => entry.tableName === 'roles'));
   assert.ok(state.createdTables.some((entry) => entry.tableName === 'groups'));
@@ -98,8 +113,10 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
     accessControlMigration.id,
     benchmarkIndexesMigration.id,
     performanceQueryIndexesMigration.id,
+    reportSubmissionsMigration.id,
+    boundedReadIndexesMigration.id,
   ]);
-  assert.equal(state.transactions.length, 5);
+  assert.equal(state.transactions.length, 6);
   assert.equal(state.transactions.every((entry) => entry.committed === true), true);
   assert.equal(state.transactions.every((entry) => entry.rolledBack === false), true);
 
@@ -109,6 +126,8 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
     accessControlMigration.id,
     benchmarkIndexesMigration.id,
     performanceQueryIndexesMigration.id,
+    reportSubmissionsMigration.id,
+    boundedReadIndexesMigration.id,
   ]);
   await runMigrations(rerunState.sequelize, {
     migrations: [
@@ -117,6 +136,8 @@ test('runMigrations applies the initial reporting schema exactly once', async ()
       accessControlMigration,
       benchmarkIndexesMigration,
       performanceQueryIndexesMigration,
+      reportSubmissionsMigration,
+      boundedReadIndexesMigration,
     ],
   });
   assert.equal(rerunState.createdTables.length, 0);
@@ -175,6 +196,14 @@ test('server model registry wires the expected reporting associations', () => {
   assert.equal(Run.associations.errorOccurrences.target, ErrorOccurrence);
   assert.equal(Run.associations.performanceStats.target, PerformanceStat);
   assert.equal(Run.associations.artifacts.target, Artifact);
+  assert.equal(Run.associations.reportSubmissions.target, ReportSubmission);
+  assert.equal(Run.associations.activeSubmissions.target, RunActiveSubmission);
+  assert.equal(Run.associations.overview.target, RunOverview);
+  assert.equal(Project.associations.overview.target, ProjectOverview);
+  assert.equal(ReportSubmission.associations.run.target, Run);
+  assert.equal(ReportSubmission.associations.suiteRuns.target, SuiteRun);
+  assert.equal(ReportSubmission.associations.coverageSnapshots.target, CoverageSnapshot);
+  assert.equal(ReportSubmission.associations.performanceStats.target, PerformanceStat);
 
   assert.equal(SuiteRun.associations.testExecutions.target, TestExecution);
   assert.equal(SuiteRun.associations.errorOccurrences.target, ErrorOccurrence);
@@ -212,6 +241,15 @@ function createFakeMigrationState(appliedMigrationIds = []) {
         const id = options?.replacements?.id;
         applied.add(id);
         insertedMigrations.push(id);
+        return [[], null];
+      }
+      if (normalized.startsWith('SELECT id, project_id, project_version_id, external_key')) {
+        return [[], null];
+      }
+      if (normalized.startsWith('INSERT INTO project_overviews')) {
+        return [[], null];
+      }
+      if (normalized.startsWith('CREATE INDEX CONCURRENTLY IF NOT EXISTS')) {
         return [[], null];
       }
       throw new Error(`Unexpected raw SQL in migration test: ${normalized}`);

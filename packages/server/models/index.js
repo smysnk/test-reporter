@@ -12,9 +12,13 @@ import ProjectModule from './ProjectModule.js';
 import ProjectPackage from './ProjectPackage.js';
 import ProjectRoleAccess from './ProjectRoleAccess.js';
 import ProjectVersion from './ProjectVersion.js';
+import ProjectOverview from './ProjectOverview.js';
 import ReleaseNote from './ReleaseNote.js';
+import ReportSubmission from './ReportSubmission.js';
 import Role from './Role.js';
 import Run from './Run.js';
+import RunActiveSubmission from './RunActiveSubmission.js';
+import RunOverview from './RunOverview.js';
 import SuiteRun from './SuiteRun.js';
 import TestExecution from './TestExecution.js';
 import User from './User.js';
@@ -38,9 +42,13 @@ export {
   ProjectPackage,
   ProjectRoleAccess,
   ProjectVersion,
+  ProjectOverview,
   ReleaseNote,
+  ReportSubmission,
   Role,
   Run,
+  RunActiveSubmission,
+  RunOverview,
   SuiteRun,
   TestExecution,
   User,

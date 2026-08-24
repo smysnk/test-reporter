@@ -26,6 +26,49 @@ test('query service resolves build number from stored source fallbacks', () => {
   }), 12);
 });
 
+test('public badge summary resolves tests and coverage from their latest active submissions independently', async () => {
+  const queryService = createGraphqlQueryService({
+    benchmarkQueryCache: false,
+    models: {
+      Project: createFindAllModel([{ id: 'project-1', key: 'workspace' }]),
+      Run: createFindAllModel([
+        {
+          id: 'run-performance',
+          projectId: 'project-1',
+          summary: { totalTests: 0, passedTests: 0, failedTests: 0, skippedTests: 0 },
+        },
+        {
+          id: 'run-tests',
+          projectId: 'project-1',
+          summary: { totalTests: 24, passedTests: 23, failedTests: 1, skippedTests: 0 },
+        },
+        {
+          id: 'run-coverage',
+          projectId: 'project-1',
+          summary: {},
+        },
+      ]),
+      ReportSubmission: createFindAllModel([
+        { id: 'submission-performance', runId: 'run-performance', kind: 'performance', status: 'active' },
+        { id: 'submission-tests', runId: 'run-tests', kind: 'tests', status: 'active' },
+        { id: 'submission-coverage', runId: 'run-coverage', kind: 'coverage', status: 'active' },
+      ]),
+      CoverageSnapshot: createFindAllModel([
+        { id: 'coverage-old', runId: 'run-tests', reportSubmissionId: 'submission-tests', linesPct: 71 },
+        { id: 'coverage-current', runId: 'run-coverage', reportSubmissionId: 'submission-coverage', linesPct: 88.5 },
+      ]),
+    },
+  });
+
+  assert.deepEqual(await queryService.getPublicBadgeSummary({ projectKey: 'workspace' }), {
+    totalTests: 24,
+    passedTests: 23,
+    failedTests: 1,
+    skippedTests: 0,
+    linesPct: 88.5,
+  });
+});
+
 test('GraphQL exposes guest-safe public reads and hides private resources', async () => {
   const server = await createServer({
     port: 0,
@@ -1662,8 +1705,7 @@ test('listRuns queries the lightweight feed fields with DB-side limit and relate
   assert.equal(runFindAllOptions.limit, 5);
   assert.deepEqual(runFindAllOptions.order, [
     ['completedAt', 'DESC'],
-    ['startedAt', 'DESC'],
-    ['createdAt', 'DESC'],
+    ['id', 'DESC'],
   ]);
   assert.deepEqual(runFindAllOptions.attributes, [
     'id',

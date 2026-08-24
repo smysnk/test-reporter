@@ -12,6 +12,10 @@ const PerformanceStat = sequelize.define('PerformanceStat', {
     type: DataTypes.UUID,
     allowNull: true,
   },
+  reportSubmissionId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
   suiteRunId: {
     type: DataTypes.UUID,
     allowNull: true,
@@ -48,6 +52,7 @@ const PerformanceStat = sequelize.define('PerformanceStat', {
 }, {
   indexes: [
     { fields: ['run_id'] },
+    { fields: ['report_submission_id'] },
     { fields: ['suite_run_id'] },
     { fields: ['test_execution_id'] },
   ],

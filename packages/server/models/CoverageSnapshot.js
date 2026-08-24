@@ -12,6 +12,10 @@ const CoverageSnapshot = sequelize.define('CoverageSnapshot', {
     type: DataTypes.UUID,
     allowNull: false,
   },
+  reportSubmissionId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
   linesCovered: {
     type: DataTypes.INTEGER,
     allowNull: true,
@@ -67,7 +71,8 @@ const CoverageSnapshot = sequelize.define('CoverageSnapshot', {
   },
 }, {
   indexes: [
-    { unique: true, fields: ['run_id'] },
+    { fields: ['run_id'] },
+    { unique: true, fields: ['report_submission_id'] },
   ],
 });
 

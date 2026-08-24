@@ -21,6 +21,14 @@ export const queryTypeDefs = `#graphql
     repositoryUrl: String
     defaultBranch: String
     metadata: JSON
+    runCount: Int!
+    latestRunId: ID
+    latestStatus: String
+    latestCompletedAt: String
+    latestLinesPct: Float
+    totalTests: Int!
+    passedTests: Int!
+    failedTests: Int!
   }
 
   type ProjectVersion {
@@ -176,6 +184,7 @@ export const queryTypeDefs = `#graphql
     totalTests: Int
     passedTests: Int
     failedTests: Int
+    cursor: String
   }
 
   type RunPackageSummary {
@@ -213,6 +222,17 @@ export const queryTypeDefs = `#graphql
     failedTestCount: Int!
     coverage: JSON
     tests: [TestExecution!]!
+  }
+
+  input PerformanceMetricSelectionInput {
+    statGroup: String!
+    statName: String!
+  }
+
+  type PerformanceTrendSeries {
+    statGroup: String!
+    statName: String!
+    points: [PerformanceStatRecord!]!
   }
 
   type CoverageTrendPoint {
@@ -309,6 +329,12 @@ export const queryTypeDefs = `#graphql
     previousValue: Float
     deltaValue: Float
     deltaPercent: Float
+    baselineId: String
+    baselineRunId: ID
+    baselineValue: Float
+    baselineDeltaValue: Float
+    baselineDeltaPercent: Float
+    baselineStatus: String
   }
 
   type BenchmarkNamespaceSummary {
@@ -410,15 +436,17 @@ export const queryTypeDefs = `#graphql
     projects: [Project!]!
     project(id: ID, key: String, slug: String): Project
     badgeSummary(projectKey: String!): BadgeSummary!
-    runFeed(limit: Int): [RunFeedEntry!]!
+    runFeed(limit: Int, after: String, projectKey: String, status: String): [RunFeedEntry!]!
     runs(projectId: ID, projectKey: String, status: String, limit: Int): [Run!]!
     run(id: ID, externalKey: String): Run
     runPackages(runId: ID!): [RunPackageSummary!]!
     runModules(runId: ID!): [RunModuleSummary!]!
     runFiles(runId: ID!, packageName: String, moduleName: String, status: String): [RunFile!]!
-    tests(runId: ID!, status: String, packageName: String, moduleName: String, filePath: String): [TestExecution!]!
+    tests(runId: ID!, status: String, packageName: String, moduleName: String, filePath: String, limit: Int): [TestExecution!]!
+    testsForSuite(runId: ID!, suiteRunId: ID!, limit: Int, after: ID, status: String, search: String): [TestExecution!]!
     runPerformanceStats(runId: ID!, statGroupPrefix: String, statNames: [String!], seriesIds: [String!]): [PerformanceStatRecord!]!
     performanceTrend(projectId: ID, projectKey: String, statGroup: String!, statName: String!, seriesIds: [String!], runnerKey: String, limit: Int): [PerformanceStatRecord!]!
+    performanceTrends(projectId: ID, projectKey: String, metrics: [PerformanceMetricSelectionInput!]!, limit: Int): [PerformanceTrendSeries!]!
     benchmarkCatalog(projectId: ID, projectKey: String): [BenchmarkCatalogEntry!]!
     benchmarkSummary(projectId: ID, projectKey: String): BenchmarkSummary!
     coverageTrend(projectId: ID, projectKey: String, packageName: String, moduleName: String, filePath: String, limit: Int): [CoverageTrendPoint!]!
@@ -450,8 +478,10 @@ export const queryResolvers = {
     runModules: (_root, args, context) => context.queryService.listRunModules({ ...args, actor: context.actor }),
     runFiles: (_root, args, context) => context.queryService.listRunFiles({ ...args, actor: context.actor }),
     tests: (_root, args, context) => context.queryService.listTestsForRun({ ...args, actor: context.actor }),
+    testsForSuite: (_root, args, context) => context.queryService.listTestsForSuiteRun({ ...args, actor: context.actor }),
     runPerformanceStats: (_root, args, context) => context.queryService.listRunPerformanceStats({ ...args, actor: context.actor }),
     performanceTrend: (_root, args, context) => context.queryService.listPerformanceTrend({ ...args, actor: context.actor }),
+    performanceTrends: (_root, args, context) => context.queryService.listPerformanceTrends({ ...args, actor: context.actor }),
     benchmarkCatalog: (_root, args, context) => context.queryService.listBenchmarkCatalog({ ...args, actor: context.actor }),
     benchmarkSummary: (_root, args, context) => context.queryService.getBenchmarkSummary({ ...args, actor: context.actor }),
     coverageTrend: (_root, args, context) => context.queryService.listCoverageTrend({ ...args, actor: context.actor }),
@@ -489,6 +519,11 @@ export const queryResolvers = {
     topImprovements: (summary, args) => limitSummaryEntries(summary?.topImprovements, args?.limit),
   },
   Run: {
+    rawReport: (run, _args, context) => context.queryService.getActiveRunReport({
+      runId: run.id,
+      kind: 'tests',
+      actor: context.actor,
+    }),
     suites: (run, _args, context) => context.queryService.listSuitesForRun({ runId: run.id, actor: context.actor }),
     coverageSnapshot: (run, _args, context) => (
       run.coverageSnapshot
@@ -497,7 +532,7 @@ export const queryResolvers = {
     artifacts: (run, _args, context) => context.queryService.listArtifacts({ runId: run.id, actor: context.actor }),
   },
   SuiteRun: {
-    tests: (suite, _args, context) => context.queryService.listTestsForSuiteRun({ suiteRunId: suite.id, actor: context.actor }),
+    tests: (suite, _args, context) => context.queryService.listTestsForSuiteRun({ runId: suite.runId, suiteRunId: suite.id, actor: context.actor }),
   },
 };
 

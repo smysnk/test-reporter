@@ -152,7 +152,7 @@ test('normalizeIngestPayload strips null characters from JSON-bound payload fiel
   assert.equal(normalized.tests[0].sourceSnippet, 'assert.equal(1, 2)');
 });
 
-test('ingestion persistence upserts duplicate runs and replaces prior facts', async () => {
+test('ingestion persistence keeps immutable submission revisions and deduplicates exact retries', async () => {
   const persistenceContext = createFakePersistenceContext();
   const persistence = createSequelizeIngestionPersistence(persistenceContext);
   const service = createIngestionService({ persistence });
@@ -259,21 +259,37 @@ test('ingestion persistence upserts duplicate runs and replaces prior facts', as
 
   assert.equal(second.created, false);
   assert.equal(models.Run.rows.length, 1);
-  assert.equal(models.SuiteRun.rows.length, 1);
-  assert.equal(models.TestExecution.rows.length, 1);
-  assert.equal(models.CoverageTrendPoint.rows.length, 4);
-  assert.deepEqual(models.CoverageTrendPoint.rows.map((row) => row.scopeType).sort(), ['file', 'module', 'package', 'project']);
-  assert.equal(models.ErrorOccurrence.rows.length, 0);
-  assert.equal(models.Artifact.rows.length, 0);
-  assert.equal(models.PerformanceStat.rows.length, 4);
+  assert.equal(models.ReportSubmission.rows.length, 2);
+  assert.deepEqual(models.ReportSubmission.rows.map((row) => row.status), ['superseded', 'active']);
+  assert.equal(models.RunActiveSubmission.rows.length, 3);
+  assert.deepEqual(models.RunActiveSubmission.rows.map((row) => row.kind).sort(), ['coverage', 'performance', 'tests']);
+  assert.equal(models.RunActiveSubmission.rows.every((row) => row.reportSubmissionId === second.submissionId), true);
+  assert.equal(models.RunOverview.rows.length, 1);
+  assert.equal(models.ProjectOverview.rows.length, 1);
+  assert.equal(models.RunOverview.rows[0].totalTests, 1);
+  assert.equal(models.ProjectOverview.rows[0].latestRunId, second.runId);
+  assert.equal(second.submissionStatus, 'revised');
+  assert.equal(second.revision, 2);
+  assert.equal(models.SuiteRun.rows.length, 2);
+  assert.equal(models.TestExecution.rows.length, 3);
+  assert.equal(models.CoverageTrendPoint.rows.length, 8);
+  assert.equal(models.CoverageTrendPoint.rows.filter((row) => row.reportSubmissionId === second.submissionId).length, 4);
   assert.equal(models.Run.rows[0].status, 'passed');
   assert.equal(models.Run.rows[0].summary.totalTests, 1);
-  assert.equal(models.CoverageTrendPoint.rows.find((row) => row.scopeType === 'project')?.linesPct, 90);
-  assert.equal(models.CoverageTrendPoint.rows.find((row) => row.scopeType === 'file')?.linesPct, 90);
+  assert.equal(models.CoverageTrendPoint.rows.find((row) => row.reportSubmissionId === second.submissionId && row.scopeType === 'project')?.linesPct, 90);
+  assert.equal(models.CoverageTrendPoint.rows.find((row) => row.reportSubmissionId === second.submissionId && row.scopeType === 'file')?.linesPct, 90);
   assert.equal(
     models.PerformanceStat.rows.some((row) => row.statGroup === 'benchmark.node.engine.nibbles.intro' && row.statName === 'elapsed_ms'),
     true,
   );
+
+  const exactRetry = await service.ingest(updatedPayload, {
+    now: '2026-03-09T15:06:00.000Z',
+  });
+  assert.equal(exactRetry.submissionStatus, 'deduplicated');
+  assert.equal(exactRetry.submissionId, second.submissionId);
+  assert.equal(models.ReportSubmission.rows.length, 2);
+  assert.equal(models.TestExecution.rows.length, 3);
 });
 
 test('server ingest route enforces auth and returns actionable validation errors', async () => {
@@ -615,6 +631,10 @@ function createFakePersistenceContext() {
     ProjectModule: createFakeModel('project-module'),
     ProjectFile: createFakeModel('project-file'),
     Run: createFakeModel('run'),
+    ReportSubmission: createFakeModel('report-submission'),
+    RunActiveSubmission: createFakeModel('run-active-submission'),
+    RunOverview: createFakeModel('run-overview'),
+    ProjectOverview: createFakeModel('project-overview'),
     SuiteRun: createFakeModel('suite-run'),
     TestExecution: createFakeModel('test-execution'),
     CoverageSnapshot: createFakeModel('coverage-snapshot'),
@@ -648,6 +668,9 @@ function createFakeModel(prefix) {
     async findAll(options = {}) {
       return rows.filter((row) => matchesWhere(row, options.where || {})).map((row) => wrapRecord(row));
     },
+    async count(options = {}) {
+      return rows.filter((row) => matchesWhere(row, options.where || {})).length;
+    },
     async create(values) {
       const row = { id: `${prefix}-${++counter}`, ...values };
       rows.push(row);
@@ -670,6 +693,9 @@ function wrapRecord(row) {
 
   return {
     ...row,
+    toJSON() {
+      return { ...row };
+    },
     async update(values) {
       Object.assign(row, values);
       Object.assign(this, row);

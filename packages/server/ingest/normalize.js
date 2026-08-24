@@ -362,10 +362,20 @@ export function normalizeIngestPayload(payload, options = {}) {
   const project = buildProject(projectKey, report, source);
   const projectVersion = buildProjectVersion(source);
   const externalKey = deriveExternalKey(projectKey, source, report);
+  const submission = buildReportSubmission(payload.submission, {
+    report,
+    source,
+    artifacts: payload.artifacts,
+    suites,
+    coverageSnapshot,
+    performanceStats: customPerformanceStats,
+    now,
+  });
 
   return {
     project,
     projectVersion,
+    submission,
     run: {
       externalKey,
       sourceProvider: normalizeOptionalString(source.provider),
@@ -408,6 +418,73 @@ export function normalizeIngestPayload(payload, options = {}) {
       errors: errors.length,
     },
   };
+}
+
+export function buildReportSubmission(input, context) {
+  const supplied = isPlainObject(input) ? input : {};
+  const kind = normalizeSubmissionKind(supplied.kind) || deriveSubmissionKind(context);
+  const producerKey = normalizeOptionalString(supplied.producerKey)
+    || normalizeOptionalString(context.source?.ci?.job)
+    || normalizeOptionalString(context.source?.ci?.workflow)
+    || 'default';
+  const submissionKey = normalizeOptionalString(supplied.submissionKey)
+    || normalizeOptionalString(context.source?.ci?.job)
+    || 'default';
+  const canonicalReport = stableStringify({
+    report: context.report,
+    artifacts: Array.isArray(context.artifacts) ? context.artifacts : [],
+  });
+  return {
+    kind,
+    producerKey,
+    submissionKey,
+    contentHash: crypto.createHash('sha256').update(canonicalReport).digest('hex'),
+    schemaVersion: normalizeOptionalString(context.report?.schemaVersion) || SUPPORTED_REPORT_SCHEMA_VERSION,
+    receivedAt: context.now,
+    rawReport: normalizeJsonValue(context.report),
+    summary: normalizeJsonObject(context.report?.summary),
+    metadata: {
+      provenance: normalizeJsonValue(context.source || {}),
+      supplied: Object.keys(supplied).length > 0,
+      factKinds: deriveSubmissionFactKinds(context, kind),
+    },
+  };
+}
+
+function deriveSubmissionFactKinds({ suites, coverageSnapshot, performanceStats }, submissionKind = 'combined') {
+  if (submissionKind === 'tests' || submissionKind === 'coverage' || submissionKind === 'performance') {
+    return [submissionKind];
+  }
+  const kinds = [];
+  if (Array.isArray(suites) && suites.some((suite) => (suite.summary?.total || 0) > 0)) kinds.push('tests');
+  if (coverageSnapshot) kinds.push('coverage');
+  if (Array.isArray(performanceStats) && performanceStats.length > 0) kinds.push('performance');
+  return kinds.length > 0 ? kinds : ['tests'];
+}
+
+function deriveSubmissionKind({ suites, coverageSnapshot, performanceStats }) {
+  const hasTests = Array.isArray(suites) && suites.some((suite) => (suite.summary?.total || 0) > 0);
+  const hasCoverage = Boolean(coverageSnapshot);
+  const hasPerformance = Array.isArray(performanceStats) && performanceStats.length > 0;
+  const kinds = [hasTests, hasCoverage, hasPerformance].filter(Boolean).length;
+  if (kinds > 1) return 'combined';
+  if (hasTests) return 'tests';
+  if (hasCoverage) return 'coverage';
+  if (hasPerformance) return 'performance';
+  return 'combined';
+}
+
+function normalizeSubmissionKind(value) {
+  const normalized = normalizeOptionalString(value)?.toLowerCase() || null;
+  return ['tests', 'coverage', 'performance', 'combined'].includes(normalized) ? normalized : null;
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 export function deriveExternalKey(projectKey, source, report) {
@@ -474,6 +551,7 @@ function buildProject(projectKey, report, source) {
     name: projectName,
     repositoryUrl: normalizeOptionalString(source.repositoryUrl),
     defaultBranch: normalizeOptionalString(source.defaultBranch) || normalizeOptionalString(source.branch),
+    isPublic: source.isPublic === true,
     metadata: {
       reportMeta: normalizeJsonObject(report.meta),
     },
@@ -643,6 +721,7 @@ function normalizeArtifactList(artifacts) {
       storageKey: normalizeOptionalString(artifact.storageKey),
       sourceUrl: normalizeOptionalString(artifact.sourceUrl),
       metadata: {
+        ...normalizeJsonObject(artifact.metadata),
         index,
       },
     }))

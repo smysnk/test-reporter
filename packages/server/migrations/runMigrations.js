@@ -29,6 +29,26 @@ export async function loadMigrations(options = {}) {
 }
 
 export async function runMigrations(sequelize, options = {}) {
+  if (typeof sequelize?.connectionManager?.getConnection !== 'function') {
+    return runMigrationsWithLock(sequelize, options);
+  }
+  const lockConnection = await sequelize.connectionManager.getConnection();
+  const lockKey = options.advisoryLockKey || 'test-station-schema-migrations-v1';
+  await sequelize.query('SELECT pg_advisory_lock(hashtext(:lockKey))', {
+    replacements: { lockKey },
+    connection: lockConnection,
+  });
+  try {
+    return await runMigrationsWithLock(sequelize, options);
+  } finally {
+    await sequelize.query('SELECT pg_advisory_unlock(hashtext(:lockKey))', {
+      replacements: { lockKey },
+      connection: lockConnection,
+    }).finally(() => sequelize.connectionManager.releaseConnection(lockConnection));
+  }
+}
+
+async function runMigrationsWithLock(sequelize, options = {}) {
   const migrations = Array.isArray(options.migrations)
     ? options.migrations
     : await loadMigrations(options);

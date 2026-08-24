@@ -1,5 +1,10 @@
 import { performance } from 'node:perf_hooks';
 import {
+  getRequestProfile,
+  setProfileOperationName,
+  summarizeRequestProfile,
+} from './profiling/requestProfile.js';
+import {
   REQUEST_ID_HEADER,
   TRACE_ID_HEADER,
   PARENT_REQUEST_ID_HEADER,
@@ -62,11 +67,22 @@ export function createGraphqlTracePlugin() {
       const startedAt = performance.now();
 
       return {
+        async didResolveOperation(requestContext) {
+          setProfileOperationName(requestContext.operationName || 'anonymous');
+        },
         async willSendResponse(requestContext) {
           const durationMs = roundMetric(performance.now() - startedAt);
           const traceContext = requestContext.contextValue?.requestTrace || null;
           const operationName = requestContext.operationName || null;
-          const serverTimingEntry = `graphql;dur=${durationMs}`;
+          setProfileOperationName(operationName || 'anonymous');
+          const profile = getRequestProfile();
+          const serverTimingEntries = [`graphql;dur=${durationMs}`];
+          if (profile?.database?.queryCount > 0) {
+            serverTimingEntries.push(`db;dur=${roundMetric(profile.database.durationMs)};desc="${profile.database.queryCount} queries"`);
+          }
+          if (profile?.database?.poolAcquireCount > 0) {
+            serverTimingEntries.push(`db-pool;dur=${roundMetric(profile.database.poolWaitMs)}`);
+          }
 
           if (requestContext.response?.http?.headers && traceContext) {
             for (const [name, value] of Object.entries(buildTraceHeaders(traceContext))) {
@@ -76,7 +92,9 @@ export function createGraphqlTracePlugin() {
             }
           }
 
-          appendServerTimingHeader(requestContext.response, serverTimingEntry);
+          for (const serverTimingEntry of serverTimingEntries) {
+            appendServerTimingHeader(requestContext.response, serverTimingEntry);
+          }
 
           if (requestContext.response?.body?.kind === 'single') {
             requestContext.response.body.singleResult.extensions = {
@@ -87,6 +105,7 @@ export function createGraphqlTracePlugin() {
                 parentRequestId: traceContext?.parentRequestId || null,
                 operationName,
                 durationMs,
+                profile: summarizeRequestProfile(profile),
               },
             };
           }

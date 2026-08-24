@@ -46,11 +46,16 @@ export const mutationTypeDefs = `#graphql
     runId: ID!
     externalKey: String!
     created: Boolean!
+    submissionId: ID
+    submissionKind: String!
+    submissionStatus: String!
+    contentHash: String
+    revision: Int!
     counts: IngestCounts!
   }
 
   type Mutation {
-    ingestRun(projectKey: String!, report: JSON!, source: JSON, artifacts: JSON): IngestRunResult!
+    ingestRun(projectKey: String!, report: JSON!, source: JSON, artifacts: JSON, submission: JSON): IngestRunResult!
     adminCreateRole(input: AdminRoleCreateInput!): AdminRole!
     adminUpdateRole(id: ID!, input: AdminRoleUpdateInput!): AdminRole!
     adminDeleteRole(id: ID!): AdminRole!
@@ -76,12 +81,14 @@ export const mutationResolvers = {
       requireServiceOrAdminActor(context);
       const artifacts = Array.isArray(args.artifacts) ? args.artifacts : [];
       const source = args.source && typeof args.source === 'object' ? args.source : {};
+      const submission = args.submission && typeof args.submission === 'object' ? args.submission : {};
 
       return context.ingestionService.ingest({
         projectKey: args.projectKey,
         report: args.report,
         source,
         artifacts,
+        submission,
       }, {
         requestId: context.requestId,
       });
