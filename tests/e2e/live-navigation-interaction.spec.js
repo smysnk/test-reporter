@@ -14,7 +14,7 @@ test('home run rows navigate to run detail when clicked', async ({ page }) => {
   await row.locator('td').first().click();
 
   await page.waitForURL(new RegExp(`/runs/${escapeRegExp(runId)}(?:\\?|$)`), { timeout: 15_000 });
-  await expect(page.getByRole('link', { name: 'Runner report' })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByRole('link', { name: 'Runner report', exact: true })).toBeVisible({ timeout: 45_000 });
 });
 
 test('project execution feed run links navigate to run detail when clicked', async ({ page }) => {
@@ -28,7 +28,7 @@ test('project execution feed run links navigate to run detail when clicked', asy
   await runLink.click();
 
   await page.waitForURL(new RegExp(`/runs/${escapeRegExp(runId)}(?:\\?|$)`), { timeout: 15_000 });
-  await expect(page.getByRole('link', { name: 'Runner report' })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByRole('link', { name: 'Runner report', exact: true })).toBeVisible({ timeout: 45_000 });
 });
 
 test('run detail operations switch navigates to the operations view when clicked', async ({ page }) => {

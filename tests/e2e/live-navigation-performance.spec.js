@@ -199,7 +199,7 @@ test('benchmarks runner report readiness, operations view, and project-page navi
   const runLink = page.locator('[data-perf-id^="project-run-link:"]').first();
   await expect(runLink).toBeVisible({ timeout: 45_000 });
   const runNavigation = await navigateByHrefWithFallback(page, runLink, /\/runs\/[^/?#]+$/);
-  await expect(page.getByRole('link', { name: 'Runner report' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Runner report', exact: true })).toBeVisible();
   const runPageProfiling = await collectProfilingSnapshot(page, 'run-page-ready');
   const runId = getRunIdFromUrl(page.url());
 
