@@ -211,7 +211,8 @@ export default function ProjectExplorerPage({ data }) {
   const trendPanels = resolvedData?.trendPanels || {};
   const [analysisTab, setAnalysisTab] = React.useState(benchmarkPanels.length > 0 ? 'benchmarks' : 'coverage');
   const [benchmarkGroup, setBenchmarkGroup] = React.useState(null);
-  const [benchmarkOverviewLoading, setBenchmarkOverviewLoading] = React.useState(Boolean(data?.project));
+  const [benchmarkOverviewLoading, setBenchmarkOverviewLoading] = React.useState(false);
+  const [benchmarkOverviewLoaded, setBenchmarkOverviewLoaded] = React.useState(false);
   const [benchmarkLoading, setBenchmarkLoading] = React.useState(false);
   const [benchmarkError, setBenchmarkError] = React.useState(null);
   const [benchmarkRevision, setBenchmarkRevision] = React.useState(0);
@@ -246,8 +247,13 @@ export default function ProjectExplorerPage({ data }) {
   }, [project?.slug]);
 
   React.useEffect(() => {
-    if (!project?.slug) return undefined;
+    setBenchmarkOverviewLoaded(false);
+  }, [project?.slug]);
+
+  React.useEffect(() => {
+    if (analysisTab !== 'benchmarks' || !project?.slug || benchmarkCatalog.length > 0 || benchmarkOverviewLoaded) return undefined;
     const controller = new AbortController();
+    setBenchmarkOverviewLoaded(true);
     setBenchmarkOverviewLoading(true);
     fetch(`/api/projects/${encodeURIComponent(project.slug)}/benchmark`, { signal: controller.signal })
       .then(async (response) => {
@@ -267,7 +273,7 @@ export default function ProjectExplorerPage({ data }) {
         if (!controller.signal.aborted) setBenchmarkOverviewLoading(false);
       });
     return () => controller.abort();
-  }, [project?.slug]);
+  }, [analysisTab, benchmarkCatalog.length, benchmarkOverviewLoaded, project?.slug]);
 
   React.useEffect(() => {
     if (!project?.slug || benchmarkCatalog.length === 0) return undefined;
@@ -301,12 +307,6 @@ export default function ProjectExplorerPage({ data }) {
   }, [project?.slug]);
 
   const latestCoverage = coverageTrend[0]?.linesPct ?? runs[0]?.coverageSnapshot?.linesPct ?? null;
-
-  React.useEffect(() => {
-    if (benchmarkPanels.length === 0 && analysisTab !== 'coverage') {
-      setAnalysisTab('coverage');
-    }
-  }, [analysisTab, benchmarkPanels.length]);
 
   React.useEffect(() => {
     if (activityLoading || !project?.slug) return;
@@ -421,7 +421,6 @@ export default function ProjectExplorerPage({ data }) {
               ? 'web-segmented-control__button web-segmented-control__button--active'
               : 'web-segmented-control__button',
             onClick: () => setAnalysisTab('benchmarks'),
-            disabled: benchmarkPanels.length === 0,
           },
           'Performance',
         ),
@@ -533,7 +532,15 @@ export default function ProjectExplorerPage({ data }) {
             ),
           ),
           benchmarkLoading ? React.createElement('span', { role: 'status', className: 'web-list__meta' }, 'Loading namespace…') : null,
-          benchmarkError ? React.createElement('button', { type: 'button', className: 'web-button web-button--ghost', onClick: () => setBenchmarkRevision((value) => value + 1) }, 'Retry namespace') : null,
+          benchmarkError ? React.createElement('button', {
+            type: 'button',
+            className: 'web-button web-button--ghost',
+            onClick: () => {
+              setBenchmarkError(null);
+              setBenchmarkOverviewLoaded(false);
+              setBenchmarkRevision((value) => value + 1);
+            },
+          }, 'Retry benchmark analysis') : null,
         ),
         benchmarkError ? React.createElement('p', { role: 'alert', className: 'web-card__copy' }, benchmarkError) : null,
         React.createElement(ProjectBenchmarkExplorer, {

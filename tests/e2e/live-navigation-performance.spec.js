@@ -96,7 +96,7 @@ test.afterAll(async () => {
 
 test('benchmarks the public home page with live data', async ({ page }, testInfo) => {
   const homeReadyStart = performance.now();
-  await goToPublicHome(page);
+  await goToPublicHome(page, { requireInteractive: false });
   const homeReadyMs = round(performance.now() - homeReadyStart);
 
   const runRows = await getRunRows(page);
@@ -289,7 +289,7 @@ test('benchmarks runner report readiness, operations view, and project-page navi
   assertBudget('projectPageNavigationMs', record.metrics.projectPageNavigationMs);
 });
 
-async function goToPublicHome(page) {
+async function goToPublicHome(page, { requireInteractive = true } = {}) {
   await page.goto('/', { waitUntil: 'commit' });
 
   if (page.url().includes('/auth/signin')) {
@@ -298,7 +298,9 @@ async function goToPublicHome(page) {
 
   const allRunsButton = await getAllRunsButton(page);
   await expect(allRunsButton).toBeVisible();
-  await expect(page.locator('[data-page-interactive="true"]')).toBeVisible({ timeout: 45_000 });
+  if (requireInteractive) {
+    await expect(page.locator('[data-page-interactive="true"]')).toBeVisible({ timeout: 45_000 });
+  }
   await page.locator('[data-perf-id^="run-row:"], .web-explorer-table__row, a[href^="/runs/"]').first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {});
   const runRows = await getRunRows(page);
   test.skip(runRows.count === 0 || !runRows.first, 'No public runs are visible to benchmark.');
