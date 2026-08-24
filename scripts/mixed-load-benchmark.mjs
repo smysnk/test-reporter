@@ -27,12 +27,31 @@ export async function runMixedLoadBenchmark({ baseUrl, apiKey, runId, readers = 
   const reads = readResults.flat();
   const durations = reads.map((entry) => entry.durationMs);
   const failures = reads.filter((entry) => entry.status >= 500 || entry.error);
+  const pathSummaries = summarizePaths(reads);
   return {
     schemaVersion: '1', readers, samplesPerReader: samples, requestCount: reads.length,
     p50Ms: percentile(durations, 0.5), p95Ms: percentile(durations, 0.95), p99Ms: percentile(durations, 0.99),
     fiveXxCount: reads.filter((entry) => entry.status >= 500).length, failureCount: failures.length,
-    ingest, passed: failures.length === 0 && ingest.status < 500,
+    ingest, paths: pathSummaries, failures, passed: failures.length === 0 && ingest.status < 500,
   };
+}
+
+function summarizePaths(reads) {
+  const grouped = new Map();
+  for (const entry of reads) {
+    const summary = grouped.get(entry.url) || { path: entry.url, requestCount: 0, fiveXxCount: 0, failureCount: 0, durations: [] };
+    summary.requestCount += 1;
+    summary.fiveXxCount += entry.status >= 500 ? 1 : 0;
+    summary.failureCount += entry.status >= 500 || entry.error ? 1 : 0;
+    summary.durations.push(entry.durationMs);
+    grouped.set(entry.url, summary);
+  }
+  return Array.from(grouped.values()).map(({ durations, ...summary }) => ({
+    ...summary,
+    p50Ms: percentile(durations, 0.5),
+    p95Ms: percentile(durations, 0.95),
+    maxMs: Math.max(...durations),
+  }));
 }
 
 async function timedFetch(fetchImpl, url, options) {

@@ -290,8 +290,7 @@ test('benchmarks runner report readiness, operations view, and project-page navi
 });
 
 async function goToPublicHome(page) {
-  await page.goto('/');
-  await page.waitForLoadState('domcontentloaded');
+  await page.goto('/', { waitUntil: 'commit' });
 
   if (page.url().includes('/auth/signin')) {
     test.skip(true, 'Live performance benchmarks require public pages or a pre-authenticated storage state.');

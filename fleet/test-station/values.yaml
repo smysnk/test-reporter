@@ -27,6 +27,8 @@ server:
     SERVER_JSON_LIMIT: "50mb"
     INGEST_JSON_LIMIT: "50mb"
     SERVER_ROLE: read
+    BENCHMARK_QUERY_CACHE_ENABLED: "true"
+    BENCHMARK_QUERY_CACHE_TTL_MS: "15000"
     WEB_URL: ""
   secret:
     DATABASE_URL: postgres://test-station:change-me@postgresql.default.svc.cluster.local:5432/test_station

@@ -6,6 +6,8 @@ export function createBenchmarkQueryCache(options = {}) {
   const ttlMs = normalizePositiveInteger(options.ttlMs) ?? DEFAULT_TTL_MS;
   const summaryEntries = new Map();
   const catalogEntries = new Map();
+  const pendingSummaries = new Map();
+  const pendingCatalogs = new Map();
 
   return {
     ttlMs,
@@ -16,6 +18,9 @@ export function createBenchmarkQueryCache(options = {}) {
       writeCacheEntry(summaryEntries, scope, value, ttlMs);
       return value;
     },
+    loadSummary(scope = {}, loader) {
+      return loadCoalescedEntry(summaryEntries, pendingSummaries, scope, loader, ttlMs);
+    },
     readCatalog(scope = {}) {
       return readCacheEntry(catalogEntries, scope, ttlMs);
     },
@@ -23,15 +28,46 @@ export function createBenchmarkQueryCache(options = {}) {
       writeCacheEntry(catalogEntries, scope, value, ttlMs);
       return value;
     },
+    loadCatalog(scope = {}, loader) {
+      return loadCoalescedEntry(catalogEntries, pendingCatalogs, scope, loader, ttlMs);
+    },
     invalidateProject(scope = {}) {
       invalidateCacheEntries(summaryEntries, scope);
       invalidateCacheEntries(catalogEntries, scope);
+      invalidatePendingEntries(pendingSummaries, scope);
+      invalidatePendingEntries(pendingCatalogs, scope);
     },
     clear() {
       summaryEntries.clear();
       catalogEntries.clear();
+      pendingSummaries.clear();
+      pendingCatalogs.clear();
     },
   };
+}
+
+function loadCoalescedEntry(cache, pending, scope, loader, ttlMs) {
+  const cached = readCacheEntry(cache, scope, ttlMs);
+  if (cached !== null) return Promise.resolve(cached);
+  const keys = createScopeKeys(scope);
+  const active = keys.map((key) => pending.get(key)).find(Boolean);
+  if (active) return active;
+
+  const promise = Promise.resolve()
+    .then(loader)
+    .then((value) => {
+      if (keys.some((key) => pending.get(key) === promise)) {
+        writeCacheEntry(cache, scope, value, ttlMs);
+      }
+      return value;
+    })
+    .finally(() => {
+      for (const key of keys) {
+        if (pending.get(key) === promise) pending.delete(key);
+      }
+    });
+  for (const key of keys) pending.set(key, promise);
+  return promise;
 }
 
 const defaultBenchmarkQueryCache = createBenchmarkQueryCache();
@@ -89,6 +125,14 @@ function invalidateCacheEntries(cache, scope) {
     for (const aliasKey of Array.isArray(entry.keys) ? entry.keys : [key]) {
       cache.delete(aliasKey);
     }
+  }
+}
+
+function invalidatePendingEntries(pending, scope) {
+  const promises = new Set(createScopeKeys(scope).map((key) => pending.get(key)).filter(Boolean));
+  if (promises.size === 0) return;
+  for (const [key, promise] of pending.entries()) {
+    if (promises.has(promise)) pending.delete(key);
   }
 }
 

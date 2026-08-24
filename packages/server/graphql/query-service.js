@@ -916,7 +916,7 @@ export function createGraphqlQueryService(options = {}) {
       }));
     },
 
-    async listBenchmarkCatalog({ actor, projectId = null, projectKey = null }) {
+    async listBenchmarkCatalog({ actor, projectId = null, projectKey = null, bypassBenchmarkCache = false }) {
       const projects = await this.listProjects({ actor });
       const scopedProjects = projects.filter((project) => (
         (projectId ? project.id === projectId : true)
@@ -926,7 +926,7 @@ export function createGraphqlQueryService(options = {}) {
         return [];
       }
       const singleProject = scopedProjects.length === 1 ? scopedProjects[0] : null;
-      const cachedCatalog = singleProject
+      const cachedCatalog = singleProject && !bypassBenchmarkCache
         ? benchmarkQueryCache?.readCatalog({
           projectId: singleProject.id,
           projectKey: singleProject.key,
@@ -937,6 +937,12 @@ export function createGraphqlQueryService(options = {}) {
         return cachedCatalog;
       }
       if (singleProject && benchmarkQueryCache) recordCacheOutcome('benchmark_catalog', 'miss');
+      if (singleProject && benchmarkQueryCache?.loadCatalog && !bypassBenchmarkCache) {
+        return benchmarkQueryCache.loadCatalog({
+          projectId: singleProject.id,
+          projectKey: singleProject.key,
+        }, () => this.listBenchmarkCatalog({ actor, projectId, projectKey, bypassBenchmarkCache: true }));
+      }
 
       const projectMap = mapBy(scopedProjects, 'id');
       if (canUsePostgresBenchmarkRepository(models)) {
@@ -1047,7 +1053,7 @@ export function createGraphqlQueryService(options = {}) {
       return catalog;
     },
 
-    async getBenchmarkSummary({ actor, projectId = null, projectKey = null }) {
+    async getBenchmarkSummary({ actor, projectId = null, projectKey = null, bypassBenchmarkCache = false }) {
       const projects = await this.listProjects({ actor });
       const scopedProjects = projects.filter((project) => (
         (projectId ? project.id === projectId : true)
@@ -1061,7 +1067,7 @@ export function createGraphqlQueryService(options = {}) {
         });
       }
       const singleProject = scopedProjects.length === 1 ? scopedProjects[0] : null;
-      const cachedSummary = singleProject
+      const cachedSummary = singleProject && !bypassBenchmarkCache
         ? benchmarkQueryCache?.readSummary({
           projectId: singleProject.id,
           projectKey: singleProject.key,
@@ -1072,6 +1078,12 @@ export function createGraphqlQueryService(options = {}) {
         return cachedSummary;
       }
       if (singleProject && benchmarkQueryCache) recordCacheOutcome('benchmark_summary', 'miss');
+      if (singleProject && benchmarkQueryCache?.loadSummary && !bypassBenchmarkCache) {
+        return benchmarkQueryCache.loadSummary({
+          projectId: singleProject.id,
+          projectKey: singleProject.key,
+        }, () => this.getBenchmarkSummary({ actor, projectId, projectKey, bypassBenchmarkCache: true }));
+      }
 
       const projectMap = mapBy(scopedProjects, 'id');
       if (canUsePostgresBenchmarkRepository(models) && models.RunOverview) {

@@ -75,6 +75,8 @@ test('fleet values and workflow use the unified image contract without stray ref
   assert.match(valuesYaml, /INGEST_SHARED_KEY:\s*change-me/);
   assert.match(valuesYaml, /SERVER_JSON_LIMIT:\s*"50mb"/);
   assert.match(valuesYaml, /INGEST_JSON_LIMIT:\s*"50mb"/);
+  assert.match(valuesYaml, /BENCHMARK_QUERY_CACHE_ENABLED:\s*"true"/);
+  assert.match(valuesYaml, /BENCHMARK_QUERY_CACHE_TTL_MS:\s*"15000"/);
   assert.match(valuesYaml, /requestBodyLimit:\s*\n\s*enabled:\s*true/);
   assert.match(valuesYaml, /maxRequestBodyBytes:\s*52428800/);
   assert.match(valuesYaml, /secretName:\s*""/);

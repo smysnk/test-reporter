@@ -507,11 +507,7 @@ export const SUITE_TESTS_QUERY = `
       fullName
       status
       durationMs
-      moduleName
-      themeName
       filePath
-      line
-      failureMessages
     }
   }
 `;

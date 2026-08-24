@@ -213,28 +213,35 @@ function RunHistoricalSignals({ data, run }) {
 function OperationsRunDetail({ data }) {
   const [showExactPerformanceRows, setShowExactPerformanceRows] = React.useState(false);
   const [showAllFiles, setShowAllFiles] = React.useState(false);
-  const [showPerformancePanels, setShowPerformancePanels] = React.useState(false);
-  const run = data?.run || null;
-  const runPackages = Array.isArray(data?.runPackages) ? data.runPackages : [];
-  const runModules = Array.isArray(data?.runModules) ? data.runModules : [];
-  const runFiles = Array.isArray(data?.runFiles) ? data.runFiles : [];
-  const failedTests = Array.isArray(data?.failedTests) ? data.failedTests : [];
+  const [showOperationsDetails, setShowOperationsDetails] = React.useState(false);
+  const sourceRun = data?.run || null;
+  const allRunPackages = Array.isArray(data?.runPackages) ? data.runPackages : [];
+  const allRunModules = Array.isArray(data?.runModules) ? data.runModules : [];
+  const allRunFiles = Array.isArray(data?.runFiles) ? data.runFiles : [];
+  const allFailedTests = Array.isArray(data?.failedTests) ? data.failedTests : [];
   const runPerformanceStats = Array.isArray(data?.runPerformanceStats) ? data.runPerformanceStats : [];
   const coverageComparison = data?.coverageComparison || null;
+  const run = showOperationsDetails
+    ? sourceRun
+    : { ...(sourceRun || {}), artifacts: [], suites: [] };
+  const runPackages = showOperationsDetails ? allRunPackages : [];
+  const runModules = showOperationsDetails ? allRunModules : [];
+  const runFiles = showOperationsDetails ? allRunFiles : [];
+  const failedTests = showOperationsDetails ? allFailedTests : [];
 
   React.useEffect(() => {
     recordClientPageMark('run-operations-ready', {
-      packageCount: runPackages.length,
-      moduleCount: runModules.length,
-      fileCount: runFiles.length,
-      failedTestCount: failedTests.length,
+      packageCount: allRunPackages.length,
+      moduleCount: allRunModules.length,
+      fileCount: allRunFiles.length,
+      failedTestCount: allFailedTests.length,
       benchmarkStatCount: runPerformanceStats.length,
       hasCoverageComparison: coverageComparison !== null,
     });
-  }, [coverageComparison, failedTests.length, runFiles.length, runModules.length, runPackages.length, runPerformanceStats.length]);
+  }, [allFailedTests.length, allRunFiles.length, allRunModules.length, allRunPackages.length, coverageComparison, runPerformanceStats.length]);
 
   React.useEffect(() => {
-    const reveal = () => setShowPerformancePanels(true);
+    const reveal = () => setShowOperationsDetails(true);
     if (typeof window.requestIdleCallback === 'function') {
       const idleId = window.requestIdleCallback(reveal, { timeout: 1_000 });
       return () => window.cancelIdleCallback(idleId);
@@ -290,7 +297,7 @@ function OperationsRunDetail({ data }) {
             copy: 'A previous run is required before the web can compute a coverage delta.',
           }),
       ),
-      showPerformancePanels
+      showOperationsDetails
         ? React.createElement(
           React.Fragment,
           null,
@@ -335,7 +342,7 @@ function OperationsRunDetail({ data }) {
               ),
           ),
         )
-        : React.createElement('p', { className: 'web-card__copy', role: 'status' }, 'Loading performance panels…'),
+        : React.createElement('p', { className: 'web-card__copy', role: 'status' }, 'Loading detailed panels…'),
       React.createElement(
         SectionCard,
         {

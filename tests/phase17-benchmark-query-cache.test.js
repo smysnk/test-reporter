@@ -59,6 +59,33 @@ test('benchmark query cache stores and invalidates project summaries and catalog
   assert.equal(cache.readCatalog({ projectId: 'project-1' }), null);
 });
 
+test('benchmark query cache coalesces concurrent misses and does not restore invalidated work', async () => {
+  const cache = createBenchmarkQueryCache({ ttlMs: 1000 });
+  const scope = { projectId: 'project-1', projectKey: 'workspace' };
+  let loadCount = 0;
+  const loader = async () => {
+    loadCount += 1;
+    await Promise.resolve();
+    return { projectKey: 'workspace' };
+  };
+
+  const [first, second] = await Promise.all([
+    cache.loadSummary(scope, loader),
+    cache.loadSummary(scope, loader),
+  ]);
+  assert.equal(loadCount, 1);
+  assert.equal(first, second);
+  assert.equal(cache.readSummary({ projectKey: 'workspace' }), first);
+
+  let completeCatalog;
+  const pendingCatalog = cache.loadCatalog(scope, () => new Promise((resolve) => { completeCatalog = resolve; }));
+  await Promise.resolve();
+  cache.invalidateProject({ projectKey: 'workspace' });
+  completeCatalog([{ projectKey: 'workspace' }]);
+  await pendingCatalog;
+  assert.equal(cache.readCatalog(scope), null);
+});
+
 test('query service caches single-project benchmark summary and catalog reads', async () => {
   const projectRows = [{
     id: 'project-1',
