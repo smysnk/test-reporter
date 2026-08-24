@@ -140,6 +140,11 @@ export const PROJECT_ACTIVITY_QUERY = `
         buildNumber
       }
     }
+  }
+`;
+
+export const PROJECT_BENCHMARK_OVERVIEW_QUERY = `
+  query WebProjectBenchmarkOverview($projectKey: String!) {
     benchmarkCatalog(projectKey: $projectKey) {
       projectKey
       statGroup

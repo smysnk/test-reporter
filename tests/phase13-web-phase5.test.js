@@ -35,7 +35,7 @@ import {
   setClientServerPageProfile,
 } from '../packages/web/lib/pageProfiling.js';
 import { buildAdminPageResult, buildOverviewPageResult, buildProjectPageResult, buildRunPageResult } from '../packages/web/lib/pageProps.js';
-import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, PERFORMANCE_TREND_QUERY, RUN_DETAIL_QUERY, RUN_HEADER_QUERY, RUN_PROJECT_HISTORY_QUERY } from '../packages/web/lib/queries.js';
+import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, PROJECT_BENCHMARK_OVERVIEW_QUERY, PERFORMANCE_TREND_QUERY, RUN_DETAIL_QUERY, RUN_HEADER_QUERY, RUN_PROJECT_HISTORY_QUERY } from '../packages/web/lib/queries.js';
 import { resolvePublicRuntimeConfig } from '../packages/web/lib/runtimeConfig.js';
 import {
   ADMIN_PAGE_UNAUTHORIZED,
@@ -1268,7 +1268,7 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
       });
     }
 
-    if (query.includes('WebProjectActivity')) {
+    if (query.includes('WebProjectActivity') || query.includes('WebProjectBenchmarkOverview')) {
       return new Response(JSON.stringify({
         data: {
           runs: [{
@@ -1606,7 +1606,7 @@ test('web project loader falls back to the base trend view when scoped trend pan
       });
     }
 
-    if (query.includes('WebProjectActivity')) {
+    if (query.includes('WebProjectActivity') || query.includes('WebProjectBenchmarkOverview')) {
       return new Response(JSON.stringify({
         data: {
           runs: [{
@@ -2418,11 +2418,13 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceRunId/);
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceUrl/);
   assert.match(PROJECT_ACTIVITY_QUERY, /buildNumber/);
-  assert.match(PROJECT_ACTIVITY_QUERY, /benchmarkCatalog\(projectKey: \$projectKey\)/);
-  assert.match(PROJECT_ACTIVITY_QUERY, /benchmarkSummary\(projectKey: \$projectKey\)/);
-  assert.match(PROJECT_ACTIVITY_QUERY, /topChanges\(limit: 8\)/);
-  assert.match(PROJECT_ACTIVITY_QUERY, /warningThresholdPct/);
-  assert.match(PROJECT_ACTIVITY_QUERY, /severeRegressionCount/);
+  assert.doesNotMatch(PROJECT_ACTIVITY_QUERY, /benchmarkCatalog/);
+  assert.doesNotMatch(PROJECT_ACTIVITY_QUERY, /benchmarkSummary/);
+  assert.match(PROJECT_BENCHMARK_OVERVIEW_QUERY, /benchmarkCatalog\(projectKey: \$projectKey\)/);
+  assert.match(PROJECT_BENCHMARK_OVERVIEW_QUERY, /benchmarkSummary\(projectKey: \$projectKey\)/);
+  assert.match(PROJECT_BENCHMARK_OVERVIEW_QUERY, /topChanges\(limit: 8\)/);
+  assert.match(PROJECT_BENCHMARK_OVERVIEW_QUERY, /warningThresholdPct/);
+  assert.match(PROJECT_BENCHMARK_OVERVIEW_QUERY, /severeRegressionCount/);
   assert.match(PERFORMANCE_TREND_QUERY, /performanceTrend\(projectKey: \$projectKey, statGroup: \$statGroup, statName: \$statName, limit: \$limit\)/);
   assert.match(RUN_HEADER_QUERY, /sourceRunId/);
   assert.match(RUN_HEADER_QUERY, /sourceUrl/);

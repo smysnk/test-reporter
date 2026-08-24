@@ -22,6 +22,7 @@ import {
   WEB_HOME_QUERY,
   WEB_RUN_FEED_PAGE_QUERY,
   PROJECT_ACTIVITY_QUERY,
+  PROJECT_BENCHMARK_OVERVIEW_QUERY,
   PROJECT_BY_SLUG_QUERY,
   RUN_PROJECT_HISTORY_QUERY,
   RUN_HEADER_QUERY,
@@ -302,10 +303,8 @@ export async function loadProjectActivity({ session, projectKey, includeBenchmar
   const activity = activityResult.data;
   const overallTrend = Array.isArray(activity.coverageTrend) ? activity.coverageTrend : [];
   const releaseNotes = Array.isArray(activity.releaseNotes) ? activity.releaseNotes : [];
-  const benchmarkCatalog = Array.isArray(activity.benchmarkCatalog) ? activity.benchmarkCatalog : [];
-  const benchmarkSummary = activity.benchmarkSummary && typeof activity.benchmarkSummary === 'object'
-    ? activity.benchmarkSummary
-    : null;
+  let benchmarkCatalog = [];
+  let benchmarkSummary = null;
   let trendPanels = {
     overall: overallTrend,
     overlays: buildTrendOverlays(overallTrend, releaseNotes),
@@ -316,6 +315,9 @@ export async function loadProjectActivity({ session, projectKey, includeBenchmar
   let benchmarkPanels = [];
 
   if (includeBenchmarks) {
+    const overview = await loadProjectBenchmarkOverview({ session, projectKey, fetchImpl, requestId, requestTrace });
+    benchmarkCatalog = overview.benchmarkCatalog;
+    benchmarkSummary = overview.benchmarkSummary;
     try {
       trendPanels = await measureProfileStep(profiler, 'project-trend-panels', () => loadProjectTrendPanels({
         session,
@@ -361,9 +363,26 @@ export async function loadProjectActivity({ session, projectKey, includeBenchmar
   };
 }
 
+export async function loadProjectBenchmarkOverview({ session, projectKey, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: PROJECT_BENCHMARK_OVERVIEW_QUERY,
+    variables: { projectKey },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  return {
+    benchmarkCatalog: Array.isArray(result.data.benchmarkCatalog) ? result.data.benchmarkCatalog : [],
+    benchmarkSummary: result.data.benchmarkSummary && typeof result.data.benchmarkSummary === 'object'
+      ? result.data.benchmarkSummary
+      : null,
+  };
+}
+
 export async function loadProjectBenchmarkNamespace({ session, projectKey, statGroup, fetchImpl = fetch, requestId = null, requestTrace = null }) {
-  const activityResult = await executeWebGraphqlRequest({ session, query: PROJECT_ACTIVITY_QUERY, variables: { projectKey }, fetchImpl, requestId, requestTrace });
-  const catalog = normalizeBenchmarkCatalogEntries(activityResult.data.benchmarkCatalog || []);
+  const overview = await loadProjectBenchmarkOverview({ session, projectKey, fetchImpl, requestId, requestTrace });
+  const catalog = normalizeBenchmarkCatalogEntries(overview.benchmarkCatalog);
   const selected = catalog.find((entry) => entry.statGroup === statGroup);
   if (!selected) {
     const error = new Error('Benchmark namespace not found');

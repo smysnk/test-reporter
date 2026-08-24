@@ -211,6 +211,7 @@ export default function ProjectExplorerPage({ data }) {
   const trendPanels = resolvedData?.trendPanels || {};
   const [analysisTab, setAnalysisTab] = React.useState(benchmarkPanels.length > 0 ? 'benchmarks' : 'coverage');
   const [benchmarkGroup, setBenchmarkGroup] = React.useState(null);
+  const [benchmarkOverviewLoading, setBenchmarkOverviewLoading] = React.useState(Boolean(data?.project));
   const [benchmarkLoading, setBenchmarkLoading] = React.useState(false);
   const [benchmarkError, setBenchmarkError] = React.useState(null);
   const [benchmarkRevision, setBenchmarkRevision] = React.useState(0);
@@ -240,6 +241,30 @@ export default function ProjectExplorerPage({ data }) {
       })
       .finally(() => {
         if (!controller.signal.aborted) setActivityLoading(false);
+      });
+    return () => controller.abort();
+  }, [project?.slug]);
+
+  React.useEffect(() => {
+    if (!project?.slug) return undefined;
+    const controller = new AbortController();
+    setBenchmarkOverviewLoading(true);
+    fetch(`/api/projects/${encodeURIComponent(project.slug)}/benchmark`, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error?.message || `Request failed (${response.status})`);
+        return payload;
+      })
+      .then((overview) => {
+        setResolvedData((current) => ({ ...current, ...overview, project: current.project }));
+      })
+      .catch((error) => {
+        if (error?.name !== 'AbortError') {
+          setBenchmarkError(error instanceof Error ? error.message : 'Unable to load benchmark overview.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setBenchmarkOverviewLoading(false);
       });
     return () => controller.abort();
   }, [project?.slug]);
@@ -324,7 +349,10 @@ export default function ProjectExplorerPage({ data }) {
       }),
     ),
     activityLoading
-      ? React.createElement('p', { className: 'web-card__copy', role: 'status' }, 'Loading project activity and analysis…')
+      ? React.createElement('p', { className: 'web-card__copy', role: 'status' }, 'Loading project activity…')
+      : null,
+    benchmarkOverviewLoading
+      ? React.createElement('p', { className: 'web-card__copy', role: 'status' }, 'Loading benchmark overview…')
       : null,
     activityError
       ? React.createElement('p', { className: 'web-card__copy', role: 'alert' }, activityError)
