@@ -3085,12 +3085,15 @@ test('web runner report embed script measures the report content instead of the 
   assert.doesNotMatch(html, /body\?\.scrollHeight/);
 });
 
-test('web embedded runner preview bounds test rows without mutating the full report', () => {
-  const report = { packages: [{ suites: [{ tests: [{ id: '1' }, { id: '2' }, { id: '3' }] }] }] };
+test('web embedded runner preview bounds and projects test evidence without mutating the full report', () => {
+  const report = { packages: [{ suites: [{ tests: [{ id: '1', assertions: ['large assertion'], rawDetails: { large: true } }, { id: '2' }, { id: '3' }] }] }] };
   const preview = prepareEmbeddedRunnerReport(report, { maxTestsPerSuite: 2 });
 
   assert.equal(preview.packages[0].suites[0].tests.length, 2);
   assert.match(preview.packages[0].suites[0].warnings[0], /2 of 3 tests/);
+  assert.deepEqual(preview.packages[0].suites[0].tests[0].assertions, []);
+  assert.deepEqual(preview.packages[0].suites[0].tests[0].rawDetails, {});
+  assert.deepEqual(report.packages[0].suites[0].tests[0].assertions, ['large assertion']);
   assert.equal(report.packages[0].suites[0].tests.length, 3);
 });
 

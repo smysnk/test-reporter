@@ -554,7 +554,7 @@ async function loadRunReportHtmlResult({ session, runId, compact = false, fetchI
     };
   }
 
-  const reportHash = crypto.createHash('sha256').update(`${compact ? 'compact:' : 'full:'}${JSON.stringify(run.rawReport)}`).digest('hex');
+  const reportHash = crypto.createHash('sha256').update(`${compact ? 'compact-v2:' : 'full:'}${JSON.stringify(run.rawReport)}`).digest('hex');
   const diskCachePath = path.join(renderedReportCacheDirectory, `${reportHash}.html`);
   if (renderedReportCache.has(reportHash)) {
     return {
@@ -580,7 +580,7 @@ async function loadRunReportHtmlResult({ session, runId, compact = false, fetchI
   const html = await measureProfileStep(profiler, 'run-report-render', async () => {
     const { renderHtmlReport } = await import('@test-station/render-html');
     const embeddedReport = prepareEmbeddedRunnerReport(run.rawReport, {
-      maxTestsPerSuite: compact ? 100 : null,
+      maxTestsPerSuite: compact ? 25 : null,
     });
     return renderHtmlReport(embeddedReport, {
       title: `${run.project?.name || 'Test Station'} Report - ${run.externalKey}`,

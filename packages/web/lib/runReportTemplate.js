@@ -36,6 +36,7 @@ const EMBED_RESIZE_SCRIPT = `<script>
   if (typeof ResizeObserver === 'function') {
     const observer = new ResizeObserver(queueHeight);
     window.addEventListener('load', () => {
+      const content = document.querySelector('main');
       if (content) {
         observer.observe(content);
       } else if (document.body) {
@@ -66,6 +67,9 @@ export function prepareEmbeddedRunnerReport(report, { maxTestsPerSuite = null } 
           `Embedded preview shows ${maxTestsPerSuite} of ${totalTests} tests. Open the full runner report for every row.`,
         ];
       }
+      if (Number.isFinite(maxTestsPerSuite) && maxTestsPerSuite > 0 && Array.isArray(suite?.tests)) {
+        suite.tests = suite.tests.map(projectEmbeddedTestSummary);
+      }
       suite.rawArtifacts = Array.isArray(suite?.rawArtifacts)
         ? suite.rawArtifacts.map((artifact) => normalizeEmbeddedArtifact(artifact))
         : [];
@@ -73,6 +77,29 @@ export function prepareEmbeddedRunnerReport(report, { maxTestsPerSuite = null } 
   }
 
   return clonedReport;
+}
+
+function projectEmbeddedTestSummary(test) {
+  if (!test || typeof test !== 'object') return test;
+  const firstFailure = Array.isArray(test.failureMessages)
+    ? normalizeString(test.failureMessages[0]).slice(0, 500)
+    : '';
+  return {
+    id: test.id,
+    name: test.name,
+    fullName: test.fullName,
+    status: test.status,
+    durationMs: test.durationMs,
+    filePath: test.filePath,
+    location: test.location,
+    module: test.module,
+    failureMessages: firstFailure ? [firstFailure] : [],
+    assertions: [],
+    setup: [],
+    mocks: [],
+    rawDetails: {},
+    sourceSnippet: null,
+  };
 }
 
 export function decorateEmbeddedRunnerReportHtml(html) {
