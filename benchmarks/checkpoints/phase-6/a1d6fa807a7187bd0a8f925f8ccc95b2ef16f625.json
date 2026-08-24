@@ -1,0 +1,237 @@
+{
+  "schemaVersion": "1",
+  "phase": "phase-6",
+  "status": "accepted",
+  "baselineId": "pre-refactor-2026-07",
+  "previousAcceptedCheckpoint": null,
+  "target": {
+    "commit": "a1d6fa807a7187bd0a8f925f8ccc95b2ef16f625",
+    "imageDigest": "sha256:84254bb9d81fab9b67d9607cac0754aa5c6197f4e53976060c2cfb72e3bd9c99",
+    "deployedRevisionVerified": true
+  },
+  "environment": {
+    "profile": "controlled.chromium.1440x1024.medium.authenticated",
+    "fixtureChecksum": "workflow-manifest",
+    "databaseCardinality": {},
+    "runner": {
+      "provider": "github-actions",
+      "os": "ubuntu-24.04",
+      "browser": "chromium"
+    },
+    "region": "production"
+  },
+  "acceptedAt": "2026-08-24T20:10:32Z",
+  "acceptancePolicy": {
+    "requiredConsecutiveGreenExecutions": 3,
+    "observedConsecutiveGreenExecutions": 3,
+    "warmupSamplesPerExecution": 1,
+    "measuredSamplesPerExecution": 5,
+    "aggregation": "worst p95 across the three accepted executions"
+  },
+  "acceptanceEvidence": [
+    {
+      "runId": "32770647334",
+      "runUrl": "https://github.com/smysnk/test-station/actions/runs/32770647334",
+      "benchmarkArtifact": "github://actions/runs/32770647334/artifacts/9536321420",
+      "checkpointArtifact": "github://actions/runs/32770647334/artifacts/9536321860",
+      "conclusion": "success"
+    },
+    {
+      "runId": "32771495634",
+      "runUrl": "https://github.com/smysnk/test-station/actions/runs/32771495634",
+      "benchmarkArtifact": "github://actions/runs/32771495634/artifacts/9536475303",
+      "checkpointArtifact": "github://actions/runs/32771495634/artifacts/9536475708",
+      "conclusion": "success"
+    },
+    {
+      "runId": "32771965612",
+      "runUrl": "https://github.com/smysnk/test-station/actions/runs/32771965612",
+      "benchmarkArtifact": "github://actions/runs/32771965612/artifacts/9536645627",
+      "checkpointArtifact": "github://actions/runs/32771965612/artifacts/9536646388",
+      "conclusion": "success"
+    }
+  ],
+  "metrics": [
+    {
+      "key": "benchmark.web.test-station.home.load.home_ready_ms_p95",
+      "baseline": 776.4,
+      "previousAccepted": null,
+      "current": 652.8,
+      "target": 1000,
+      "noiseBandPercent": 5,
+      "deltaFromBaselinePercent": -15.92,
+      "deltaFromPreviousPercent": null,
+      "budgetHeadroomPercent": 34.72,
+      "sampleCount": 15,
+      "status": "green",
+      "critical": true,
+      "artifact": "github://actions/runs/32771965612/artifacts/9536645627"
+    },
+    {
+      "key": "benchmark.web.test-station.sidebar.focus.and.project.load.project_focus_ms_p95",
+      "baseline": null,
+      "previousAccepted": null,
+      "current": 244.9,
+      "target": 1000,
+      "noiseBandPercent": 5,
+      "deltaFromBaselinePercent": null,
+      "deltaFromPreviousPercent": null,
+      "budgetHeadroomPercent": 75.51,
+      "sampleCount": 15,
+      "status": "green",
+      "critical": true,
+      "artifact": "github://actions/runs/32771965612/artifacts/9536645627"
+    },
+    {
+      "key": "benchmark.web.test-station.sidebar.focus.and.project.load.clear_project_focus_ms_p95",
+      "baseline": null,
+      "previousAccepted": null,
+      "current": 182.2,
+      "target": 1000,
+      "noiseBandPercent": 5,
+      "deltaFromBaselinePercent": null,
+      "deltaFromPreviousPercent": null,
+      "budgetHeadroomPercent": 81.78,
+      "sampleCount": 15,
+      "status": "green",
+      "critical": true,
+      "artifact": "github://actions/runs/32771965612/artifacts/9536645627"
+    },
+    {
+      "key": "benchmark.web.test-station.run.and.project.navigation.project_page_navigation_ms_p95",
+      "baseline": null,
+      "previousAccepted": null,
+      "current": 325.6,
+      "target": 1500,
+      "noiseBandPercent": 5,
+      "deltaFromBaselinePercent": null,
+      "deltaFromPreviousPercent": null,
+      "budgetHeadroomPercent": 78.29,
+      "sampleCount": 15,
+      "status": "green",
+      "critical": true,
+      "artifact": "github://actions/runs/32771965612/artifacts/9536645627"
+    },
+    {
+      "key": "benchmark.web.test-station.run.and.project.navigation.run_navigation_ms_p95",
+      "baseline": null,
+      "previousAccepted": null,
+      "current": 406.5,
+      "target": 1000,
+      "noiseBandPercent": 5,
+      "deltaFromBaselinePercent": null,
+      "deltaFromPreviousPercent": null,
+      "budgetHeadroomPercent": 59.35,
+      "sampleCount": 15,
+      "status": "green",
+      "critical": true,
+      "artifact": "github://actions/runs/32771965612/artifacts/9536645627"
+    },
+    {
+      "key": "benchmark.web.test-station.run.and.project.navigation.runner_report_ready_ms_p95",
+      "baseline": null,
+      "previousAccepted": null,
+      "current": 1356.9,
+      "target": 2000,
+      "noiseBandPercent": 5,
+      "deltaFromBaselinePercent": null,
+      "deltaFromPreviousPercent": null,
+      "budgetHeadroomPercent": 32.16,
+      "sampleCount": 15,
+      "status": "green",
+      "critical": true,
+      "artifact": "github://actions/runs/32771965612/artifacts/9536645627"
+    },
+    {
+      "key": "benchmark.web.test-station.run.and.project.navigation.operations_view_switch_ms_p95",
+      "baseline": null,
+      "previousAccepted": null,
+      "current": 1114.7,
+      "target": 1500,
+      "noiseBandPercent": 5,
+      "deltaFromBaselinePercent": null,
+      "deltaFromPreviousPercent": null,
+      "budgetHeadroomPercent": 25.69,
+      "sampleCount": 15,
+      "status": "green",
+      "critical": true,
+      "artifact": "github://actions/runs/32771965612/artifacts/9536645627"
+    },
+    {
+      "key": "benchmark.web.test-station.run.and.project.navigation.suite_expansion_ms_p95",
+      "baseline": null,
+      "previousAccepted": null,
+      "current": 185.8,
+      "target": 300,
+      "noiseBandPercent": 5,
+      "deltaFromBaselinePercent": null,
+      "deltaFromPreviousPercent": null,
+      "budgetHeadroomPercent": 38.07,
+      "sampleCount": 15,
+      "status": "green",
+      "critical": true,
+      "artifact": "github://actions/runs/32771965612/artifacts/9536645627"
+    },
+    {
+      "key": "benchmark.web.test-station.run.and.project.navigation.paginated_test_fetch_ms_p95",
+      "baseline": null,
+      "previousAccepted": null,
+      "current": 105.5,
+      "target": 500,
+      "noiseBandPercent": 5,
+      "deltaFromBaselinePercent": null,
+      "deltaFromPreviousPercent": null,
+      "budgetHeadroomPercent": 78.9,
+      "sampleCount": 15,
+      "status": "green",
+      "critical": true,
+      "artifact": "github://actions/runs/32771965612/artifacts/9536645627"
+    }
+  ],
+  "correctnessGates": [
+    {
+      "key": "release-pipeline",
+      "status": "passed",
+      "evidence": "https://github.com/smysnk/test-station/actions/runs/32770647334"
+    },
+    {
+      "key": "three-consecutive-production-checkpoints",
+      "status": "passed",
+      "evidence": ["32770647334", "32771495634", "32771965612"]
+    },
+    {
+      "key": "mixed-large-ingest-and-25-readers",
+      "status": "passed",
+      "requestCountPerExecution": 75,
+      "fiveXxCount": 0,
+      "failureCount": 0
+    },
+    {
+      "key": "live-health-readiness-and-migration",
+      "status": "passed",
+      "revision": "a1d6fa807a7187bd0a8f925f8ccc95b2ef16f625",
+      "migration": "20260824_bounded_read_indexes"
+    }
+  ],
+  "deliverables": [
+    {
+      "key": "phase-0-through-phase-6-implementation",
+      "status": "complete"
+    },
+    {
+      "key": "immutable-production-evidence",
+      "status": "complete"
+    },
+    {
+      "key": "final-baseline-comparison",
+      "status": "complete",
+      "note": "The only captured directional pre-refactor browser KPI, home ready, improved from 776.4 ms to a conservative three-execution worst p95 of 652.8 ms. Metrics without a controlled historical value remain baseline null rather than inferred."
+    },
+    {
+      "key": "rollback-retention",
+      "status": "retained-by-policy",
+      "note": "Run.rawReport remains compatibility-only for one stable release and is excluded from normal reads."
+    }
+  ],
+  "waivers": []
+}

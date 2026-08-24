@@ -129,6 +129,23 @@ test('self benchmark preserves raw samples and applies budgets after p95 aggrega
   assert.match(workflow, /Generate and validate phase checkpoint/);
 });
 
+test('accepted phase index points to a validated three-execution production checkpoint', () => {
+  const index = JSON.parse(fs.readFileSync(new URL('../benchmarks/checkpoints/accepted.json', import.meta.url), 'utf8'));
+  const accepted = index.phases['phase-6'];
+  const checkpoint = JSON.parse(fs.readFileSync(new URL(`../benchmarks/checkpoints/${accepted.checkpoint}`, import.meta.url), 'utf8'));
+
+  assert.equal(accepted.status, 'accepted');
+  assert.equal(accepted.commit, checkpoint.target.commit);
+  assert.equal(accepted.imageDigest, checkpoint.target.imageDigest);
+  assert.equal(checkpoint.status, 'accepted');
+  assert.deepEqual(validatePhaseCheckpoint(checkpoint), []);
+  assert.equal(checkpoint.acceptancePolicy.observedConsecutiveGreenExecutions, 3);
+  assert.equal(checkpoint.acceptanceEvidence.length, 3);
+  assert.equal(new Set(checkpoint.acceptanceEvidence.map((entry) => entry.runId)).size, 3);
+  assert.ok(checkpoint.acceptanceEvidence.every((entry) => entry.conclusion === 'success'));
+  assert.ok(checkpoint.metrics.filter((metric) => metric.critical).every((metric) => metric.status === 'green'));
+});
+
 function listen(server) {
   return new Promise((resolve) => {
     server.httpServer.listen(0, '127.0.0.1', () => {
