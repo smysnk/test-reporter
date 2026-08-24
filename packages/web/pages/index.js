@@ -4,11 +4,7 @@ import { useRouter } from 'next/router';
 import { useDispatch, useSelector } from 'react-redux';
 import { MetricGrid, SectionCard, StatusPill, EmptyState } from '../components/WebBits.js';
 import { formatCoveragePct, formatDateTime, formatDuration, formatRepositoryName, formatRunBuildLabel, resolveRunBuildNumber } from '../lib/format.js';
-import {
-  buildHomeExplorerModel,
-  resolveInitialVisibleRunCount,
-  resolveNextVisibleRunCount,
-} from '../lib/homeExplorer.js';
+import { buildHomeExplorerModel } from '../lib/homeExplorer.js';
 import { getWebSession, logWebSessionProbe } from '../lib/auth.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../lib/requestTrace.js';
 import { recordClientPageMark, createPageLoadProfiler, buildServerTimingHeader } from '../lib/pageProfiling.js';
@@ -256,13 +252,16 @@ function RunTable({ runs, selectedProject }) {
 export default function WebIndexPage({ data }) {
   const dispatch = useDispatch();
   const selectedProjectSlug = useSelector((state) => state.explorer.selectedProjectSlug);
+  const [loadedRuns, setLoadedRuns] = React.useState(() => Array.isArray(data?.runs) ? data.runs : []);
+  const [hasMoreByScope, setHasMoreByScope] = React.useState(() => ({ __all__: Boolean(data?.hasMoreRuns) }));
+  const [feedLoading, setFeedLoading] = React.useState(false);
+  const [feedError, setFeedError] = React.useState(null);
   const model = buildHomeExplorerModel({
     projects: data?.projects,
-    runs: data?.runs,
+    runs: loadedRuns,
     selectedProjectSlug,
   });
   const feedScopeKey = model.selectedProject?.slug || '__all__';
-  const [visibleRunCount, setVisibleRunCount] = React.useState(() => resolveInitialVisibleRunCount(model.visibleRuns.length));
   const loadMoreAnchorRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -271,19 +270,33 @@ export default function WebIndexPage({ data }) {
     }
   }, [dispatch, model.selectedProject, selectedProjectSlug]);
 
-  React.useEffect(() => {
-    setVisibleRunCount(resolveInitialVisibleRunCount(model.visibleRuns.length));
-  }, [feedScopeKey, model.visibleRuns.length]);
-
-  const loadMoreRuns = React.useCallback(() => {
-    setVisibleRunCount((currentVisibleRuns) => resolveNextVisibleRunCount(currentVisibleRuns, model.visibleRuns.length));
-  }, [model.visibleRuns.length]);
-
-  const visibleRuns = React.useMemo(
-    () => model.visibleRuns.slice(0, visibleRunCount),
-    [model.visibleRuns, visibleRunCount],
-  );
-  const hasMoreRuns = visibleRunCount < model.visibleRuns.length;
+  const visibleRuns = model.visibleRuns;
+  const hasMoreRuns = hasMoreByScope[feedScopeKey] ?? true;
+  const loadMoreRuns = React.useCallback(async () => {
+    if (feedLoading || !hasMoreRuns) return;
+    setFeedLoading(true);
+    setFeedError(null);
+    try {
+      const lastRun = visibleRuns[visibleRuns.length - 1] || null;
+      const search = new URLSearchParams();
+      if (lastRun?.cursor) search.set('after', lastRun.cursor);
+      if (model.selectedProject?.key) search.set('projectKey', model.selectedProject.key);
+      const response = await fetch(`/api/run-feed?${search.toString()}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || `Run feed request failed (${response.status})`);
+      const incoming = Array.isArray(payload.runs) ? payload.runs : [];
+      setLoadedRuns((current) => {
+        const byId = new Map(current.map((run) => [run.id, run]));
+        for (const run of incoming) byId.set(run.id, run);
+        return Array.from(byId.values());
+      });
+      setHasMoreByScope((current) => ({ ...current, [feedScopeKey]: Boolean(payload.hasMoreRuns) }));
+    } catch (error) {
+      setFeedError(error instanceof Error ? error.message : 'Unable to load more runs');
+    } finally {
+      setFeedLoading(false);
+    }
+  }, [feedLoading, feedScopeKey, hasMoreRuns, model.selectedProject?.key, visibleRuns]);
 
   React.useEffect(() => {
     if (!hasMoreRuns || typeof IntersectionObserver !== 'function') {
@@ -307,7 +320,7 @@ export default function WebIndexPage({ data }) {
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMoreRuns, loadMoreRuns, visibleRunCount]);
+  }, [hasMoreRuns, loadMoreRuns, visibleRuns.length]);
 
   React.useEffect(() => {
     recordClientPageMark('overview-page-ready', {
@@ -461,7 +474,7 @@ export default function WebIndexPage({ data }) {
               React.createElement(
                 'span',
                 { className: 'web-explorer__feed-count' },
-                `Showing ${visibleRuns.length} of ${model.visibleRuns.length} runs`,
+                `${visibleRuns.length} runs loaded`,
               ),
               hasMoreRuns
                 ? React.createElement(
@@ -472,7 +485,7 @@ export default function WebIndexPage({ data }) {
                     onClick: loadMoreRuns,
                     'data-perf-id': 'home-runs-load-more',
                   },
-                  `Load ${Math.min(model.visibleRuns.length - visibleRuns.length, 30)} more`,
+                  feedLoading ? 'Loading…' : 'Load 30 more',
                 )
                 : React.createElement(
                   'span',
@@ -480,6 +493,9 @@ export default function WebIndexPage({ data }) {
                   'All visible runs loaded',
                 ),
             )
+            : null,
+          feedError
+            ? React.createElement('p', { className: 'web-card__copy', role: 'alert' }, feedError)
             : null,
           hasMoreRuns
             ? React.createElement('div', {

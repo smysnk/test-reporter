@@ -45,10 +45,61 @@ import {
   loadProjectBadgeSummary,
   loadWebHomePage,
   loadProjectExplorerPage,
+  loadProjectActivity,
   loadRunExplorerPage,
+  loadRunInsights,
+  loadRunOperationsData,
   loadRunReportHtml,
+  loadSuiteTests,
+  loadWebRunFeedPage,
   resolveWebServerUrl,
 } from '../packages/web/lib/serverGraphql.js';
+
+test('web pagination loaders use one-row lookahead and return stable cursors', async () => {
+  const suiteTests = Array.from({ length: 101 }, (_, index) => ({ id: `test-${String(index + 1).padStart(3, '0')}`, fullName: `test ${index + 1}` }));
+  const runFeed = Array.from({ length: 31 }, (_, index) => ({
+    id: `run-${index + 1}`,
+    externalKey: `run-${index + 1}`,
+    cursor: `cursor-${index + 1}`,
+    projectId: 'project-1',
+    projectKey: 'workspace',
+    projectSlug: 'workspace',
+    projectName: 'Workspace',
+  }));
+  const fetchImpl = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    if (request.query.includes('query WebSuiteTests')) {
+      assert.deepEqual(request.variables, {
+        runId: 'run-1',
+        suiteRunId: 'suite-1',
+        limit: 101,
+        after: 'test-000',
+        status: 'failed',
+        search: 'worker',
+      });
+      return new Response(JSON.stringify({ data: { testsForSuite: suiteTests } }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ data: { runFeed } }), { status: 200 });
+  };
+
+  const testPage = await loadSuiteTests({
+    session: null,
+    runId: 'run-1',
+    suiteRunId: 'suite-1',
+    after: 'test-000',
+    status: 'failed',
+    search: 'worker',
+    fetchImpl,
+  });
+  assert.equal(testPage.tests.length, 100);
+  assert.equal(testPage.hasMore, true);
+  assert.equal(testPage.nextCursor, 'test-100');
+
+  const feedPage = await loadWebRunFeedPage({ session: null, after: 'cursor-0', fetchImpl });
+  assert.equal(feedPage.runs.length, 30);
+  assert.equal(feedPage.hasMoreRuns, true);
+  assert.equal(feedPage.runs.at(-1).cursor, 'cursor-30');
+});
 import { buildRunTemplateHref, resolveRunTemplateMode } from '../packages/web/lib/runTemplateRouting.js';
 import { buildSignInRedirectUrl, isProtectedWebPath, normalizeCallbackTarget } from '../packages/web/lib/routeProtection.js';
 import { RUNNER_REPORT_HEIGHT_MESSAGE_TYPE } from '../packages/web/lib/runReportTemplate.js';
@@ -979,6 +1030,7 @@ test('web health endpoint returns a fast readiness payload', () => {
   assert.deepEqual(response.payload, {
     status: 'ok',
     service: 'test-station-web',
+    revision: 'unknown',
   });
 });
 
@@ -1396,10 +1448,13 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
       });
     }
 
-    if (query.includes('WebPerformanceTrend')) {
+    if (query.includes('WebPerformanceTrends')) {
       return new Response(JSON.stringify({
         data: {
-          performanceTrend: [
+          performanceTrends: [{
+            statGroup: 'benchmark.node.engine.nibbles.intro',
+            statName: 'elapsed_ms',
+            points: [
             {
               id: 'perf-run-1-redux',
               runId: 'run-1',
@@ -1466,7 +1521,8 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
               runnerKey: 'gha-ubuntu-latest-node20',
               metadata: {},
             },
-          ],
+            ],
+          }],
         },
       }), {
         status: 200,
@@ -1483,7 +1539,11 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
   assert.deepEqual(home.runs[0].summary, { totalTests: 2, passedTests: 1, failedTests: 1 });
   assert.equal(requests[0].headers['x-request-id'], 'req-home');
 
-  const project = await loadProjectExplorerPage({ session, slug: 'workspace', fetchImpl, requestId: 'req-project' });
+  const projectShell = await loadProjectExplorerPage({ session, slug: 'workspace', fetchImpl, requestId: 'req-project' });
+  const project = {
+    ...projectShell,
+    ...await loadProjectActivity({ session, projectKey: projectShell.project.key, includeBenchmarks: true, fetchImpl, requestId: 'req-project-activity' }),
+  };
   assert.equal(project.project.key, 'workspace');
   assert.equal(project.runs.length, 1);
   assert.equal(project.coverageTrend.length, 2);
@@ -1499,15 +1559,18 @@ test('web GraphQL helpers forward actor headers and combine project activity dat
   assert.equal(project.trendPanels.packageTrends[0].label, 'workspace');
   assert.equal(project.trendPanels.moduleTrends[0].label, 'runtime');
   assert.equal(project.trendPanels.fileTrends[0].label, '/repo/packages/core/src/index.js');
-  assert.equal(requests[1].body.variables.slug, 'workspace');
-  assert.equal(requests[2].body.variables.projectKey, 'workspace');
-  assert.equal(requests[3].body.variables.runId, 'run-1');
-  assert.equal(requests[4].body.variables.packageName, 'workspace');
-  assert.equal(requests[5].body.variables.moduleName, 'runtime');
-  assert.equal(requests[6].body.variables.filePath, '/repo/packages/core/src/index.js');
-  assert.equal(requests[7].body.variables.projectKey, 'workspace');
-  assert.equal(requests[7].body.variables.statGroup, 'benchmark.node.engine.nibbles.intro');
-  assert.equal(requests[7].body.variables.statName, 'elapsed_ms');
+  const requestFor = (operation) => requests.find((request) => request.body.query.includes(operation));
+  assert.equal(requestFor('WebProjectBySlug').body.variables.slug, 'workspace');
+  assert.equal(requestFor('WebProjectActivity').body.variables.projectKey, 'workspace');
+  assert.equal(requestFor('WebRunScopeTrendCatalog').body.variables.runId, 'run-1');
+  assert.equal(requests.find((request) => request.body.variables.packageName === 'workspace').body.variables.packageName, 'workspace');
+  assert.equal(requests.find((request) => request.body.variables.moduleName === 'runtime').body.variables.moduleName, 'runtime');
+  assert.equal(requests.find((request) => request.body.variables.filePath).body.variables.filePath, '/repo/packages/core/src/index.js');
+  assert.equal(requestFor('WebPerformanceTrends').body.variables.projectKey, 'workspace');
+  assert.deepEqual(requestFor('WebPerformanceTrends').body.variables.metrics, [{
+    statGroup: 'benchmark.node.engine.nibbles.intro',
+    statName: 'elapsed_ms',
+  }]);
 });
 
 test('web project loader falls back to the base trend view when scoped trend panels fail', async () => {
@@ -1592,12 +1655,21 @@ test('web project loader falls back to the base trend view when scoped trend pan
     throw new Error(`Unexpected web GraphQL request: ${query}`);
   };
 
-  const project = await loadProjectExplorerPage({
+  const projectShell = await loadProjectExplorerPage({
     session,
     slug: 'workspace',
     fetchImpl,
     requestId: 'req-project-fallback',
   });
+  const project = {
+    ...projectShell,
+    ...await loadProjectActivity({
+      session,
+      projectKey: projectShell.project.key,
+      fetchImpl,
+      requestId: 'req-project-fallback-activity',
+    }),
+  };
 
   assert.equal(project.project.key, 'workspace');
   assert.equal(project.coverageTrend.length, 1);
@@ -2210,10 +2282,13 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
       });
     }
 
-    if (query.includes('query WebPerformanceTrend')) {
+    if (query.includes('query WebPerformanceTrends')) {
       return new Response(JSON.stringify({
         data: {
-          performanceTrend: [{
+          performanceTrends: [{
+            statGroup: 'benchmark.node.engine.nibbles.intro',
+            statName: 'elapsed_ms',
+            points: [{
             id: 'perf-run-1-redux',
             runId: 'run-1',
             suiteRunId: null,
@@ -2234,6 +2309,7 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
             seriesId: 'interpreter-redux',
             runnerKey: 'gha-ubuntu-latest-node20',
             metadata: {},
+            }],
           }],
         },
       }), {
@@ -2262,13 +2338,21 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.deepEqual(runnerView.failedTests, []);
   assert.deepEqual(runnerView.runModules, []);
   assert.equal(runnerView.coverageComparison, null);
-  assert.equal(runnerView.coverageTrend.length, 1);
-  assert.equal(runnerView.benchmarkPanels.length, 1);
+  assert.equal(runnerView.coverageTrend.length, 0);
+  assert.equal(runnerView.benchmarkPanels.length, 0);
 
-  const operationsView = await loadRunExplorerPage({
+  const insights = await loadRunInsights({
     session,
     runId: 'run-1',
-    templateMode: 'web',
+    projectKey: 'workspace',
+    fetchImpl,
+  });
+  assert.equal(insights.coverageTrend.length, 1);
+  assert.equal(insights.benchmarkPanels.length, 1);
+
+  const operationsView = await loadRunOperationsData({
+    session,
+    runId: 'run-1',
     fetchImpl,
   });
   assert.equal(operationsView.run.id, 'run-1');
@@ -2278,9 +2362,7 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(operationsView.runPerformanceStats[0].statGroup, 'benchmark.node.engine.nibbles.intro');
   assert.equal(operationsView.coverageComparison.deltaLinesPct, 6);
   assert.equal(operationsView.coverageComparison.fileChanges[0].filePath, '/repo/packages/core/src/index.js');
-  assert.equal(operationsView.coverageTrend.length, 1);
-  assert.equal(operationsView.coverageTrendOverlays.length, 2);
-  assert.equal(operationsView.benchmarkPanels.length, 1);
+  assert.equal(insights.coverageTrendOverlays.length, 2);
 
   const direct = await executeWebGraphql({
     session,
@@ -2309,9 +2391,9 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader')), true);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader') && query.includes('runPackages(runId: $runId)')), false);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPackages(runId: $runId)')), true);
-  assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPerformanceStats(runId: $runId)')), true);
+  assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPerformanceStats(runId: $runId, statGroupPrefix: "benchmark.")')), true);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunProjectHistory') && query.includes('coverageTrend(projectKey: $projectKey')), true);
-  assert.equal(graphqlQueries.some((query) => query.includes('query WebPerformanceTrend') && query.includes('performanceTrend(projectKey: $projectKey')), true);
+  assert.equal(graphqlQueries.some((query) => query.includes('query WebPerformanceTrends') && query.includes('performanceTrends(projectKey: $projectKey')), true);
 });
 
 test('web run build chip and GraphQL queries include build metadata and source links', () => {
@@ -2328,13 +2410,11 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(html, /build #88/);
   assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
   assert.match(WEB_HOME_QUERY, /viewer/);
-  assert.match(WEB_HOME_QUERY, /runFeed\s*\{/);
-  assert.doesNotMatch(WEB_HOME_QUERY, /runFeed\(limit:/);
+  assert.match(WEB_HOME_QUERY, /runFeed\(limit:\s*31\)\s*\{/);
   assert.match(WEB_HOME_QUERY, /sourceRunId/);
   assert.match(WEB_HOME_QUERY, /sourceUrl/);
   assert.match(WEB_HOME_QUERY, /buildNumber/);
-  assert.match(PROJECT_ACTIVITY_QUERY, /runs\(projectKey: \$projectKey\)\s*\{/);
-  assert.doesNotMatch(PROJECT_ACTIVITY_QUERY, /runs\(projectKey: \$projectKey,\s*limit:/);
+  assert.match(PROJECT_ACTIVITY_QUERY, /runs\(projectKey: \$projectKey,\s*limit:\s*30\)\s*\{/);
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceRunId/);
   assert.match(PROJECT_ACTIVITY_QUERY, /sourceUrl/);
   assert.match(PROJECT_ACTIVITY_QUERY, /buildNumber/);
@@ -2350,7 +2430,7 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(RUN_DETAIL_QUERY, /sourceRunId/);
   assert.match(RUN_DETAIL_QUERY, /sourceUrl/);
   assert.match(RUN_DETAIL_QUERY, /buildNumber/);
-  assert.match(RUN_DETAIL_QUERY, /runPerformanceStats\(runId: \$runId\)/);
+  assert.match(RUN_DETAIL_QUERY, /runPerformanceStats\(runId: \$runId, statGroupPrefix: "benchmark\."\)/);
   assert.match(RUN_PROJECT_HISTORY_QUERY, /coverageTrend\(projectKey: \$projectKey, limit: 12\)/);
   assert.match(RUN_PROJECT_HISTORY_QUERY, /benchmarkCatalog\(projectKey: \$projectKey\)/);
 });

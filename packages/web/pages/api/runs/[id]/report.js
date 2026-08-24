@@ -7,9 +7,11 @@ import {
   applyTraceHeadersToNextResponse,
   resolveWebRequestTrace,
 } from '../../../../lib/requestTrace.js';
+import { incrementWebCounter, observeWebDuration } from '../../../../lib/runtimeMetrics.js';
 
 export function createRunReportHandler({ getSession = getWebSession, loadReportHtml = loadRunReportHtmlResult } = {}) {
   return async function webRunReportHandler(req, res) {
+    const startedAt = performance.now();
     if (req.method !== 'GET') {
       res.setHeader('allow', 'GET');
       res.status(405).end('Method Not Allowed');
@@ -36,8 +38,13 @@ export function createRunReportHandler({ getSession = getWebSession, loadReportH
         requestTrace,
       });
       const html = typeof result === 'string' ? result : result?.html;
+      const redirectUrl = typeof result === 'string' ? null : result?.redirectUrl;
+      const etag = typeof result === 'string' ? null : result?.etag;
       const upstreamTrace = typeof result === 'string' ? null : result?.meta?.responseTrace?.trace;
       const upstreamServerTiming = typeof result === 'string' ? null : result?.meta?.responseTrace?.serverTiming;
+      const cacheStatus = typeof result === 'string' ? 'legacy-string' : result?.cacheStatus || 'miss';
+      res.setHeader('x-test-station-cache', cacheStatus);
+      incrementWebCounter('test_station_web_report_requests_total', { outcome: cacheStatus });
 
       if (upstreamServerTiming) {
         res.setHeader('server-timing', upstreamServerTiming);
@@ -52,7 +59,26 @@ export function createRunReportHandler({ getSession = getWebSession, loadReportH
         res.setHeader(UPSTREAM_PARENT_REQUEST_ID_HEADER, upstreamTrace.parentRequestId);
       }
 
+      if (etag) {
+        const quotedEtag = `"${etag}"`;
+        res.setHeader('etag', quotedEtag);
+        if (req.headers['if-none-match'] === quotedEtag) {
+          incrementWebCounter('test_station_web_report_requests_total', { outcome: 'not-modified' });
+          observeWebDuration('test_station_web_report_duration_ms', performance.now() - startedAt, { outcome: 'not-modified' });
+          res.status(304).end();
+          return;
+        }
+      }
+
+      if (redirectUrl) {
+        res.setHeader('cache-control', 'private, max-age=300, stale-while-revalidate=3600');
+        observeWebDuration('test_station_web_report_duration_ms', performance.now() - startedAt, { outcome: cacheStatus });
+        res.redirect(307, redirectUrl);
+        return;
+      }
+
       if (!html) {
+        observeWebDuration('test_station_web_report_duration_ms', performance.now() - startedAt, { outcome: 'miss' });
         renderHtmlResponse(res, 404, renderStatusHtml({
           title: 'Run report not found',
           copy: 'The requested execution could not be resolved from the reporting backend.',
@@ -61,7 +87,10 @@ export function createRunReportHandler({ getSession = getWebSession, loadReportH
       }
 
       renderHtmlResponse(res, 200, html);
+      observeWebDuration('test_station_web_report_duration_ms', performance.now() - startedAt, { outcome: cacheStatus });
     } catch (error) {
+      incrementWebCounter('test_station_web_report_requests_total', { outcome: 'error' });
+      observeWebDuration('test_station_web_report_duration_ms', performance.now() - startedAt, { outcome: 'error' });
       renderHtmlResponse(res, 500, renderStatusHtml({
         title: 'Runner report failed to load',
         copy: error instanceof Error && error.message
@@ -75,7 +104,9 @@ export function createRunReportHandler({ getSession = getWebSession, loadReportH
 export default createRunReportHandler();
 
 function renderHtmlResponse(res, statusCode, html) {
-  res.setHeader('cache-control', 'private, no-store');
+  res.setHeader('cache-control', statusCode === 200
+    ? 'private, max-age=300, stale-while-revalidate=3600'
+    : 'private, no-store');
   res.setHeader('content-type', 'text/html; charset=utf-8');
   res.status(statusCode).send(html);
 }

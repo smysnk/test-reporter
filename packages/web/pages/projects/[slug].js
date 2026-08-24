@@ -196,16 +196,103 @@ function ProjectRunTable({ runs }) {
 }
 
 export default function ProjectExplorerPage({ data }) {
-  const project = data?.project || null;
-  const runs = Array.isArray(data?.runs) ? data.runs : [];
-  const coverageTrend = Array.isArray(data?.coverageTrend) ? data.coverageTrend : [];
-  const releaseNotes = Array.isArray(data?.releaseNotes) ? data.releaseNotes : [];
-  const benchmarkPanels = Array.isArray(data?.benchmarkPanels) ? data.benchmarkPanels : [];
-  const benchmarkSummary = data?.benchmarkSummary && typeof data.benchmarkSummary === 'object'
-    ? data.benchmarkSummary
+  const [resolvedData, setResolvedData] = React.useState(data || {});
+  const [activityLoading, setActivityLoading] = React.useState(Boolean(data?.project));
+  const [activityError, setActivityError] = React.useState(null);
+  const project = resolvedData?.project || null;
+  const runs = Array.isArray(resolvedData?.runs) ? resolvedData.runs : [];
+  const coverageTrend = Array.isArray(resolvedData?.coverageTrend) ? resolvedData.coverageTrend : [];
+  const releaseNotes = Array.isArray(resolvedData?.releaseNotes) ? resolvedData.releaseNotes : [];
+  const benchmarkCatalog = Array.isArray(resolvedData?.benchmarkCatalog) ? resolvedData.benchmarkCatalog : [];
+  const benchmarkPanels = Array.isArray(resolvedData?.benchmarkPanels) ? resolvedData.benchmarkPanels : [];
+  const benchmarkSummary = resolvedData?.benchmarkSummary && typeof resolvedData.benchmarkSummary === 'object'
+    ? resolvedData.benchmarkSummary
     : null;
-  const trendPanels = data?.trendPanels || {};
+  const trendPanels = resolvedData?.trendPanels || {};
   const [analysisTab, setAnalysisTab] = React.useState(benchmarkPanels.length > 0 ? 'benchmarks' : 'coverage');
+  const [benchmarkGroup, setBenchmarkGroup] = React.useState(null);
+  const [benchmarkLoading, setBenchmarkLoading] = React.useState(false);
+  const [benchmarkError, setBenchmarkError] = React.useState(null);
+  const [benchmarkRevision, setBenchmarkRevision] = React.useState(0);
+
+  React.useEffect(() => {
+    setResolvedData(data || {});
+  }, [data?.project?.slug]);
+
+  React.useEffect(() => {
+    if (!project?.slug) return undefined;
+    const controller = new AbortController();
+    setActivityLoading(true);
+    setActivityError(null);
+    fetch(`/api/projects/${encodeURIComponent(project.slug)}/activity`, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error?.message || `Request failed (${response.status})`);
+        return payload;
+      })
+      .then((activity) => {
+        setResolvedData((current) => ({ ...current, ...activity, project: current.project }));
+      })
+      .catch((error) => {
+        if (error?.name !== 'AbortError') {
+          setActivityError(error instanceof Error ? error.message : 'Unable to load project activity.');
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setActivityLoading(false);
+      });
+    return () => controller.abort();
+  }, [project?.slug]);
+
+  React.useEffect(() => {
+    if (!project?.slug || benchmarkCatalog.length === 0) return undefined;
+    const requestedFromUrl = new URL(window.location.href).searchParams.get('benchmarkGroup');
+    const requestedGroup = benchmarkGroup || requestedFromUrl;
+    const selected = requestedGroup && benchmarkCatalog.some((entry) => entry.statGroup === requestedGroup)
+      ? requestedGroup
+      : benchmarkCatalog[0].statGroup;
+    if (selected !== benchmarkGroup) setBenchmarkGroup(selected);
+    const url = new URL(window.location.href);
+    url.searchParams.set('benchmarkGroup', selected);
+    window.history.replaceState(window.history.state, '', url);
+    const controller = new AbortController();
+    setBenchmarkLoading(true);
+    setBenchmarkError(null);
+    fetch(`/api/projects/${encodeURIComponent(project.slug)}/benchmark?statGroup=${encodeURIComponent(selected)}`, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error?.message || `Request failed (${response.status})`);
+        return payload;
+      })
+      .then((payload) => setResolvedData((current) => ({ ...current, benchmarkPanels: payload.benchmarkPanels || [] })))
+      .catch((error) => { if (error?.name !== 'AbortError') setBenchmarkError(error instanceof Error ? error.message : 'Unable to load benchmark namespace.'); })
+      .finally(() => { if (!controller.signal.aborted) setBenchmarkLoading(false); });
+    return () => controller.abort();
+  }, [benchmarkCatalog, benchmarkGroup, benchmarkRevision, project?.slug]);
+
+  React.useEffect(() => {
+    if (!project?.slug) return;
+    recordClientPageMark('project-shell-ready', { projectSlug: project.slug });
+  }, [project?.slug]);
+
+  const latestCoverage = coverageTrend[0]?.linesPct ?? runs[0]?.coverageSnapshot?.linesPct ?? null;
+
+  React.useEffect(() => {
+    if (benchmarkPanels.length === 0 && analysisTab !== 'coverage') {
+      setAnalysisTab('coverage');
+    }
+  }, [analysisTab, benchmarkPanels.length]);
+
+  React.useEffect(() => {
+    if (activityLoading || !project?.slug) return;
+    recordClientPageMark('project-page-ready', {
+      projectSlug: project.slug,
+      runCount: runs.length,
+      coveragePointCount: coverageTrend.length,
+      releaseNoteCount: releaseNotes.length,
+      benchmarkNamespaceCount: benchmarkPanels.length,
+    });
+  }, [activityLoading, benchmarkPanels.length, coverageTrend.length, project?.slug, releaseNotes.length, runs.length]);
 
   if (!project) {
     return React.createElement(
@@ -217,24 +304,6 @@ export default function ProjectExplorerPage({ data }) {
       },
     );
   }
-
-  const latestCoverage = coverageTrend[0]?.linesPct ?? runs[0]?.coverageSnapshot?.linesPct ?? null;
-
-  React.useEffect(() => {
-    if (benchmarkPanels.length === 0 && analysisTab !== 'coverage') {
-      setAnalysisTab('coverage');
-    }
-  }, [analysisTab, benchmarkPanels.length]);
-
-  React.useEffect(() => {
-    recordClientPageMark('project-page-ready', {
-      projectSlug: project.slug,
-      runCount: runs.length,
-      coveragePointCount: coverageTrend.length,
-      releaseNoteCount: releaseNotes.length,
-      benchmarkNamespaceCount: benchmarkPanels.length,
-    });
-  }, [benchmarkPanels.length, coverageTrend.length, project.slug, releaseNotes.length, runs.length]);
 
   return React.createElement(
     React.Fragment,
@@ -249,11 +318,17 @@ export default function ProjectExplorerPage({ data }) {
       React.createElement(MetricGrid, {
         items: [
           { label: 'Project Key', value: project.key, copy: project.defaultBranch ? `default branch ${project.defaultBranch}` : 'default branch unavailable' },
-          { label: 'Recent Runs', value: String(runs.length), copy: 'Most recent executions available through GraphQL' },
+          { label: 'Recent Runs', value: String(Number.isFinite(project.runCount) ? project.runCount : runs.length), copy: 'Projected total with the latest executions loaded progressively' },
           { label: 'Latest Line Coverage', value: formatCoveragePct(latestCoverage), copy: 'Recent trend point or run snapshot' },
         ],
       }),
     ),
+    activityLoading
+      ? React.createElement('p', { className: 'web-card__copy', role: 'status' }, 'Loading project activity and analysis…')
+      : null,
+    activityError
+      ? React.createElement('p', { className: 'web-card__copy', role: 'alert' }, activityError)
+      : null,
     React.createElement(
       'div',
       { className: 'web-grid web-grid--two' },
@@ -416,6 +491,23 @@ export default function ProjectExplorerPage({ data }) {
           copy: 'Start from the biggest benchmark changes, then drill into exact series history only where it matters.',
           compact: true,
         },
+        React.createElement(
+          'div',
+          { className: 'web-list__row' },
+          React.createElement(
+            'label',
+            { className: 'web-list__meta' },
+            'Namespace ',
+            React.createElement(
+              'select',
+              { value: benchmarkGroup || '', onChange: (event) => setBenchmarkGroup(event.target.value), 'aria-label': 'Benchmark namespace' },
+              ...benchmarkCatalog.map((entry) => React.createElement('option', { key: entry.statGroup, value: entry.statGroup }, entry.statGroup)),
+            ),
+          ),
+          benchmarkLoading ? React.createElement('span', { role: 'status', className: 'web-list__meta' }, 'Loading namespace…') : null,
+          benchmarkError ? React.createElement('button', { type: 'button', className: 'web-button web-button--ghost', onClick: () => setBenchmarkRevision((value) => value + 1) }, 'Retry namespace') : null,
+        ),
+        benchmarkError ? React.createElement('p', { role: 'alert', className: 'web-card__copy' }, benchmarkError) : null,
         React.createElement(ProjectBenchmarkExplorer, {
           benchmarkSummary,
           benchmarkPanels,

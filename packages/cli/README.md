@@ -328,6 +328,8 @@ Optional environment variables:
 - `TEST_STATION_E2E_BUDGET_RUNNER_REPORT_READY_MS`
 - `TEST_STATION_E2E_BUDGET_OPERATIONS_VIEW_SWITCH_MS`
 - `TEST_STATION_E2E_BUDGET_PROJECT_PAGE_NAVIGATION_MS`
+- `TEST_STATION_E2E_BUDGET_SUITE_EXPANSION_MS`
+- `TEST_STATION_E2E_ENFORCE_BUDGETS`: set to `true` in gating jobs; measurements always retain the checked-in defaults
 
 ### Live UI Interaction Regressions
 

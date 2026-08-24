@@ -14,7 +14,29 @@ import { loadRunExplorerPage } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
 
 export default function RunDetailPage({ data, templateMode = 'runner' }) {
-  const run = data?.run || null;
+  const runId = data?.run?.id || null;
+  const insights = useRunResource(runId, runId ? `/api/runs/${encodeURIComponent(runId)}/insights` : null);
+  const operations = useRunResource(
+    runId,
+    runId && templateMode === 'web' ? `/api/runs/${encodeURIComponent(runId)}/operations` : null,
+  );
+  const resolvedData = {
+    ...(data || {}),
+    ...(insights.data || {}),
+    ...(operations.data || {}),
+    run: operations.data?.run || data?.run || null,
+  };
+  const run = resolvedData?.run || null;
+
+  React.useEffect(() => {
+    if (!run?.id) return;
+    recordClientPageMark('run-page-ready', {
+      runId: run.id,
+      templateMode,
+      failedTestCount: Array.isArray(resolvedData?.failedTests) ? resolvedData.failedTests.length : 0,
+    });
+  }, [resolvedData?.failedTests?.length, run?.id, templateMode]);
+
   if (!run) {
     return React.createElement(
       SectionCard,
@@ -28,14 +50,6 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
 
   const runBuildLabel = formatRunBuildLabel(run);
   const runBuildCopy = run.sourceRunId ? `run ${run.sourceRunId}` : 'run link unavailable';
-
-  React.useEffect(() => {
-    recordClientPageMark('run-page-ready', {
-      runId: run.id,
-      templateMode,
-      failedTestCount: Array.isArray(data?.failedTests) ? data.failedTests.length : 0,
-    });
-  }, [data?.failedTests?.length, run.id, templateMode]);
 
   return React.createElement(
     React.Fragment,
@@ -85,14 +99,60 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
         ],
       }),
     ),
-    React.createElement(RunHistoricalSignals, { data, run }),
+    React.createElement(PanelResourceState, { label: 'historical signals', resource: insights }),
+    React.createElement(RunHistoricalSignals, { data: resolvedData, run, loading: insights.loading }),
     templateMode === 'runner'
       ? React.createElement(RunnerReportSection, {
         runId: run.id,
         externalKey: run.externalKey,
       })
-      : React.createElement(OperationsRunDetail, { data }),
+      : React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(PanelResourceState, { label: 'operations detail', resource: operations }),
+        operations.data ? React.createElement(OperationsRunDetail, { data: resolvedData }) : null,
+      ),
   );
+}
+
+function useRunResource(key, url) {
+  const [state, setState] = React.useState({ data: null, loading: Boolean(url), error: null, revision: 0 });
+  const retry = React.useCallback(() => setState((current) => ({ ...current, revision: current.revision + 1 })), []);
+  React.useEffect(() => {
+    if (!key || !url) {
+      setState({ data: null, loading: false, error: null, revision: 0 });
+      return undefined;
+    }
+    const controller = new AbortController();
+    setState((current) => ({ ...current, data: null, loading: true, error: null }));
+    fetch(url, { signal: controller.signal })
+      .then(readJsonResponse)
+      .then((resourceData) => setState((current) => ({ ...current, data: resourceData, loading: false, error: null })))
+      .catch((error) => {
+        if (error?.name !== 'AbortError') {
+          setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : 'Unable to load panel.' }));
+        }
+      });
+    return () => controller.abort();
+  }, [key, url, state.revision]);
+  return { ...state, retry };
+}
+
+function PanelResourceState({ label, resource }) {
+  if (resource.loading) return React.createElement('p', { className: 'web-card__copy', role: 'status' }, `Loading ${label}…`);
+  if (!resource.error) return null;
+  return React.createElement(
+    'div',
+    { className: 'web-list__row', role: 'alert' },
+    React.createElement('span', { className: 'web-card__copy' }, resource.error),
+    React.createElement('button', { type: 'button', className: 'web-button web-button--ghost', onClick: resource.retry }, `Retry ${label}`),
+  );
+}
+
+async function readJsonResponse(response) {
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload?.error?.message || payload?.error || `Request failed (${response.status})`);
+  return payload;
 }
 
 function RunHistoricalSignals({ data, run }) {
@@ -439,34 +499,198 @@ function OperationsRunDetail({ data }) {
         compact: true,
       },
       Array.isArray(run.suites) && run.suites.length > 0
-        ? React.createElement(
-          'div',
-          { className: 'web-list' },
-          ...run.suites.map((suite) => React.createElement(
-            'article',
-            { className: 'web-list__item', key: suite.id },
-            React.createElement(
-              'div',
-              { className: 'web-list__row' },
-              React.createElement('strong', { className: 'web-list__title' }, suite.label),
-              React.createElement(StatusPill, { status: suite.status }),
-            ),
-            React.createElement(
-              'div',
-              { className: 'web-list__row' },
-              React.createElement('span', { className: 'web-chip' }, suite.runtime),
-              React.createElement('span', { className: 'web-chip' }, formatDuration(suite.durationMs)),
-              React.createElement('span', { className: 'web-chip' }, `${suite.tests.length} tests`),
-            ),
-            suite.warnings?.length
-              ? React.createElement(InlineList, { items: suite.warnings })
-              : null,
-          )),
-        )
+        ? React.createElement(ProgressiveSuiteList, { runId: run.id, suites: run.suites })
         : React.createElement(EmptyState, {
           title: 'No suites stored',
           copy: 'This run did not expose suite-level detail.',
         }),
+    ),
+  );
+}
+
+function ProgressiveSuiteList({ runId, suites }) {
+  const [expandedSuiteId, setExpandedSuiteId] = React.useState(null);
+  const [testsBySuite, setTestsBySuite] = React.useState({});
+  const [loadingSuiteId, setLoadingSuiteId] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const [statusFilter, setStatusFilter] = React.useState('');
+  const [searchFilter, setSearchFilter] = React.useState('');
+  const requestRef = React.useRef(null);
+  const filterKeyRef = React.useRef(`${statusFilter}\0${searchFilter}`);
+
+  const loadSuitePage = React.useCallback(async (suite, append = false) => {
+    const existing = testsBySuite[suite.id] || { tests: [], hasMore: false, nextCursor: null };
+    const params = new URLSearchParams({ suiteRunId: suite.id });
+    if (append && existing.nextCursor) params.set('after', existing.nextCursor);
+    if (statusFilter) params.set('status', statusFilter);
+    if (searchFilter.trim()) params.set('search', searchFilter.trim());
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    requestRef.current = controller;
+    setLoadingSuiteId(suite.id);
+    setError(null);
+    try {
+      const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/suite-tests?${params.toString()}`, { signal: controller.signal });
+      const payload = await readJsonResponse(response);
+      setTestsBySuite((current) => ({
+        ...current,
+        [suite.id]: {
+          tests: append
+            ? [...(current[suite.id]?.tests || []), ...(Array.isArray(payload.tests) ? payload.tests : [])]
+            : (Array.isArray(payload.tests) ? payload.tests : []),
+          hasMore: payload.hasMore === true,
+          nextCursor: payload.nextCursor || null,
+        },
+      }));
+    } catch (loadError) {
+      if (loadError?.name !== 'AbortError') setError(loadError instanceof Error ? loadError.message : 'Unable to load suite tests');
+    } finally {
+      if (!controller.signal.aborted) setLoadingSuiteId(null);
+    }
+  }, [runId, searchFilter, statusFilter, testsBySuite]);
+
+  React.useEffect(() => () => requestRef.current?.abort(), []);
+
+  React.useEffect(() => {
+    const filterKey = `${statusFilter}\0${searchFilter}`;
+    if (filterKeyRef.current === filterKey) return undefined;
+    filterKeyRef.current = filterKey;
+    if (!expandedSuiteId) return undefined;
+    const suite = suites.find((entry) => entry.id === expandedSuiteId);
+    if (!suite) return undefined;
+    const timer = setTimeout(() => {
+      setTestsBySuite((current) => ({ ...current, [suite.id]: undefined }));
+      void loadSuitePage(suite, false);
+      const url = new URL(window.location.href);
+      if (statusFilter) url.searchParams.set('testStatus', statusFilter); else url.searchParams.delete('testStatus');
+      if (searchFilter.trim()) url.searchParams.set('testSearch', searchFilter.trim()); else url.searchParams.delete('testSearch');
+      window.history.replaceState(window.history.state, '', url);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchFilter, statusFilter]);
+
+  const toggleSuite = React.useCallback(async (suite) => {
+    if (expandedSuiteId === suite.id) {
+      setExpandedSuiteId(null);
+      return;
+    }
+    setExpandedSuiteId(suite.id);
+    if (testsBySuite[suite.id]) return;
+    await loadSuitePage(suite);
+  }, [expandedSuiteId, loadSuitePage, testsBySuite]);
+
+  return React.createElement(
+    'div',
+    { className: 'web-list' },
+    React.createElement(
+      'div',
+      { className: 'web-list__row' },
+      React.createElement(
+        'label',
+        { className: 'web-list__meta' },
+        'Status ',
+        React.createElement(
+          'select',
+          { value: statusFilter, onChange: (event) => setStatusFilter(event.target.value), 'aria-label': 'Filter suite tests by status' },
+          React.createElement('option', { value: '' }, 'All'),
+          React.createElement('option', { value: 'failed' }, 'Failed'),
+          React.createElement('option', { value: 'passed' }, 'Passed'),
+          React.createElement('option', { value: 'skipped' }, 'Skipped'),
+        ),
+      ),
+      React.createElement('input', {
+        type: 'search',
+        value: searchFilter,
+        placeholder: 'Search tests',
+        'aria-label': 'Search suite tests',
+        onChange: (event) => setSearchFilter(event.target.value),
+      }),
+    ),
+    ...suites.map((suite) => {
+      const expanded = expandedSuiteId === suite.id;
+      const suitePage = testsBySuite[suite.id] || { tests: [], hasMore: false, nextCursor: null };
+      const tests = suitePage.tests;
+      const totalTests = Number.isFinite(suite.summary?.total) ? suite.summary.total : null;
+      return React.createElement(
+        'article',
+        { className: 'web-list__item', key: suite.id },
+        React.createElement(
+          'div',
+          { className: 'web-list__row' },
+          React.createElement('strong', { className: 'web-list__title' }, suite.label),
+          React.createElement(StatusPill, { status: suite.status }),
+        ),
+        React.createElement(
+          'div',
+          { className: 'web-list__row' },
+          React.createElement('span', { className: 'web-chip' }, suite.runtime),
+          React.createElement('span', { className: 'web-chip' }, formatDuration(suite.durationMs)),
+          React.createElement('span', { className: 'web-chip' }, totalTests === null ? 'tests unavailable' : `${totalTests} tests`),
+          React.createElement('button', {
+            type: 'button',
+            className: 'web-button web-button--ghost',
+            onClick: () => void toggleSuite(suite),
+            'aria-expanded': expanded,
+          }, expanded ? 'Collapse tests' : 'Load tests'),
+        ),
+        suite.warnings?.length ? React.createElement(InlineList, { items: suite.warnings }) : null,
+        expanded
+          ? React.createElement(
+            'div',
+            { className: 'web-list', 'aria-live': 'polite' },
+            loadingSuiteId === suite.id
+              ? React.createElement('span', { className: 'web-list__meta' }, 'Loading tests…')
+              : tests.length > 0
+                ? React.createElement(VirtualTestRows, { tests })
+                : React.createElement('span', { className: 'web-list__meta' }, 'No test rows returned.'),
+            suitePage.hasMore
+              ? React.createElement('button', {
+                type: 'button',
+                className: 'web-button web-button--ghost',
+                disabled: loadingSuiteId === suite.id,
+                onClick: () => void loadSuitePage(suite, true),
+              }, loadingSuiteId === suite.id ? 'Loading more…' : `Load next 100${totalTests ? ` of ${totalTests}` : ''}`)
+              : null,
+          )
+          : null,
+        expanded && error ? React.createElement('span', { className: 'web-list__meta', role: 'alert' }, error) : null,
+      );
+    }),
+  );
+}
+
+function VirtualTestRows({ tests, height = 360, rowHeight = 76 }) {
+  const [scrollTop, setScrollTop] = React.useState(0);
+  const overscan = 4;
+  const visibleCount = Math.ceil(height / rowHeight);
+  const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+  const end = Math.min(tests.length, start + visibleCount + overscan * 2);
+  return React.createElement(
+    'div',
+    {
+      role: 'list',
+      tabIndex: 0,
+      'aria-label': `${tests.length} loaded tests`,
+      onScroll: (event) => setScrollTop(event.currentTarget.scrollTop),
+      style: { height: `${height}px`, overflowY: 'auto', position: 'relative' },
+    },
+    React.createElement(
+      'div',
+      { style: { height: `${tests.length * rowHeight}px`, position: 'relative' } },
+      ...tests.slice(start, end).map((test, index) => React.createElement(
+        'div',
+        {
+          role: 'listitem',
+          className: 'web-list__item',
+          key: test.id,
+          style: { position: 'absolute', top: `${(start + index) * rowHeight}px`, left: 0, right: 0, minHeight: `${rowHeight}px` },
+        },
+        React.createElement('div', { className: 'web-list__row' },
+          React.createElement('span', { className: 'web-list__title' }, test.fullName),
+          React.createElement(StatusPill, { status: test.status }),
+        ),
+        React.createElement('span', { className: 'web-list__meta' }, `${test.filePath || 'no file'} • ${formatDuration(test.durationMs)}`),
+      )),
     ),
   );
 }

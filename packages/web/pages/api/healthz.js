@@ -3,5 +3,6 @@ export default function healthz(_req, res) {
   res.status(200).json({
     status: 'ok',
     service: 'test-station-web',
+    revision: process.env.TEST_STATION_APP_REVISION || 'unknown',
   });
 }

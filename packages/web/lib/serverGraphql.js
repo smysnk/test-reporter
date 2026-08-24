@@ -1,4 +1,8 @@
 import { buildWebActorHeaders } from './auth.js';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {
   buildTraceHeaders,
   createStandaloneWebTrace,
@@ -14,7 +18,9 @@ import {
   ADMIN_USERS_QUERY,
   BADGE_SUMMARY_QUERY,
   PERFORMANCE_TREND_QUERY,
+  PERFORMANCE_TRENDS_QUERY,
   WEB_HOME_QUERY,
+  WEB_RUN_FEED_PAGE_QUERY,
   PROJECT_ACTIVITY_QUERY,
   PROJECT_BY_SLUG_QUERY,
   RUN_PROJECT_HISTORY_QUERY,
@@ -23,6 +29,7 @@ import {
   RUN_DETAIL_QUERY,
   RUN_REPORT_QUERY,
   SCOPED_COVERAGE_TREND_QUERY,
+  SUITE_TESTS_QUERY,
   VIEWER_ACCESS_QUERY,
 } from './queries.js';
 import {
@@ -31,6 +38,8 @@ import {
 } from './runReportTemplate.js';
 
 export const ADMIN_PAGE_UNAUTHORIZED = Symbol('test-station.admin-page-unauthorized');
+const renderedReportCache = new Map();
+const renderedReportCacheDirectory = path.join(os.tmpdir(), 'test-station-rendered-reports');
 
 async function measureProfileStep(profiler, name, fn, details = null) {
   if (!profiler || typeof profiler.measureStep !== 'function') {
@@ -82,6 +91,7 @@ async function executeWebGraphqlRequest({
   const meta = {
     requestTrace: downstreamTrace,
     responseTrace: extractTraceResponseMeta(response.headers),
+    responseProfile: payload?.extensions?.testStationTrace || null,
   };
 
   if (!response.ok || Array.isArray(payload.errors) && payload.errors.length > 0) {
@@ -151,7 +161,30 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
     viewer: data.viewer || data.me || null,
     projects: Array.isArray(data.projects) ? data.projects : [],
     runs: Array.isArray(data.runFeed)
-      ? data.runFeed.map((entry) => ({
+      ? data.runFeed.slice(0, 30).map(normalizeRunFeedEntry)
+      : [],
+    hasMoreRuns: Array.isArray(data.runFeed) && data.runFeed.length > 30,
+  };
+}
+
+export async function loadWebRunFeedPage({ session, after = null, projectKey = null, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: WEB_RUN_FEED_PAGE_QUERY,
+    variables: { after, projectKey },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  const entries = Array.isArray(result.data.runFeed) ? result.data.runFeed : [];
+  return {
+    runs: entries.slice(0, 30).map(normalizeRunFeedEntry),
+    hasMoreRuns: entries.length > 30,
+  };
+}
+
+function normalizeRunFeedEntry(entry) {
+  return {
         id: entry.id,
         externalKey: entry.externalKey,
         status: entry.status,
@@ -161,6 +194,7 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
         sourceUrl: entry.sourceUrl,
         completedAt: entry.completedAt,
         durationMs: entry.durationMs,
+        cursor: entry.cursor || null,
         projectId: entry.projectId,
         project: {
           key: entry.projectKey,
@@ -184,8 +218,6 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
         coverageSnapshot: Number.isFinite(entry.linesPct)
           ? { linesPct: entry.linesPct }
           : null,
-      }))
-      : [],
   };
 }
 
@@ -241,16 +273,29 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
     return null;
   }
 
+  return {
+    project: base.project,
+    runs: [],
+    coverageTrend: [],
+    releaseNotes: [],
+    benchmarkCatalog: [],
+    benchmarkSummary: null,
+    benchmarkPanels: [],
+    trendPanels: {},
+  };
+}
+
+export async function loadProjectActivity({ session, projectKey, includeBenchmarks = false, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
   const activityResult = await measureProfileStep(profiler, 'project-activity-query', () => executeWebGraphqlRequest({
     session,
     query: PROJECT_ACTIVITY_QUERY,
-    variables: { projectKey: base.project.key },
+    variables: { projectKey },
     fetchImpl,
     requestId,
     requestTrace,
   }), (response) => ({
     query: 'PROJECT_ACTIVITY_QUERY',
-    projectKey: base.project.key,
+    projectKey,
     ...response?.meta,
   }));
   const activity = activityResult.data;
@@ -260,50 +305,51 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
   const benchmarkSummary = activity.benchmarkSummary && typeof activity.benchmarkSummary === 'object'
     ? activity.benchmarkSummary
     : null;
-  let trendPanels;
-  let benchmarkPanels;
+  let trendPanels = {
+    overall: overallTrend,
+    overlays: buildTrendOverlays(overallTrend, releaseNotes),
+    packageTrends: [],
+    moduleTrends: [],
+    fileTrends: [],
+  };
+  let benchmarkPanels = [];
 
-  try {
-    trendPanels = await measureProfileStep(profiler, 'project-trend-panels', () => loadProjectTrendPanels({
-      session,
-      projectKey: base.project.key,
-      latestRunId: Array.isArray(activity.runs) && activity.runs[0] ? activity.runs[0].id : null,
-      overallTrend,
-      releaseNotes,
-      fetchImpl,
-      requestId,
-      requestTrace,
-      profiler,
-    }), {
-      latestRunId: Array.isArray(activity.runs) && activity.runs[0] ? activity.runs[0].id : null,
-    });
-  } catch {
-    trendPanels = {
-      overall: overallTrend,
-      overlays: buildTrendOverlays(overallTrend, releaseNotes),
-      packageTrends: [],
-      moduleTrends: [],
-      fileTrends: [],
-    };
-  }
+  if (includeBenchmarks) {
+    try {
+      trendPanels = await measureProfileStep(profiler, 'project-trend-panels', () => loadProjectTrendPanels({
+        session,
+        projectKey,
+        latestRunId: Array.isArray(activity.runs) && activity.runs[0] ? activity.runs[0].id : null,
+        overallTrend,
+        releaseNotes,
+        fetchImpl,
+        requestId,
+        requestTrace,
+        profiler,
+      }), {
+        latestRunId: Array.isArray(activity.runs) && activity.runs[0] ? activity.runs[0].id : null,
+      });
+    } catch {
+      // Keep the bounded overall trend when optional scoped analysis fails.
+    }
 
-  try {
-    benchmarkPanels = await measureProfileStep(profiler, 'project-benchmark-panels', () => loadProjectBenchmarkPanels({
-      session,
-      projectKey: base.project.key,
-      benchmarkCatalog,
-      fetchImpl,
-      requestId,
-      requestTrace,
-    }), {
-      namespaceCount: benchmarkCatalog.length,
-    });
-  } catch {
-    benchmarkPanels = [];
+    try {
+      benchmarkPanels = await measureProfileStep(profiler, 'project-benchmark-panels', () => loadProjectBenchmarkPanels({
+        session,
+        projectKey,
+        benchmarkCatalog,
+        fetchImpl,
+        requestId,
+        requestTrace,
+      }), {
+        namespaceCount: benchmarkCatalog.length,
+      });
+    } catch {
+      // Namespace panels retain independent loading and retry states.
+    }
   }
 
   return {
-    project: base.project,
     runs: Array.isArray(activity.runs) ? activity.runs : [],
     coverageTrend: overallTrend,
     releaseNotes,
@@ -311,6 +357,21 @@ export async function loadProjectExplorerPage({ session, slug, fetchImpl = fetch
     benchmarkSummary,
     benchmarkPanels,
     trendPanels,
+  };
+}
+
+export async function loadProjectBenchmarkNamespace({ session, projectKey, statGroup, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const activityResult = await executeWebGraphqlRequest({ session, query: PROJECT_ACTIVITY_QUERY, variables: { projectKey }, fetchImpl, requestId, requestTrace });
+  const catalog = normalizeBenchmarkCatalogEntries(activityResult.data.benchmarkCatalog || []);
+  const selected = catalog.find((entry) => entry.statGroup === statGroup);
+  if (!selected) {
+    const error = new Error('Benchmark namespace not found');
+    error.statusCode = 404;
+    error.publicMessage = 'Benchmark namespace not found.';
+    throw error;
+  }
+  return {
+    benchmarkPanels: await loadProjectBenchmarkPanels({ session, projectKey, benchmarkCatalog: [selected], fetchImpl, requestId, requestTrace }),
   };
 }
 
@@ -323,16 +384,15 @@ export async function loadRunExplorerPage({
   requestTrace = null,
   profiler = null,
 }) {
-  const useOperationsQuery = templateMode === 'web';
-  const result = await measureProfileStep(profiler, useOperationsQuery ? 'run-detail-query' : 'run-header-query', () => executeWebGraphqlRequest({
+  const result = await measureProfileStep(profiler, 'run-header-query', () => executeWebGraphqlRequest({
     session,
-    query: useOperationsQuery ? RUN_DETAIL_QUERY : RUN_HEADER_QUERY,
+    query: RUN_HEADER_QUERY,
     variables: { runId },
     fetchImpl,
     requestId,
     requestTrace,
   }), (response) => ({
-    query: useOperationsQuery ? 'RUN_DETAIL_QUERY' : 'RUN_HEADER_QUERY',
+    query: 'RUN_HEADER_QUERY',
     runId,
     templateMode,
     ...response?.meta,
@@ -343,64 +403,100 @@ export async function loadRunExplorerPage({
     return null;
   }
 
-  const projectKey = typeof data.run?.project?.key === 'string' && data.run.project.key.trim()
-    ? data.run.project.key.trim()
-    : null;
-  let coverageTrend = [];
-  let coverageTrendOverlays = [];
-  let benchmarkPanels = [];
-
-  if (projectKey) {
-    try {
-      const historyResult = await measureProfileStep(profiler, 'run-project-history-query', () => executeWebGraphqlRequest({
-        session,
-        query: RUN_PROJECT_HISTORY_QUERY,
-        variables: { projectKey },
-        fetchImpl,
-        requestId,
-        requestTrace,
-      }), (response) => ({
-        query: 'RUN_PROJECT_HISTORY_QUERY',
-        projectKey,
-        runId,
-        ...response?.meta,
-      }));
-      const historyData = historyResult.data;
-      coverageTrend = Array.isArray(historyData.coverageTrend) ? historyData.coverageTrend : [];
-      coverageTrendOverlays = buildTrendOverlays(
-        coverageTrend,
-        Array.isArray(historyData.releaseNotes) ? historyData.releaseNotes : [],
-      );
-
-      benchmarkPanels = await measureProfileStep(profiler, 'run-project-benchmark-panels', () => loadProjectBenchmarkPanels({
-        session,
-        projectKey,
-        benchmarkCatalog: Array.isArray(historyData.benchmarkCatalog) ? historyData.benchmarkCatalog : [],
-        fetchImpl,
-        requestId,
-        requestTrace,
-      }), {
-        projectKey,
-        runId,
-      });
-    } catch {
-      coverageTrend = [];
-      coverageTrendOverlays = [];
-      benchmarkPanels = [];
-    }
-  }
-
   return {
     run: data.run,
+    coverageTrend: [],
+    coverageTrendOverlays: [],
+    benchmarkPanels: [],
+    runPackages: [],
+    runModules: [],
+    runFiles: [],
+    failedTests: [],
+    runPerformanceStats: [],
+    coverageComparison: null,
+  };
+}
+
+export async function loadRunInsights({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const headerResult = await executeWebGraphqlRequest({
+    session,
+    query: RUN_HEADER_QUERY,
+    variables: { runId },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  const projectKey = headerResult.data.run?.project?.key || null;
+  if (!projectKey) {
+    const error = new Error('Run not found');
+    error.statusCode = 404;
+    error.publicMessage = 'Run not found.';
+    throw error;
+  }
+  const historyResult = await executeWebGraphqlRequest({
+    session,
+    query: RUN_PROJECT_HISTORY_QUERY,
+    variables: { projectKey },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  const historyData = historyResult.data;
+  const coverageTrend = Array.isArray(historyData.coverageTrend) ? historyData.coverageTrend : [];
+  return {
     coverageTrend,
-    coverageTrendOverlays,
-    benchmarkPanels,
-    runPackages: useOperationsQuery && Array.isArray(data.runPackages) ? data.runPackages : [],
-    runModules: useOperationsQuery && Array.isArray(data.runModules) ? data.runModules : [],
-    runFiles: useOperationsQuery && Array.isArray(data.runFiles) ? data.runFiles : [],
-    failedTests: useOperationsQuery && Array.isArray(data.tests) ? data.tests : [],
-    runPerformanceStats: useOperationsQuery && Array.isArray(data.runPerformanceStats) ? data.runPerformanceStats : [],
-    coverageComparison: useOperationsQuery ? (data.runCoverageComparison || null) : null,
+    coverageTrendOverlays: buildTrendOverlays(
+      coverageTrend,
+      Array.isArray(historyData.releaseNotes) ? historyData.releaseNotes : [],
+    ),
+    benchmarkPanels: await loadProjectBenchmarkPanels({
+      session,
+      projectKey,
+      benchmarkCatalog: Array.isArray(historyData.benchmarkCatalog) ? historyData.benchmarkCatalog.slice(0, 1) : [],
+      fetchImpl,
+      requestId,
+      requestTrace,
+    }),
+    runId,
+  };
+}
+
+export async function loadRunOperationsData({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: RUN_DETAIL_QUERY,
+    variables: { runId },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  const data = result.data;
+  return {
+    run: data.run || null,
+    runPackages: Array.isArray(data.runPackages) ? data.runPackages : [],
+    runModules: Array.isArray(data.runModules) ? data.runModules : [],
+    runFiles: Array.isArray(data.runFiles) ? data.runFiles : [],
+    failedTests: Array.isArray(data.tests) ? data.tests : [],
+    runPerformanceStats: Array.isArray(data.runPerformanceStats) ? data.runPerformanceStats : [],
+    coverageComparison: data.runCoverageComparison || null,
+  };
+}
+
+export async function loadSuiteTests({ session, runId, suiteRunId, limit = 100, after = null, status = null, search = null, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: SUITE_TESTS_QUERY,
+    variables: { runId, suiteRunId, limit: limit + 1, after, status, search },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  const tests = Array.isArray(result.data.testsForSuite) ? result.data.testsForSuite : [];
+  const page = tests.slice(0, limit);
+  return {
+    tests: page,
+    hasMore: tests.length > limit,
+    nextCursor: page.at(-1)?.id || null,
   };
 }
 
@@ -424,6 +520,43 @@ async function loadRunReportHtmlResult({ session, runId, fetchImpl = fetch, requ
     return null;
   }
 
+  const storedHtmlArtifact = (Array.isArray(run.artifacts) ? run.artifacts : []).find((artifact) => (
+    typeof artifact?.sourceUrl === 'string'
+    && /^https?:\/\//i.test(artifact.sourceUrl)
+    && (artifact.relativePath === 'index.html' || artifact.relativePath?.endsWith('/index.html'))
+  ));
+  if (storedHtmlArtifact) {
+    return {
+      redirectUrl: storedHtmlArtifact.sourceUrl,
+      etag: storedHtmlArtifact.metadata?.contentHash || null,
+      meta: result.meta,
+      cacheStatus: 'stored-artifact',
+    };
+  }
+
+  const reportHash = crypto.createHash('sha256').update(JSON.stringify(run.rawReport)).digest('hex');
+  const diskCachePath = path.join(renderedReportCacheDirectory, `${reportHash}.html`);
+  if (renderedReportCache.has(reportHash)) {
+    return {
+      html: renderedReportCache.get(reportHash),
+      etag: reportHash,
+      meta: result.meta,
+      cacheStatus: 'render-cache-hit',
+    };
+  }
+  try {
+    const cachedHtml = fs.readFileSync(diskCachePath, 'utf8');
+    renderedReportCache.set(reportHash, cachedHtml);
+    return {
+      html: cachedHtml,
+      etag: reportHash,
+      meta: result.meta,
+      cacheStatus: 'render-cache-hit',
+    };
+  } catch (error) {
+    if (error?.code !== 'ENOENT') throw error;
+  }
+
   const html = await measureProfileStep(profiler, 'run-report-render', async () => {
     const { renderHtmlReport } = await import('@test-station/render-html');
     const embeddedReport = prepareEmbeddedRunnerReport(run.rawReport);
@@ -434,9 +567,16 @@ async function loadRunReportHtmlResult({ session, runId, fetchImpl = fetch, requ
     runId,
   });
 
+  const decoratedHtml = decorateEmbeddedRunnerReportHtml(html);
+  fs.mkdirSync(renderedReportCacheDirectory, { recursive: true });
+  fs.writeFileSync(diskCachePath, decoratedHtml, { mode: 0o600 });
+  renderedReportCache.set(reportHash, decoratedHtml);
+  if (renderedReportCache.size > 50) renderedReportCache.delete(renderedReportCache.keys().next().value);
   return {
-    html: decorateEmbeddedRunnerReportHtml(html),
+    html: decoratedHtml,
+    etag: reportHash,
     meta: result.meta,
+    cacheStatus: 'render-cache-miss',
   };
 }
 
@@ -708,29 +848,22 @@ async function loadProjectBenchmarkPanels({
     return [];
   }
 
-  const metricResponses = await Promise.all(catalogEntries.flatMap((entry) => (
-    entry.statNames.map(async (statName) => {
-      const result = await executeWebGraphqlRequest({
-        session,
-        query: PERFORMANCE_TREND_QUERY,
-        variables: {
-          projectKey,
-          statGroup: entry.statGroup,
-          statName,
-          limit: 18,
-        },
-        fetchImpl,
-        requestId,
-        requestTrace,
-      });
-
-      return {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: PERFORMANCE_TRENDS_QUERY,
+    variables: {
+      projectKey,
+      metrics: catalogEntries.flatMap((entry) => entry.statNames.map((statName) => ({
         statGroup: entry.statGroup,
         statName,
-        points: Array.isArray(result.data.performanceTrend) ? result.data.performanceTrend : [],
-      };
-    })
-  )));
+      }))),
+      limit: 18,
+    },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  const metricResponses = Array.isArray(result.data.performanceTrends) ? result.data.performanceTrends : [];
 
   const panelMap = new Map(catalogEntries.map((entry) => [entry.statGroup, {
     ...entry,

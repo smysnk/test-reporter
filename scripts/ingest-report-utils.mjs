@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { captureGitHubDefaultEnvironment } from '../packages/core/src/github-actions-env.js';
 
 export function readJson(filePath) {
@@ -18,6 +19,8 @@ export function createIngestPayload(options = {}) {
     jobStatus: options.jobStatus,
     artifactCount: countOutputFiles(outputDir),
     storage,
+    sourceRunId: options.sourceRunId,
+    targetCommit: options.targetCommit,
   }, options.env);
 
   return {
@@ -25,6 +28,7 @@ export function createIngestPayload(options = {}) {
     report: attachArtifactLocations(report, storage),
     source,
     artifacts: collectOutputArtifacts(outputDir, storage),
+    ...(normalizeSubmissionOptions(options.submission) ? { submission: normalizeSubmissionOptions(options.submission) } : {}),
   };
 }
 
@@ -76,6 +80,10 @@ export function collectOutputArtifacts(outputDir, storage = {}) {
         mediaType: inferMediaType(relativePath),
         storageKey: locator.storageKey,
         sourceUrl: locator.sourceUrl,
+        metadata: {
+          contentHash: crypto.createHash('sha256').update(fs.readFileSync(path.resolve(outputDir, relativePath))).digest('hex'),
+          sizeBytes: fs.statSync(path.resolve(outputDir, relativePath)).size,
+        },
       };
     });
 }
@@ -121,7 +129,9 @@ export function buildGitHubSourceContext(options = {}, env = process.env) {
     || new Date().toISOString();
   const buildDurationMs = diffTimestamps(startedAt, completedAt);
   const buildNumber = parseInteger(env.GITHUB_RUN_NUMBER);
-  const runId = trimToNull(env.GITHUB_RUN_ID);
+  const runId = trimToNull(options.sourceRunId)
+    || trimToNull(env.TEST_STATION_SOURCE_RUN_ID)
+    || trimToNull(env.GITHUB_RUN_ID);
   const runAttempt = parseInteger(env.GITHUB_RUN_ATTEMPT);
   const runUrl = repositoryFullName && runId ? `${serverUrl}/${repositoryFullName}/actions/runs/${runId}` : null;
   const semanticVersion = tag && /^v?\d+\.\d+\.\d+([-.+].+)?$/.test(tag) ? tag.replace(/^v/, '') : null;
@@ -166,6 +176,9 @@ export function buildGitHubSourceContext(options = {}, env = process.env) {
         prefix: storage.prefix,
         baseUrl: storage.baseUrl,
       },
+      targetCommit: trimToNull(options.targetCommit)
+        || trimToNull(env.TEST_STATION_TARGET_COMMIT)
+        || trimToNull(env.GITHUB_SHA),
     },
   };
 }
@@ -176,6 +189,15 @@ export function normalizeStorageOptions(storage = {}) {
     prefix: normalizeRelativePath(storage.prefix || ''),
     baseUrl: normalizeBaseUrl(storage.baseUrl),
   };
+}
+
+export function normalizeSubmissionOptions(submission = null) {
+  if (!submission || typeof submission !== 'object') return null;
+  const kind = trimToNull(submission.kind);
+  const producerKey = trimToNull(submission.producerKey);
+  const submissionKey = trimToNull(submission.submissionKey);
+  if (!kind && !producerKey && !submissionKey) return null;
+  return { kind, producerKey, submissionKey };
 }
 
 function createArtifactLocator(relativePath, storage = {}) {

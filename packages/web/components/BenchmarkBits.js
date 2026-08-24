@@ -134,7 +134,10 @@ export function ProjectBenchmarkExplorer({ benchmarkSummary = null, benchmarkPan
                   'td',
                   null,
                   React.createElement('strong', { className: 'web-list__title' }, formatBenchmarkDelta(entry.deltaPercent)),
-                  React.createElement('div', { className: 'web-list__meta' }, formatBenchmarkDeltaValue(entry.deltaValue, entry.unit)),
+                  React.createElement('div', { className: 'web-list__meta' }, `previous ${formatBenchmarkDeltaValue(entry.deltaValue, entry.unit)}`),
+                  entry.baselineId
+                    ? React.createElement('div', { className: 'web-list__meta' }, `baseline ${entry.baselineId}: ${formatBenchmarkDelta(entry.baselineDeltaPercent)}`)
+                    : null,
                 ),
                 React.createElement('td', null, entry.latestBranch || 'no branch'),
                 React.createElement('td', null, entry.latestRunnerKey || 'runner unavailable'),
@@ -828,6 +831,14 @@ function normalizeBenchmarkSummaryTopChanges(entries) {
       previousValue: Number.isFinite(entry.previousValue) ? entry.previousValue : null,
       deltaValue: Number.isFinite(entry.deltaValue) ? entry.deltaValue : null,
       deltaPercent: Number.isFinite(entry.deltaPercent) ? entry.deltaPercent : null,
+      ...(entry.baselineId ? {
+        baselineId: entry.baselineId,
+        baselineRunId: entry.baselineRunId || null,
+        baselineValue: Number.isFinite(entry.baselineValue) ? entry.baselineValue : null,
+        baselineDeltaValue: Number.isFinite(entry.baselineDeltaValue) ? entry.baselineDeltaValue : null,
+        baselineDeltaPercent: Number.isFinite(entry.baselineDeltaPercent) ? entry.baselineDeltaPercent : null,
+        baselineStatus: entry.baselineStatus || null,
+      } : {}),
     }));
 }
 

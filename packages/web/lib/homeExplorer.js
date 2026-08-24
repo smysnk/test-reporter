@@ -40,19 +40,27 @@ export function buildHomeExplorerModel({ projects, runs, selectedProjectSlug = n
   const sidebarProjects = projectList
     .map((project) => {
       const projectRuns = runList.filter((run) => run?.project?.slug === project.slug);
-      const latestRun = projectRuns.reduce((latest, run) => {
+      const latestRunFromWindow = projectRuns.reduce((latest, run) => {
         if (!latest) {
           return run;
         }
 
         return toTimestamp(run?.completedAt) > toTimestamp(latest?.completedAt) ? run : latest;
       }, null);
+      const latestRun = project.latestRunId
+        ? {
+          id: project.latestRunId,
+          status: project.latestStatus || 'unknown',
+          completedAt: project.latestCompletedAt || null,
+          coverageSnapshot: Number.isFinite(project.latestLinesPct) ? { linesPct: project.latestLinesPct } : null,
+        }
+        : latestRunFromWindow;
 
       return {
         ...project,
         latestRun,
         latestCoverage: latestRun?.coverageSnapshot?.linesPct ?? null,
-        recentRunCount: projectRuns.length,
+        recentRunCount: Number.isFinite(project.runCount) ? project.runCount : projectRuns.length,
       };
     })
     .sort(compareProjectsByActivity);

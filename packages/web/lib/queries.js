@@ -13,8 +13,16 @@ export const WEB_HOME_QUERY = `
       name
       defaultBranch
       repositoryUrl
+      runCount
+      latestRunId
+      latestStatus
+      latestCompletedAt
+      latestLinesPct
+      totalTests
+      passedTests
+      failedTests
     }
-    runFeed {
+    runFeed(limit: 31) {
       id
       externalKey
       status
@@ -35,6 +43,35 @@ export const WEB_HOME_QUERY = `
       totalTests
       passedTests
       failedTests
+      cursor
+    }
+  }
+`;
+
+export const WEB_RUN_FEED_PAGE_QUERY = `
+  query WebRunFeedPage($after: String, $projectKey: String) {
+    runFeed(limit: 31, after: $after, projectKey: $projectKey) {
+      id
+      externalKey
+      status
+      branch
+      commitSha
+      sourceRunId
+      sourceUrl
+      completedAt
+      durationMs
+      projectId
+      projectKey
+      projectSlug
+      projectName
+      projectRepositoryUrl
+      versionKey
+      buildNumber
+      linesPct
+      totalTests
+      passedTests
+      failedTests
+      cursor
     }
   }
 `;
@@ -49,13 +86,21 @@ export const PROJECT_BY_SLUG_QUERY = `
       defaultBranch
       repositoryUrl
       metadata
+      runCount
+      latestRunId
+      latestStatus
+      latestCompletedAt
+      latestLinesPct
+      totalTests
+      passedTests
+      failedTests
     }
   }
 `;
 
 export const PROJECT_ACTIVITY_QUERY = `
   query WebProjectActivity($projectKey: String!) {
-    runs(projectKey: $projectKey) {
+    runs(projectKey: $projectKey, limit: 30) {
       id
       externalKey
       status
@@ -143,6 +188,12 @@ export const PROJECT_ACTIVITY_QUERY = `
         previousValue
         deltaValue
         deltaPercent
+        baselineId
+        baselineRunId
+        baselineValue
+        baselineDeltaValue
+        baselineDeltaPercent
+        baselineStatus
       }
       topRegressions(limit: 1) {
         statGroup
@@ -205,6 +256,32 @@ export const PERFORMANCE_TREND_QUERY = `
       seriesId
       runnerKey
       metadata
+    }
+  }
+`;
+
+export const PERFORMANCE_TRENDS_QUERY = `
+  query WebPerformanceTrends($projectKey: String!, $metrics: [PerformanceMetricSelectionInput!]!, $limit: Int!) {
+    performanceTrends(projectKey: $projectKey, metrics: $metrics, limit: $limit) {
+      statGroup
+      statName
+      points {
+        runId
+        externalKey
+        versionKey
+        completedAt
+        branch
+        commitSha
+        buildNumber
+        statGroup
+        statName
+        numericValue
+        textValue
+        unit
+        seriesId
+        runnerKey
+        metadata
+      }
     }
   }
 `;
@@ -324,17 +401,6 @@ export const RUN_DETAIL_QUERY = `
         durationMs
         warnings
         summary
-        tests {
-          id
-          fullName
-          status
-          durationMs
-          moduleName
-          themeName
-          filePath
-          line
-          failureMessages
-        }
       }
       artifacts {
         id
@@ -371,7 +437,7 @@ export const RUN_DETAIL_QUERY = `
       failedTestCount
       coverage
     }
-    tests(runId: $runId, status: "failed") {
+    tests(runId: $runId, status: "failed", limit: 50) {
       id
       fullName
       status
@@ -381,7 +447,7 @@ export const RUN_DETAIL_QUERY = `
       line
       failureMessages
     }
-    runPerformanceStats(runId: $runId) {
+    runPerformanceStats(runId: $runId, statGroupPrefix: "benchmark.") {
       id
       runId
       suiteRunId
@@ -447,6 +513,22 @@ export const RUN_DETAIL_QUERY = `
   }
 `;
 
+export const SUITE_TESTS_QUERY = `
+  query WebSuiteTests($runId: ID!, $suiteRunId: ID!, $limit: Int!, $after: ID, $status: String, $search: String) {
+    testsForSuite(runId: $runId, suiteRunId: $suiteRunId, limit: $limit, after: $after, status: $status, search: $search) {
+      id
+      fullName
+      status
+      durationMs
+      moduleName
+      themeName
+      filePath
+      line
+      failureMessages
+    }
+  }
+`;
+
 export const RUN_HEADER_QUERY = `
   query WebRunHeader($runId: ID!) {
     run(id: $runId) {
@@ -492,6 +574,13 @@ export const RUN_REPORT_QUERY = `
         name
       }
       rawReport
+      artifacts {
+        relativePath
+        sourceUrl
+        storageKey
+        mediaType
+        metadata
+      }
     }
   }
 `;
