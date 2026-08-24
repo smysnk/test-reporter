@@ -39,8 +39,10 @@ export function generatePhaseCheckpoint({ aggregate, phase, commit, imageDigest,
 }
 
 function resolveTarget(budgets, name) {
-  const base = name.replace(/(?:Median|P95)$/, '');
-  const value = budgets?.[name] ?? budgets?.[base];
+  if (Number.isFinite(budgets?.[name])) return budgets[name];
+  if (!name.endsWith('P95')) return null;
+  const base = name.replace(/P95$/, '');
+  const value = budgets?.[base];
   return Number.isFinite(value) ? value : null;
 }
 function percent(value, denominator) { return denominator ? Number(((value / denominator) * 100).toFixed(2)) : null; }

@@ -94,7 +94,7 @@ test('phase checkpoints require immutable evidence and reject red critical metri
     aggregate: {
       sampleCount: 5,
       budgets: { homeReadyMs: 1_000 },
-      benchmarks: [{ scenario: 'home-load', metrics: { homeReadyMsMedian: 900 } }],
+      benchmarks: [{ scenario: 'home-load', metrics: { homeReadyMsMedian: 900, homeReadyMsP95: 950 } }],
     },
     phase: 'phase-6',
     commit: 'abcdef1234567',
@@ -102,19 +102,23 @@ test('phase checkpoints require immutable evidence and reject red critical metri
     artifact: `sha256:${'2'.repeat(64)}`,
   });
   assert.deepEqual(validatePhaseCheckpoint(checkpoint), []);
+  assert.equal(checkpoint.metrics[0].target, null);
+  assert.equal(checkpoint.metrics[0].status, 'neutral');
+  assert.equal(checkpoint.metrics[1].target, 1_000);
+  assert.equal(checkpoint.metrics[1].critical, true);
 
-  checkpoint.metrics[0].current = 1_200;
-  checkpoint.metrics[0].status = 'red';
+  checkpoint.metrics[1].current = 1_200;
+  checkpoint.metrics[1].status = 'red';
   assert.match(validatePhaseCheckpoint(checkpoint).join('\n'), /requires a valid waiver/);
   checkpoint.waivers.push({
-    metricKey: checkpoint.metrics[0].key,
+    metricKey: checkpoint.metrics[1].key,
     owner: 'performance-owner',
     rationale: 'Known upstream variance while capacity change rolls out.',
     expiresAt: '2026-09-01T00:00:00.000Z',
   });
   assert.deepEqual(validatePhaseCheckpoint(checkpoint, { now: new Date('2026-08-24T00:00:00.000Z') }), []);
 
-  checkpoint.metrics[0].artifact = 'artifacts/latest.json';
+  checkpoint.metrics[1].artifact = 'artifacts/latest.json';
   assert.match(validatePhaseCheckpoint(checkpoint).join('\n'), /mutable artifact reference/);
 });
 

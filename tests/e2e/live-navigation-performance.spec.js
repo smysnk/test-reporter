@@ -214,12 +214,14 @@ test('benchmarks runner report readiness, operations view, and project-page navi
   const runnerReportProfiling = await collectProfilingSnapshot(page, 'runner-frame-height-ready');
 
   const operationsViewLink = page.getByRole('link', { name: 'Operations view' });
+  const operationsReadyStart = performance.now();
   const operationsNavigation = await navigateByHrefWithFallback(
     page,
     operationsViewLink,
     new RegExp(`/runs/${escapeRegExp(runId)}\\?template=web`),
   );
   await expect(page.getByText('Run-to-run comparison', { exact: true })).toBeVisible();
+  const operationsViewSwitchMs = round(performance.now() - operationsReadyStart);
   const operationsProfiling = await collectProfilingSnapshot(page, 'run-operations-ready');
   const suiteLoadButton = page.getByRole('button', { name: 'Load tests' }).first();
   let suiteExpansionMs = null;
@@ -257,7 +259,7 @@ test('benchmarks runner report readiness, operations view, and project-page navi
     metrics: {
       runNavigationMs: runNavigation.durationMs,
       runnerReportReadyMs,
-      operationsViewSwitchMs: operationsNavigation.durationMs,
+      operationsViewSwitchMs,
       suiteExpansionMs,
       paginatedTestFetchMs,
       projectPageNavigationMs: projectNavigation.durationMs,

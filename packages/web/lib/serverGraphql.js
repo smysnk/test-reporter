@@ -38,7 +38,7 @@ import {
 } from './runReportTemplate.js';
 
 export const ADMIN_PAGE_UNAUTHORIZED = Symbol('test-station.admin-page-unauthorized');
-const INITIAL_HOME_RUN_LIMIT = 20;
+const INITIAL_HOME_RUN_LIMIT = 10;
 const renderedReportCache = new Map();
 const renderedReportCacheDirectory = path.join(os.tmpdir(), 'test-station-rendered-reports');
 

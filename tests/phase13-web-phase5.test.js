@@ -2410,7 +2410,7 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(html, /build #88/);
   assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
   assert.match(WEB_HOME_QUERY, /viewer/);
-  assert.match(WEB_HOME_QUERY, /runFeed\(limit:\s*21\)\s*\{/);
+  assert.match(WEB_HOME_QUERY, /runFeed\(limit:\s*11\)\s*\{/);
   assert.match(WEB_HOME_QUERY, /sourceRunId/);
   assert.match(WEB_HOME_QUERY, /sourceUrl/);
   assert.match(WEB_HOME_QUERY, /buildNumber/);
@@ -2431,6 +2431,9 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(RUN_DETAIL_QUERY, /sourceUrl/);
   assert.match(RUN_DETAIL_QUERY, /buildNumber/);
   assert.match(RUN_DETAIL_QUERY, /runPerformanceStats\(runId: \$runId, statGroupPrefix: "benchmark\."\)/);
+  assert.doesNotMatch(RUN_DETAIL_QUERY, /durationMs\n\s+summary\n\s+project \{/);
+  assert.doesNotMatch(RUN_DETAIL_QUERY, /runPerformanceStats[\s\S]*?\n\s+textValue\n/);
+  assert.match(RUN_DETAIL_QUERY, /tests\(runId: \$runId, status: "failed", limit: 20\)/);
   assert.match(RUN_PROJECT_HISTORY_QUERY, /coverageTrend\(projectKey: \$projectKey, limit: 12\)/);
   assert.match(RUN_PROJECT_HISTORY_QUERY, /benchmarkCatalog\(projectKey: \$projectKey\)/);
 });
@@ -3085,11 +3088,17 @@ test('web focused run view avoids nested scroll containers around the report', (
 });
 
 test('web run template routing defaults to the runner report and keeps the operations view addressable', () => {
+  const runPageSource = fs.readFileSync(new URL('../packages/web/pages/runs/[id].js', import.meta.url), 'utf8');
+
   assert.equal(resolveRunTemplateMode(undefined), 'runner');
   assert.equal(resolveRunTemplateMode('runner'), 'runner');
   assert.equal(resolveRunTemplateMode('web'), 'web');
   assert.equal(buildRunTemplateHref('run-1', 'runner'), '/runs/run-1');
   assert.equal(buildRunTemplateHref('run-1', 'web'), '/runs/run-1?template=web');
+  assert.match(runPageSource, /const activeTemplateMode = resolveRunTemplateMode\(router\.query\?\.template \?\? templateMode\)/);
+  assert.equal((runPageSource.match(/shallow: true/g) || []).length, 2);
+  assert.match(runPageSource, /Show \$\{runPerformanceStats\.length\} recorded rows/);
+  assert.match(runPageSource, /runFiles\.slice\(0, 30\)/);
 });
 
 function createRunnerReportFixture() {

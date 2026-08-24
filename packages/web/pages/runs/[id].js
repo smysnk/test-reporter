@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { BenchmarkExplorer, PerformanceDomainSummary, RunBenchmarkDeltaSummary, RunBenchmarkSummary } from '../../components/BenchmarkBits.js';
 import { CoverageTrendPanel } from '../../components/CoverageTrendPanel.js';
 import { EmptyState, InlineList, MetricGrid, RunSourceLink, SectionCard, StatusPill } from '../../components/WebBits.js';
@@ -14,11 +15,13 @@ import { loadRunExplorerPage } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
 
 export default function RunDetailPage({ data, templateMode = 'runner' }) {
+  const router = useRouter();
+  const activeTemplateMode = resolveRunTemplateMode(router.query?.template ?? templateMode);
   const runId = data?.run?.id || null;
   const insights = useRunResource(runId, runId ? `/api/runs/${encodeURIComponent(runId)}/insights` : null);
   const operations = useRunResource(
     runId,
-    runId && templateMode === 'web' ? `/api/runs/${encodeURIComponent(runId)}/operations` : null,
+    runId && activeTemplateMode === 'web' ? `/api/runs/${encodeURIComponent(runId)}/operations` : null,
   );
   const resolvedData = {
     ...(data || {}),
@@ -32,10 +35,10 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
     if (!run?.id) return;
     recordClientPageMark('run-page-ready', {
       runId: run.id,
-      templateMode,
+      templateMode: activeTemplateMode,
       failedTestCount: Array.isArray(resolvedData?.failedTests) ? resolvedData.failedTests.length : 0,
     });
-  }, [resolvedData?.failedTests?.length, run?.id, templateMode]);
+  }, [activeTemplateMode, resolvedData?.failedTests?.length, run?.id]);
 
   if (!run) {
     return React.createElement(
@@ -59,7 +62,7 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
       {
         eyebrow: 'Run Detail',
         title: run.externalKey,
-        copy: templateMode === 'runner'
+        copy: activeTemplateMode === 'runner'
           ? 'Switch between the web operator view and the exact HTML template emitted by the test runner.'
           : 'A single execution view that combines summary counts, suite health, failure details, files, and raw artifacts.',
       },
@@ -85,7 +88,7 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
           React.createElement(RunSourceLink, { run }),
           React.createElement(TemplateSwitch, {
             runId: run.id,
-            activeTemplate: templateMode,
+            activeTemplate: activeTemplateMode,
           }),
         ),
       ),
@@ -101,7 +104,7 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
     ),
     React.createElement(PanelResourceState, { label: 'historical signals', resource: insights }),
     React.createElement(RunHistoricalSignals, { data: resolvedData, run, loading: insights.loading }),
-    templateMode === 'runner'
+    activeTemplateMode === 'runner'
       ? React.createElement(RunnerReportSection, {
         runId: run.id,
         externalKey: run.externalKey,
@@ -208,6 +211,8 @@ function RunHistoricalSignals({ data, run }) {
 }
 
 function OperationsRunDetail({ data }) {
+  const [showExactPerformanceRows, setShowExactPerformanceRows] = React.useState(false);
+  const [showAllFiles, setShowAllFiles] = React.useState(false);
   const run = data?.run || null;
   const runPackages = Array.isArray(data?.runPackages) ? data.runPackages : [];
   const runModules = Array.isArray(data?.runModules) ? data.runModules : [];
@@ -299,10 +304,20 @@ function OperationsRunDetail({ data }) {
         React.createElement(PerformanceDomainSummary, {
           stats: runPerformanceStats,
         }),
-        React.createElement(RunBenchmarkSummary, {
-          stats: runPerformanceStats,
-          historyHref: '#run-benchmark-history',
-        }),
+        showExactPerformanceRows
+          ? React.createElement(RunBenchmarkSummary, {
+            stats: runPerformanceStats,
+            historyHref: '#run-benchmark-history',
+          })
+          : React.createElement(
+            'button',
+            {
+              type: 'button',
+              className: 'web-button web-button--secondary',
+              onClick: () => setShowExactPerformanceRows(true),
+            },
+            `Show ${runPerformanceStats.length} recorded rows`,
+          ),
       ),
       React.createElement(
         SectionCard,
@@ -474,7 +489,7 @@ function OperationsRunDetail({ data }) {
                 React.createElement(
                   'tbody',
                   null,
-                  ...runFiles.map((file) => React.createElement(
+                  ...(showAllFiles ? runFiles : runFiles.slice(0, 30)).map((file) => React.createElement(
                     'tr',
                     { key: file.path },
                     React.createElement('td', { className: 'web-table__path' }, file.path),
@@ -485,6 +500,17 @@ function OperationsRunDetail({ data }) {
                   )),
                 ),
               ),
+              runFiles.length > 30 && !showAllFiles
+                ? React.createElement(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'web-button web-button--secondary',
+                    onClick: () => setShowAllFiles(true),
+                  },
+                  `Show all ${runFiles.length} files`,
+                )
+                : null,
             )
             : null,
         ),
@@ -703,6 +729,7 @@ function TemplateSwitch({ runId, activeTemplate }) {
       Link,
       {
         href: buildRunTemplateHref(runId, 'web'),
+        shallow: true,
         'data-perf-id': 'run-template-web',
         className: activeTemplate === 'web'
           ? 'web-segmented-control__link web-segmented-control__link--active'
@@ -714,6 +741,7 @@ function TemplateSwitch({ runId, activeTemplate }) {
       Link,
       {
         href: buildRunTemplateHref(runId, 'runner'),
+        shallow: true,
         'data-perf-id': 'run-template-runner',
         className: activeTemplate === 'runner'
           ? 'web-segmented-control__link web-segmented-control__link--active'

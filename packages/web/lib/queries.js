@@ -22,7 +22,7 @@ export const WEB_HOME_QUERY = `
       passedTests
       failedTests
     }
-    runFeed(limit: 21) {
+    runFeed(limit: 11) {
       id
       externalKey
       status
@@ -375,7 +375,6 @@ export const RUN_DETAIL_QUERY = `
       startedAt
       completedAt
       durationMs
-      summary
       project {
         key
         slug
@@ -415,36 +414,29 @@ export const RUN_DETAIL_QUERY = `
       status
       durationMs
       suiteCount
-      summary
       frameworks
     }
     runModules(runId: $runId) {
       module
       owner
-      durationMs
       packageCount
       packages
-      frameworks
       coverage
     }
     runFiles(runId: $runId) {
       path
-      packageName
       moduleName
-      language
       status
       testCount
       failedTestCount
       coverage
     }
-    tests(runId: $runId, status: "failed", limit: 50) {
+    tests(runId: $runId, status: "failed", limit: 20) {
       id
       fullName
       status
       moduleName
-      themeName
       filePath
-      line
       failureMessages
     }
     runPerformanceStats(runId: $runId, statGroupPrefix: "benchmark.") {
@@ -452,18 +444,13 @@ export const RUN_DETAIL_QUERY = `
       runId
       suiteRunId
       testExecutionId
-      projectId
       projectKey
-      externalKey
-      versionKey
       completedAt
       branch
       commitSha
-      buildNumber
       statGroup
       statName
       numericValue
-      textValue
       unit
       seriesId
       runnerKey
