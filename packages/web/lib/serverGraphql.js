@@ -491,19 +491,6 @@ export async function loadRunOperationsData({ session, runId, fetchImpl = fetch,
     requestTrace,
   });
   const data = result.data;
-  const firstSuiteId = data.run?.suites?.[0]?.id || null;
-  const initialSuitePages = firstSuiteId
-    ? {
-      [firstSuiteId]: await loadSuiteTests({
-        session,
-        runId,
-        suiteRunId: firstSuiteId,
-        fetchImpl,
-        requestId,
-        requestTrace,
-      }),
-    }
-    : {};
   return {
     run: data.run || null,
     runPackages: Array.isArray(data.runPackages) ? data.runPackages : [],
@@ -512,7 +499,6 @@ export async function loadRunOperationsData({ session, runId, fetchImpl = fetch,
     failedTests: Array.isArray(data.tests) ? data.tests : [],
     runPerformanceStats: Array.isArray(data.runPerformanceStats) ? data.runPerformanceStats : [],
     coverageComparison: data.runCoverageComparison || null,
-    initialSuitePages,
   };
 }
 

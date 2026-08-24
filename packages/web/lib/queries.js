@@ -549,6 +549,9 @@ export const RUN_HEADER_QUERY = `
         functionsPct
         statementsPct
       }
+      suites {
+        id
+      }
     }
   }
 `;

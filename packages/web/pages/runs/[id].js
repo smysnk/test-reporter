@@ -18,16 +18,26 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
   const router = useRouter();
   const activeTemplateMode = resolveRunTemplateMode(router.query?.template ?? templateMode);
   const runId = data?.run?.id || null;
+  const firstSuiteId = data?.run?.suites?.[0]?.id || null;
   const insights = useRunResource(runId, runId ? `/api/runs/${encodeURIComponent(runId)}/insights` : null);
   const operations = useRunResource(
     runId,
     runId && activeTemplateMode === 'web' ? `/api/runs/${encodeURIComponent(runId)}/operations` : null,
+  );
+  const initialSuitePage = useRunResource(
+    firstSuiteId,
+    runId && firstSuiteId && activeTemplateMode === 'web'
+      ? `/api/runs/${encodeURIComponent(runId)}/suite-tests?suiteRunId=${encodeURIComponent(firstSuiteId)}`
+      : null,
   );
   const resolvedData = {
     ...(data || {}),
     ...(insights.data || {}),
     ...(operations.data || {}),
     run: operations.data?.run || data?.run || null,
+    initialSuitePages: firstSuiteId && initialSuitePage.data
+      ? { [firstSuiteId]: initialSuitePage.data }
+      : {},
   };
   const run = resolvedData?.run || null;
 
@@ -571,6 +581,16 @@ function ProgressiveSuiteList({ runId, suites, initialPages = {} }) {
   const [searchFilter, setSearchFilter] = React.useState('');
   const requestRef = React.useRef(null);
   const filterKeyRef = React.useRef(`${statusFilter}\0${searchFilter}`);
+  const initialPageEntry = Object.entries(initialPages || {})[0] || [];
+  const initialPageSuiteId = initialPageEntry[0] || null;
+  const initialPage = initialPageEntry[1] || null;
+
+  React.useEffect(() => {
+    if (!initialPageSuiteId || !initialPage) return;
+    setTestsBySuite((current) => current[initialPageSuiteId]
+      ? current
+      : { ...current, [initialPageSuiteId]: initialPage });
+  }, [initialPage, initialPageSuiteId]);
 
   const loadSuitePage = React.useCallback(async (suite, append = false) => {
     const existing = testsBySuite[suite.id] || { tests: [], hasMore: false, nextCursor: null };

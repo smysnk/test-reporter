@@ -2175,6 +2175,7 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
             project: { key: 'workspace', slug: 'workspace', name: 'Workspace' },
             projectVersion: { versionKey: 'commit:abc123', buildNumber: 88 },
             coverageSnapshot: { linesPct: 80 },
+            suites: [{ id: 'suite-1' }],
           },
         },
       }), {
@@ -2282,23 +2283,6 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
       });
     }
 
-    if (query.includes('query WebSuiteTests')) {
-      assert.deepEqual(request.variables, {
-        runId: 'run-1',
-        suiteRunId: 'suite-1',
-        limit: 101,
-        after: null,
-        status: null,
-        search: null,
-      });
-      return new Response(JSON.stringify({
-        data: { testsForSuite: [{ id: 'suite-test-1', fullName: 'prefetched test', status: 'passed' }] },
-      }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
-
     if (query.includes('query WebPerformanceTrends')) {
       return new Response(JSON.stringify({
         data: {
@@ -2379,7 +2363,6 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(operationsView.runPerformanceStats[0].statGroup, 'benchmark.node.engine.nibbles.intro');
   assert.equal(operationsView.coverageComparison.deltaLinesPct, 6);
   assert.equal(operationsView.coverageComparison.fileChanges[0].filePath, '/repo/packages/core/src/index.js');
-  assert.equal(operationsView.initialSuitePages['suite-1'].tests[0].id, 'suite-test-1');
   assert.equal(insights.coverageTrendOverlays.length, 2);
 
   const direct = await executeWebGraphql({
@@ -2407,6 +2390,7 @@ test('web run loader and raw GraphQL executor preserve response structure', asyn
   assert.equal(formatBenchmarkMetricLabel('steps_per_second'), 'Steps Per Second');
   assert.equal(formatBenchmarkNamespace('benchmark.node.engine.nibbles.intro'), 'Node / Engine / Nibbles / Intro');
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader')), true);
+  assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader') && query.includes('suites {')), true);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunHeader') && query.includes('runPackages(runId: $runId)')), false);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPackages(runId: $runId)')), true);
   assert.equal(graphqlQueries.some((query) => query.includes('query WebRunDetail') && query.includes('runPerformanceStats(runId: $runId, statGroupPrefix: "benchmark.")')), true);
