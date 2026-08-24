@@ -3097,6 +3097,8 @@ test('web run template routing defaults to the runner report and keeps the opera
   assert.equal(buildRunTemplateHref('run-1', 'web'), '/runs/run-1?template=web');
   assert.match(runPageSource, /const activeTemplateMode = resolveRunTemplateMode\(router\.query\?\.template \?\? templateMode\)/);
   assert.equal((runPageSource.match(/shallow: true/g) || []).length, 2);
+  assert.match(runPageSource, /requestIdleCallback\(reveal, \{ timeout: 1_000 \}\)/);
+  assert.match(runPageSource, /showPerformancePanels[\s\S]*Loading performance panels…/);
   assert.match(runPageSource, /Show \$\{runPerformanceStats\.length\} recorded rows/);
   assert.match(runPageSource, /runFiles\.slice\(0, 30\)/);
 });

@@ -213,6 +213,7 @@ function RunHistoricalSignals({ data, run }) {
 function OperationsRunDetail({ data }) {
   const [showExactPerformanceRows, setShowExactPerformanceRows] = React.useState(false);
   const [showAllFiles, setShowAllFiles] = React.useState(false);
+  const [showPerformancePanels, setShowPerformancePanels] = React.useState(false);
   const run = data?.run || null;
   const runPackages = Array.isArray(data?.runPackages) ? data.runPackages : [];
   const runModules = Array.isArray(data?.runModules) ? data.runModules : [];
@@ -231,6 +232,16 @@ function OperationsRunDetail({ data }) {
       hasCoverageComparison: coverageComparison !== null,
     });
   }, [coverageComparison, failedTests.length, runFiles.length, runModules.length, runPackages.length, runPerformanceStats.length]);
+
+  React.useEffect(() => {
+    const reveal = () => setShowPerformancePanels(true);
+    if (typeof window.requestIdleCallback === 'function') {
+      const idleId = window.requestIdleCallback(reveal, { timeout: 1_000 });
+      return () => window.cancelIdleCallback(idleId);
+    }
+    const timeoutId = window.setTimeout(reveal, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, []);
 
   return React.createElement(
     React.Fragment,
@@ -279,46 +290,52 @@ function OperationsRunDetail({ data }) {
             copy: 'A previous run is required before the web can compute a coverage delta.',
           }),
       ),
-      React.createElement(
-        SectionCard,
-        {
-          eyebrow: 'Performance Delta',
-          title: 'Run benchmark movement',
-          copy: 'This run is compared against the most recent matching benchmark history before raw metric rows are shown.',
-          compact: true,
-        },
-        React.createElement(RunBenchmarkDeltaSummary, {
-          stats: runPerformanceStats,
-          benchmarkPanels: Array.isArray(data?.benchmarkPanels) ? data.benchmarkPanels : [],
-          historyHref: '#run-benchmark-history',
-        }),
-      ),
-      React.createElement(
-        SectionCard,
-        {
-          eyebrow: 'Performance Rows',
-          title: 'Recorded performance stats',
-          copy: 'Namespaced performance rows remain available when you need the exact stored values behind the delta summaries.',
-          compact: true,
-        },
-        React.createElement(PerformanceDomainSummary, {
-          stats: runPerformanceStats,
-        }),
-        showExactPerformanceRows
-          ? React.createElement(RunBenchmarkSummary, {
-            stats: runPerformanceStats,
-            historyHref: '#run-benchmark-history',
-          })
-          : React.createElement(
-            'button',
+      showPerformancePanels
+        ? React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(
+            SectionCard,
             {
-              type: 'button',
-              className: 'web-button web-button--secondary',
-              onClick: () => setShowExactPerformanceRows(true),
+              eyebrow: 'Performance Delta',
+              title: 'Run benchmark movement',
+              copy: 'This run is compared against the most recent matching benchmark history before raw metric rows are shown.',
+              compact: true,
             },
-            `Show ${runPerformanceStats.length} recorded rows`,
+            React.createElement(RunBenchmarkDeltaSummary, {
+              stats: runPerformanceStats,
+              benchmarkPanels: Array.isArray(data?.benchmarkPanels) ? data.benchmarkPanels : [],
+              historyHref: '#run-benchmark-history',
+            }),
           ),
-      ),
+          React.createElement(
+            SectionCard,
+            {
+              eyebrow: 'Performance Rows',
+              title: 'Recorded performance stats',
+              copy: 'Namespaced performance rows remain available when you need the exact stored values behind the delta summaries.',
+              compact: true,
+            },
+            React.createElement(PerformanceDomainSummary, {
+              stats: runPerformanceStats,
+            }),
+            showExactPerformanceRows
+              ? React.createElement(RunBenchmarkSummary, {
+                stats: runPerformanceStats,
+                historyHref: '#run-benchmark-history',
+              })
+              : React.createElement(
+                'button',
+                {
+                  type: 'button',
+                  className: 'web-button web-button--secondary',
+                  onClick: () => setShowExactPerformanceRows(true),
+                },
+                `Show ${runPerformanceStats.length} recorded rows`,
+              ),
+          ),
+        )
+        : React.createElement('p', { className: 'web-card__copy', role: 'status' }, 'Loading performance panels…'),
       React.createElement(
         SectionCard,
         {
