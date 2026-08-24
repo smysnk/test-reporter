@@ -1,0 +1,21 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "test-station.serverName" . }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "test-station.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "test-station.webName" . }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "test-station.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: web

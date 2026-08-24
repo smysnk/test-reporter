@@ -33,7 +33,7 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "test-station.serverName" $ }}
+                name: {{ include "test-station.ingestName" $ }}
                 port:
                   number: {{ $.Values.server.service.port }}
           {{- end }}
@@ -47,7 +47,7 @@ spec:
             pathType: {{ .pathType }}
             backend:
               service:
-                name: {{ include "test-station.serverName" $ }}
+                name: {{ include "test-station.ingestName" $ }}
                 port:
                   number: {{ $.Values.server.service.port }}
           {{- end }}

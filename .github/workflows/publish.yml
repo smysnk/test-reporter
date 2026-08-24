@@ -234,4 +234,18 @@ jobs:
           echo "KUBECONFIG_PATH=$kubeconfig_path" >> "$GITHUB_ENV"
 
       - name: Deploy Fleet bundle and roll main workloads
+        env:
+          TEST_STATION_TARGET_COMMIT: ${{ github.sha }}
         run: ./scripts/deploy-fleet.sh --kubeconfig "$KUBECONFIG_PATH" --restart
+
+  self-benchmark:
+    needs: [docker-image, fleet-deploy]
+    uses: ./.github/workflows/self-benchmark.yml
+    with:
+      base_url: https://test-station.smysnk.com
+      target_commit: ${{ github.sha }}
+      image_digest: ${{ needs.docker-image.outputs.image_digest }}
+      baseline_id: pre-refactor-2026-07
+      refactor_phase: phase-6
+      enforce_budgets: true
+    secrets: inherit

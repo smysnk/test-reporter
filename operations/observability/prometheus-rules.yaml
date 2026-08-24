@@ -1,0 +1,34 @@
+groups:
+  - name: test-station-performance
+    rules:
+      - alert: TestStationHighFiveXxRate
+        expr: sum(rate(test_station_http_requests_total{outcome="error"}[5m])) / clamp_min(sum(rate(test_station_http_requests_total[5m])), 1) > 0.01
+        for: 10m
+        labels: { severity: page }
+        annotations: { summary: "Test Station 5xx rate exceeds 1%" }
+      - alert: TestStationDatabasePoolWait
+        expr: rate(test_station_database_pool_wait_ms_sum[5m]) / clamp_min(rate(test_station_database_pool_wait_ms_count[5m]), 1) > 100
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "Test Station database pool wait exceeds 100 ms" }
+      - alert: TestStationDatabaseTimeouts
+        expr: increase(test_station_database_timeouts_total[10m]) > 0
+        labels: { severity: page }
+        annotations: { summary: "Test Station database query timed out" }
+      - alert: TestStationIngestFailures
+        expr: increase(test_station_ingest_requests_total{outcome="error"}[10m]) > 0
+        labels: { severity: warning }
+        annotations: { summary: "Test Station ingest failures detected" }
+      - alert: TestStationProjectionLag
+        expr: test_station_projection_lag_ms > 60000
+        for: 10m
+        labels: { severity: warning }
+        annotations: { summary: "Test Station projection lag exceeds one minute" }
+      - alert: TestStationLegacyReportFallback
+        expr: increase(test_station_web_report_requests_total{outcome="render-cache-miss"}[30m]) > 5
+        labels: { severity: warning }
+        annotations: { summary: "Test Station is repeatedly rendering legacy reports" }
+      - alert: TestStationPodRestarting
+        expr: increase(kube_pod_container_status_restarts_total{namespace="test-station"}[15m]) > 2
+        labels: { severity: page }
+        annotations: { summary: "Test Station pod is restarting repeatedly" }

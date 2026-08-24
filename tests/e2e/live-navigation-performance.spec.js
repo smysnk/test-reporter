@@ -6,14 +6,17 @@ import { test, expect } from '@playwright/test';
 const benchmarkRecords = [];
 const outputRoot = path.resolve(process.cwd(), process.env.TEST_STATION_E2E_OUTPUT_DIR || 'artifacts/e2e-performance');
 const baseURL = process.env.TEST_STATION_E2E_BASE_URL || 'https://test-station.smysnk.com';
+const enforceBudgets = process.env.TEST_STATION_E2E_ENFORCE_BUDGETS === 'true';
 const budgetConfig = {
-  homeReadyMs: readBudget('TEST_STATION_E2E_BUDGET_HOME_READY_MS'),
-  projectFocusMs: readBudget('TEST_STATION_E2E_BUDGET_PROJECT_FOCUS_MS'),
-  clearProjectFocusMs: readBudget('TEST_STATION_E2E_BUDGET_PROJECT_CLEAR_MS'),
-  runNavigationMs: readBudget('TEST_STATION_E2E_BUDGET_RUN_NAVIGATION_MS'),
-  runnerReportReadyMs: readBudget('TEST_STATION_E2E_BUDGET_RUNNER_REPORT_READY_MS'),
-  operationsViewSwitchMs: readBudget('TEST_STATION_E2E_BUDGET_OPERATIONS_VIEW_SWITCH_MS'),
-  projectPageNavigationMs: readBudget('TEST_STATION_E2E_BUDGET_PROJECT_PAGE_NAVIGATION_MS'),
+  homeReadyMs: readBudget('TEST_STATION_E2E_BUDGET_HOME_READY_MS', 1_000),
+  projectFocusMs: readBudget('TEST_STATION_E2E_BUDGET_PROJECT_FOCUS_MS', 1_000),
+  clearProjectFocusMs: readBudget('TEST_STATION_E2E_BUDGET_PROJECT_CLEAR_MS', 1_000),
+  runNavigationMs: readBudget('TEST_STATION_E2E_BUDGET_RUN_NAVIGATION_MS', 1_000),
+  runnerReportReadyMs: readBudget('TEST_STATION_E2E_BUDGET_RUNNER_REPORT_READY_MS', 2_000),
+  operationsViewSwitchMs: readBudget('TEST_STATION_E2E_BUDGET_OPERATIONS_VIEW_SWITCH_MS', 1_500),
+  projectPageNavigationMs: readBudget('TEST_STATION_E2E_BUDGET_PROJECT_PAGE_NAVIGATION_MS', 1_500),
+  suiteExpansionMs: readBudget('TEST_STATION_E2E_BUDGET_SUITE_EXPANSION_MS', 300),
+  paginatedTestFetchMs: readBudget('TEST_STATION_E2E_BUDGET_PAGINATED_TEST_FETCH_MS', 500),
 };
 
 test.describe.configure({ mode: 'serial' });
@@ -26,6 +29,7 @@ test.beforeEach(async ({ page }) => {
       cls: 0,
       longTaskCount: 0,
       longTaskDurationMs: 0,
+      interactionLatencyMs: 0,
     };
 
     try {
@@ -35,6 +39,15 @@ test.beforeEach(async ({ page }) => {
           perfStore.lcp = Math.max(perfStore.lcp || 0, entry.startTime || 0);
         }
       }).observe({ type: 'largest-contentful-paint', buffered: true });
+    } catch {}
+
+    try {
+      const perfStore = window.__TEST_STATION_PERF__;
+      new PerformanceObserver((entryList) => {
+        for (const entry of entryList.getEntries()) {
+          if (entry.interactionId) perfStore.interactionLatencyMs = Math.max(perfStore.interactionLatencyMs, entry.duration || 0);
+        }
+      }).observe({ type: 'event', buffered: true, durationThreshold: 16 });
     } catch {}
 
     try {
@@ -144,7 +157,7 @@ test('benchmarks sidebar project focus and project-page load', async ({ page }, 
     },
     async () => {
       await page.waitForURL(new RegExp(`/projects/${escapeRegExp(projectSlug)}$`), { timeout: 45_000 });
-      await expect(page.getByText('Execution feed', { exact: true })).toBeVisible({ timeout: 45_000 });
+      await expect(page.getByText('Test Runs', { exact: true })).toBeVisible({ timeout: 45_000 });
     },
   );
   const projectPageProfiling = await collectProfilingSnapshot(page, 'project-page-ready');
@@ -183,8 +196,8 @@ test('benchmarks runner report readiness, operations view, and project-page navi
   await page.goto(`/projects/${projectSlug}`);
   await page.waitForURL(new RegExp(`/projects/${escapeRegExp(projectSlug)}$`), { timeout: 45_000 });
 
-  const runLink = page.locator('.web-list__item[href^="/runs/"], a.web-list__item[href^="/runs/"], a[href^="/runs/"]').first();
-  test.skip(await runLink.count() === 0, 'No project-scoped run links are visible to benchmark.');
+  const runLink = page.locator('[data-perf-id^="project-run-link:"]').first();
+  await expect(runLink).toBeVisible({ timeout: 45_000 });
   const runNavigation = await navigateByHrefWithFallback(page, runLink, /\/runs\/[^/?#]+$/);
   await expect(page.getByRole('link', { name: 'Runner report' })).toBeVisible();
   const runPageProfiling = await collectProfilingSnapshot(page, 'run-page-ready');
@@ -208,10 +221,34 @@ test('benchmarks runner report readiness, operations view, and project-page navi
   );
   await expect(page.getByText('Run-to-run comparison', { exact: true })).toBeVisible();
   const operationsProfiling = await collectProfilingSnapshot(page, 'run-operations-ready');
+  const suiteLoadButton = page.getByRole('button', { name: 'Load tests' }).first();
+  let suiteExpansionMs = null;
+  let paginatedTestFetchMs = null;
+  let renderedTestRows = 0;
+  if (await suiteLoadButton.count() > 0) {
+    suiteExpansionMs = await measureInteraction(
+      async () => suiteLoadButton.click(),
+      async () => {
+        await expect(page.getByRole('button', { name: 'Collapse tests' }).first()).toBeVisible();
+        await expect(page.getByText('Loading tests…', { exact: true })).toHaveCount(0);
+      },
+    );
+    const nextPageButton = page.getByRole('button', { name: /Load next 100/ }).first();
+    if (await nextPageButton.count() > 0) {
+      paginatedTestFetchMs = await measureInteraction(
+        async () => nextPageButton.click(),
+        async () => {
+          await expect(page.getByRole('button', { name: /Loading more/ })).toHaveCount(0);
+          await expect(page.getByRole('list', { name: '200 loaded tests' })).toBeVisible();
+        },
+      );
+    }
+    renderedTestRows = await page.locator('.web-list .web-list .web-list__item').count();
+  }
 
   const projectLink = page.locator('[data-perf-id="run-project-link"], .web-run-detail__header a[href^="/projects/"]').first();
   const projectNavigation = await navigateByHrefWithFallback(page, projectLink, /\/projects\/[^/?#]+$/);
-  await expect(page.getByText('Execution feed', { exact: true })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText('Test Runs', { exact: true })).toBeVisible({ timeout: 45_000 });
   const projectPageProfiling = await collectProfilingSnapshot(page, 'project-page-ready');
 
   const record = {
@@ -221,6 +258,8 @@ test('benchmarks runner report readiness, operations view, and project-page navi
       runNavigationMs: runNavigation.durationMs,
       runnerReportReadyMs,
       operationsViewSwitchMs: operationsNavigation.durationMs,
+      suiteExpansionMs,
+      paginatedTestFetchMs,
       projectPageNavigationMs: projectNavigation.durationMs,
       ...await collectBrowserMetrics(page),
     },
@@ -228,6 +267,7 @@ test('benchmarks runner report readiness, operations view, and project-page navi
       runId,
       runNavigationMode: runNavigation.mode,
       operationsViewSwitchMode: operationsNavigation.mode,
+      renderedTestRows,
       projectPageNavigationMode: projectNavigation.mode,
     },
     profiling: {
@@ -241,6 +281,8 @@ test('benchmarks runner report readiness, operations view, and project-page navi
   assertBudget('runNavigationMs', record.metrics.runNavigationMs);
   assertBudget('runnerReportReadyMs', record.metrics.runnerReportReadyMs);
   assertBudget('operationsViewSwitchMs', record.metrics.operationsViewSwitchMs);
+  if (Number.isFinite(record.metrics.suiteExpansionMs)) assertBudget('suiteExpansionMs', record.metrics.suiteExpansionMs);
+  if (Number.isFinite(record.metrics.paginatedTestFetchMs)) assertBudget('paginatedTestFetchMs', record.metrics.paginatedTestFetchMs);
   assertBudget('projectPageNavigationMs', record.metrics.projectPageNavigationMs);
   await recordBenchmark(testInfo, record);
 });
@@ -273,8 +315,15 @@ async function collectBrowserMetrics(page) {
     const nav = performance.getEntriesByType('navigation')[0];
     const firstContentfulPaint = performance.getEntriesByName('first-contentful-paint')[0];
     const perfStore = window.__TEST_STATION_PERF__ || {};
+    const resources = performance.getEntriesByType('resource');
+    const selectedResources = resources.filter((entry) => entry.name.includes('/graphql')
+      || entry.name.includes('/_next/data/')
+      || entry.name.includes('/api/runs/')
+      || entry.name.includes('/api/projects/'));
+    const resourceBytes = (entries, field) => entries.reduce((total, entry) => total + (Number(entry[field]) || 0), 0);
 
     return {
+      timeToFirstByteMs: roundMetric(nav?.responseStart),
       responseEndMs: roundMetric(nav?.responseEnd),
       domContentLoadedMs: roundMetric(nav?.domContentLoadedEventEnd),
       loadEventMs: roundMetric(nav?.loadEventEnd),
@@ -283,8 +332,18 @@ async function collectBrowserMetrics(page) {
       cumulativeLayoutShift: roundMetric(perfStore.cls, 4),
       longTaskCount: Number.isFinite(perfStore.longTaskCount) ? perfStore.longTaskCount : 0,
       longTaskDurationMs: roundMetric(perfStore.longTaskDurationMs),
+      interactionLatencyMs: roundMetric(perfStore.interactionLatencyMs),
       decodedBodySizeBytes: Number.isFinite(nav?.decodedBodySize) ? nav.decodedBodySize : null,
       transferSizeBytes: Number.isFinite(nav?.transferSize) ? nav.transferSize : null,
+      domNodeCount: document.getElementsByTagName('*').length,
+      jsHeapUsedBytes: Number.isFinite(performance.memory?.usedJSHeapSize) ? performance.memory.usedJSHeapSize : null,
+      resourceRequestCount: selectedResources.length,
+      resourceTransferSizeBytes: resourceBytes(selectedResources, 'transferSize'),
+      resourceDecodedBodySizeBytes: resourceBytes(selectedResources, 'decodedBodySize'),
+      graphqlRequestCount: selectedResources.filter((entry) => entry.name.includes('/graphql')).length,
+      graphqlTransferSizeBytes: resourceBytes(selectedResources.filter((entry) => entry.name.includes('/graphql')), 'transferSize'),
+      bffRequestCount: selectedResources.filter((entry) => entry.name.includes('/api/runs/') || entry.name.includes('/api/projects/')).length,
+      bffTransferSizeBytes: resourceBytes(selectedResources.filter((entry) => entry.name.includes('/api/runs/') || entry.name.includes('/api/projects/')), 'transferSize'),
     };
 
     function roundMetric(value, precision = 1) {
@@ -393,6 +452,9 @@ async function recordBenchmark(testInfo, record) {
 }
 
 function assertBudget(metricName, durationMs) {
+  if (!enforceBudgets) {
+    return;
+  }
   const budget = budgetConfig[metricName];
   if (!Number.isFinite(budget)) {
     return;
@@ -401,14 +463,14 @@ function assertBudget(metricName, durationMs) {
   expect(durationMs, `${metricName} exceeded its configured budget of ${budget}ms`).toBeLessThanOrEqual(budget);
 }
 
-function readBudget(name) {
+function readBudget(name, fallback) {
   const raw = process.env[name];
   if (!raw) {
-    return null;
+    return fallback;
   }
 
   const value = Number(raw);
-  return Number.isFinite(value) ? value : null;
+  return Number.isFinite(value) ? value : fallback;
 }
 
 function round(value) {
@@ -505,6 +567,7 @@ async function navigateByHrefWithFallback(page, linkLocator, urlPattern) {
 }
 
 async function resolveBenchmarkProjectSlug(page, fallbackTitle = null) {
+  if (process.env.TEST_STATION_BENCHMARK_PROJECT_SLUG) return process.env.TEST_STATION_BENCHMARK_PROJECT_SLUG;
   const projectButton = page.locator('[data-project-slug]').first();
   if (await projectButton.count() > 0) {
     return projectButton.getAttribute('data-project-slug');

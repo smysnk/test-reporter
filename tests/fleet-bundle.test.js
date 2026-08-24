@@ -66,6 +66,7 @@ test('fleet values and workflow use the unified image contract without stray ref
   assert.doesNotMatch(gitRepoYaml, /helm:\s*\n\s*values:/);
   assert.match(valuesYaml, /publicDomain:\s*""/);
   assert.match(valuesYaml, /ingressPaths:\s*\n\s*-\s*path:\s*\/api\/ingest/);
+  assert.match(valuesYaml, /server:[\s\S]*?service:\s*\n\s*type:\s*ClusterIP/);
   assert.match(valuesYaml, /paths:\s*\n\s*-\s*path:\s*\/api\/auth/);
   assert.match(valuesYaml, /-\s*path:\s*\/api\/healthz/);
   assert.match(valuesYaml, /-\s*path:\s*\/api\/badges/);
@@ -80,14 +81,14 @@ test('fleet values and workflow use the unified image contract without stray ref
   assert.match(valuesYaml, /repository:\s*ghcr\.io\/smysnk\/test-station/);
   assert.match(valuesYaml, /pullPolicy:\s*Always/);
   assert.match(valuesYaml, /livenessProbe:\s*\n\s*path:\s*\/api\/healthz/);
-  assert.match(valuesYaml, /readinessProbe:\s*\n\s*path:\s*\/api\/healthz/);
+  assert.match(valuesYaml, /readinessProbe:\s*\n\s*path:\s*\/api\/readyz/);
   assert.match(webIngressYaml, /test-station\.publicDomain/);
   assert.match(webIngressYaml, /Values\.web\.ingress\.paths/);
   assert.doesNotMatch(webIngressYaml, /router\.middlewares/);
   assert.doesNotMatch(webIngressYaml, /webIngressBufferingMiddlewareName/);
   assert.match(serverIngressYaml, /router\.middlewares/);
   assert.match(serverIngressYaml, /webIngressBufferingMiddlewareName/);
-  assert.match(serverIngressYaml, /test-station\.serverName/);
+  assert.match(serverIngressYaml, /test-station\.ingestName/);
   assert.match(webIngressYaml, /test-station\.defaultTlsSecretName/);
   assert.match(webIngressYaml, /kindIs "map"/);
   assert.match(webConfigMapYaml, /NEXTAUTH_URL/);

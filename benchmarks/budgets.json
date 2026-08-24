@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1",
+  "noiseBandPercent": 5,
+  "metrics": {
+    "homeReadyMs": { "target": 1000, "unit": "ms", "lowerIsBetter": true, "critical": true },
+    "runNavigationMs": { "target": 1000, "unit": "ms", "lowerIsBetter": true, "critical": true },
+    "operationsViewSwitchMs": { "target": 1500, "unit": "ms", "lowerIsBetter": true, "critical": true },
+    "runnerReportReadyMs": { "target": 2000, "unit": "ms", "lowerIsBetter": true, "critical": true },
+    "suiteExpansionMs": { "target": 300, "unit": "ms", "lowerIsBetter": true, "critical": true },
+    "paginatedTestFetchMs": { "target": 500, "unit": "ms", "lowerIsBetter": true, "critical": true },
+    "initialTransferSizeBytes": { "target": 153600, "unit": "bytes", "lowerIsBetter": true, "critical": true },
+    "initialDecodedJsonBytes": { "target": 51200, "unit": "bytes", "lowerIsBetter": true, "critical": true },
+    "benchmarkNamespaceDecodedBytes": { "target": 102400, "unit": "bytes", "lowerIsBetter": true, "critical": true }
+  }
+}

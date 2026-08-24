@@ -9,13 +9,13 @@ image:
   pullSecrets: []
 
 server:
-  replicaCount: 1
+  replicaCount: 2
   args:
     - server
   existingConfigMap: ""
   existingSecret: ""
   service:
-    type: NodePort
+    type: ClusterIP
     port: 4400
     nodePort: null
   ingressPaths:
@@ -26,12 +26,19 @@ server:
     SERVER_PORT: "4400"
     SERVER_JSON_LIMIT: "50mb"
     INGEST_JSON_LIMIT: "50mb"
+    SERVER_ROLE: read
     WEB_URL: ""
   secret:
     DATABASE_URL: postgres://test-station:change-me@postgresql.default.svc.cluster.local:5432/test_station
     INGEST_SHARED_KEY: change-me
   podAnnotations: {}
-  resources: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -40,12 +47,39 @@ server:
     initialDelaySeconds: 20
     periodSeconds: 20
   readinessProbe:
-    path: /healthz
+    path: /readyz
     initialDelaySeconds: 10
     periodSeconds: 10
 
-web:
+ingest:
   replicaCount: 1
+  args:
+    - server
+  service:
+    type: ClusterIP
+    port: 4400
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  livenessProbe:
+    path: /healthz
+    initialDelaySeconds: 20
+    periodSeconds: 20
+  readinessProbe:
+    path: /readyz
+    initialDelaySeconds: 10
+    periodSeconds: 10
+
+migrations:
+  enabled: true
+  backoffLimit: 3
+
+web:
+  replicaCount: 2
   args:
     - web
   existingConfigMap: ""
@@ -73,7 +107,13 @@ web:
     DISCORD_CLIENT_ID: ""
     DISCORD_CLIENT_SECRET: ""
   podAnnotations: {}
-  resources: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -82,7 +122,7 @@ web:
     initialDelaySeconds: 30
     periodSeconds: 20
   readinessProbe:
-    path: /api/healthz
+    path: /api/readyz
     initialDelaySeconds: 10
     periodSeconds: 10
   ingress:
@@ -97,6 +137,10 @@ web:
       - path: /api/auth
         pathType: Prefix
       - path: /api/healthz
+        pathType: Prefix
+      - path: /api/readyz
+        pathType: Prefix
+      - path: /api/metrics
         pathType: Prefix
       - path: /api/badges
         pathType: Prefix

@@ -1,0 +1,42 @@
+name: PostgreSQL Performance Integration
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-integration:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_station
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d test_station"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/test_station
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: yarn }
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn workspace server migrate
+      - run: node ./scripts/validate-postgres-refactor.mjs
+      - run: TEST_STATION_PLAN_PROJECT_KEY=postgres-refactor-integration TEST_STATION_PLAN_OUTPUT=artifacts/postgres-refactor/query-plan.json yarn benchmark:query-plan
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: postgres-refactor-evidence
+          path: artifacts/postgres-refactor
+          if-no-files-found: error

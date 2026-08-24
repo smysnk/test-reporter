@@ -1,0 +1,215 @@
+name: Test Station Self Benchmark
+
+on:
+  workflow_call:
+    inputs:
+      base_url:
+        required: true
+        type: string
+      target_commit:
+        required: true
+        type: string
+      image_digest:
+        required: true
+        type: string
+      baseline_id:
+        required: true
+        type: string
+      refactor_phase:
+        required: true
+        type: string
+      enforce_budgets:
+        required: true
+        type: boolean
+    secrets:
+      TEST_STATION_E2E_STORAGE_STATE:
+        required: false
+      TEST_STATION_INGEST_SHARED_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Deployed Test Station URL
+        required: true
+        default: https://test-station.smysnk.com
+      target_commit:
+        description: Exact deployed commit to benchmark
+        required: true
+      image_digest:
+        description: Immutable deployed image digest
+        required: true
+      baseline_id:
+        description: Named comparison baseline
+        required: true
+        default: pre-refactor-2026-07
+      refactor_phase:
+        description: Refactor phase label
+        required: true
+        default: phase-0
+      enforce_budgets:
+        description: Fail after publishing when budgets are exceeded
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: self-benchmark-${{ inputs.base_url }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-24.04
+    env:
+      TEST_STATION_INGEST_SHARED_KEY: ${{ secrets.TEST_STATION_INGEST_SHARED_KEY }}
+      TEST_STATION_STORAGE_STATE_JSON: ${{ secrets.TEST_STATION_E2E_STORAGE_STATE }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_commit }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn playwright install --with-deps chromium
+
+      - name: Materialize authenticated browser state
+        if: env.TEST_STATION_STORAGE_STATE_JSON != ''
+        shell: bash
+        run: |
+          storage_state_path="${RUNNER_TEMP}/test-station-storage-state.json"
+          printf '%s' "$TEST_STATION_STORAGE_STATE_JSON" > "$storage_state_path"
+          jq -e '.cookies and .origins' "$storage_state_path" >/dev/null
+          echo "TEST_STATION_E2E_STORAGE_STATE=$storage_state_path" >> "$GITHUB_ENV"
+
+      - name: Verify deployed revision
+        env:
+          TEST_STATION_E2E_BASE_URL: ${{ inputs.base_url }}
+          TEST_STATION_TARGET_COMMIT: ${{ inputs.target_commit }}
+        shell: bash
+        run: |
+          for attempt in $(seq 1 30); do
+            deployed_revision="$(curl --fail --silent --show-error "${TEST_STATION_E2E_BASE_URL}/api/healthz" | jq -r '.revision // "unknown"')"
+            if [ "$deployed_revision" = "$TEST_STATION_TARGET_COMMIT" ]; then
+              exit 0
+            fi
+            echo "Waiting for deployed revision ${TEST_STATION_TARGET_COMMIT}; observed ${deployed_revision} (attempt ${attempt}/30)"
+            sleep 10
+          done
+          echo "Deployed revision did not converge to ${TEST_STATION_TARGET_COMMIT}" >&2
+          exit 1
+
+      - name: Run deployed benchmark
+        id: benchmark
+        continue-on-error: true
+        env:
+          TEST_STATION_E2E_BASE_URL: ${{ inputs.base_url }}
+          TEST_STATION_BASELINE_ID: ${{ inputs.baseline_id }}
+          TEST_STATION_REFACTOR_PHASE: ${{ inputs.refactor_phase }}
+          TEST_STATION_TARGET_COMMIT: ${{ inputs.target_commit }}
+          TEST_STATION_E2E_ENFORCE_BUDGETS: ${{ inputs.enforce_budgets }}
+          TEST_STATION_E2E_BUDGET_HOME_READY_MS: 1000
+          TEST_STATION_E2E_BUDGET_RUN_NAVIGATION_MS: 1000
+          TEST_STATION_E2E_BUDGET_RUNNER_REPORT_READY_MS: 2000
+          TEST_STATION_E2E_BUDGET_OPERATIONS_VIEW_SWITCH_MS: 1500
+          TEST_STATION_E2E_BUDGET_SUITE_EXPANSION_MS: 300
+          TEST_STATION_E2E_BUDGET_PAGINATED_TEST_FETCH_MS: 500
+          TEST_STATION_BENCHMARK_PROJECT_SLUG: test-station-performance-fixture
+        shell: bash
+        run: |
+          set +e
+          if [ -n "$TEST_STATION_INGEST_SHARED_KEY" ]; then
+            TEST_STATION_INGEST_ENDPOINT="${{ inputs.base_url }}/api/ingest" node ./scripts/seed-performance-fixtures.mjs > artifacts-fixture-manifest.json
+          fi
+          overall_status=0
+          for sample in 0 1 2 3 4 5; do
+            export TEST_STATION_E2E_OUTPUT_DIR="artifacts/e2e-performance/samples/${sample}"
+            yarn test:e2e:performance
+            status=$?
+            if [ "$sample" -gt 0 ] && [ "$status" -ne 0 ]; then overall_status=$status; fi
+          done
+          aggregate_args=()
+          for sample in 1 2 3 4 5; do
+            aggregate_args+=(--input "artifacts/e2e-performance/samples/${sample}/latest.json")
+          done
+          node ./scripts/aggregate-performance-samples.mjs "${aggregate_args[@]}" --output artifacts/e2e-performance/latest.json
+          exit "$overall_status"
+
+      - name: Run mixed large-ingest and 25-reader reliability check
+        if: always() && env.TEST_STATION_INGEST_SHARED_KEY != ''
+        env:
+          TEST_STATION_E2E_BASE_URL: ${{ inputs.base_url }}
+        shell: bash
+        run: |
+          export TEST_STATION_MIXED_LOAD_RUN_ID="$(jq -r '.receipts[] | select(.tier == "large") | .runId' artifacts-fixture-manifest.json)"
+          yarn benchmark:mixed-load
+
+      - name: Convert benchmark into a Test Station report
+        if: always()
+        env:
+          TEST_STATION_BASELINE_ID: ${{ inputs.baseline_id }}
+          TEST_STATION_REFACTOR_PHASE: ${{ inputs.refactor_phase }}
+          TEST_STATION_TARGET_COMMIT: ${{ inputs.target_commit }}
+        run: |
+          if [ -n "$TEST_STATION_INGEST_SHARED_KEY" ]; then
+            TEST_STATION_INGEST_ENDPOINT="${{ inputs.base_url }}/api/ingest" yarn benchmark:ingest:e2e
+          fi
+          yarn test:performance:report
+
+      - name: Upload immutable benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: self-benchmark-${{ inputs.refactor_phase }}-${{ github.run_attempt }}
+          path: |
+            artifacts/e2e-performance
+            .test-results/self-performance-report
+          if-no-files-found: error
+
+      - name: Generate and validate phase checkpoint
+        if: always()
+        shell: bash
+        run: |
+          artifact_sha="$(sha256sum artifacts/e2e-performance/latest.json | awk '{print $1}')"
+          node ./scripts/generate-phase-checkpoint.mjs \
+            --input artifacts/e2e-performance/latest.json \
+            --phase "${{ inputs.refactor_phase }}" \
+            --commit "${{ inputs.target_commit }}" \
+            --image-digest "${{ inputs.image_digest }}" \
+            --artifact "sha256:${artifact_sha}" \
+            --baseline-id "${{ inputs.baseline_id }}" \
+            --output "benchmarks/checkpoints/${{ inputs.refactor_phase }}/${{ inputs.target_commit }}.json"
+          node ./scripts/validate-phase-checkpoint.mjs "benchmarks/checkpoints/${{ inputs.refactor_phase }}/${{ inputs.target_commit }}.json"
+
+      - name: Upload machine-readable checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-${{ inputs.refactor_phase }}-${{ github.run_attempt }}
+          path: benchmarks/checkpoints/${{ inputs.refactor_phase }}/${{ inputs.target_commit }}.json
+          if-no-files-found: error
+
+      - name: Publish performance report
+        if: always() && env.TEST_STATION_INGEST_SHARED_KEY != ''
+        env:
+          TEST_STATION_INGEST_ENDPOINT: ${{ inputs.base_url }}/api/ingest
+          TEST_STATION_INGEST_PROJECT_KEY: test-station
+          TEST_STATION_SOURCE_RUN_ID: ${{ github.run_id }}
+          TEST_STATION_TARGET_COMMIT: ${{ inputs.target_commit }}
+        run: >-
+          node ./scripts/publish-ingest-report.mjs
+          --input ./.test-results/self-performance-report/report.json
+          --source-run-id "$TEST_STATION_SOURCE_RUN_ID"
+          --submission-kind performance
+          --producer-key test-station-web-performance
+          --submission-key "${{ inputs.target_commit }}:${{ inputs.refactor_phase }}:${{ github.run_attempt }}"
+
+      - name: Apply benchmark gate after evidence publication
+        if: always() && inputs.enforce_budgets && steps.benchmark.outcome != 'success'
+        run: exit 1

@@ -35,6 +35,10 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- printf "%s-web" (include "test-station.fullname" .) -}}
 {{- end -}}
 
+{{- define "test-station.ingestName" -}}
+{{- printf "%s-ingest" (include "test-station.fullname" .) -}}
+{{- end -}}
+
 {{- define "test-station.serverConfigMapName" -}}
 {{- if .Values.server.existingConfigMap -}}
 {{- .Values.server.existingConfigMap -}}

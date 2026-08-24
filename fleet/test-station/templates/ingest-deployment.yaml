@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "test-station.ingestName" . }}
+  labels:
+    {{- include "test-station.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingest
+spec:
+  replicas: {{ .Values.ingest.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "test-station.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: ingest
+  template:
+    metadata:
+      labels:
+        {{- include "test-station.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: ingest
+    spec:
+      {{- if .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range .Values.image.pullSecrets }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: ingest
+          image: {{ include "test-station.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            {{- toYaml .Values.ingest.args | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.ingest.service.port }}
+          env:
+            - name: SERVER_ROLE
+              value: ingest
+          envFrom:
+            - configMapRef:
+                name: {{ include "test-station.serverConfigMapName" . }}
+            - secretRef:
+                name: {{ include "test-station.serverSecretName" . }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.ingest.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.ingest.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ingest.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.ingest.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.ingest.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.ingest.readinessProbe.periodSeconds }}
+          resources:
+            {{- toYaml .Values.ingest.resources | nindent 12 }}

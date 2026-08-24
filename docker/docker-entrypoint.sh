@@ -14,6 +14,12 @@ case "$cmd" in
   server)
     exec yarn workspace server start "$@"
     ;;
+  migrate)
+    exec yarn workspace server migrate "$@"
+    ;;
+  backfill)
+    exec node ./scripts/backfill-report-submissions.mjs "$@"
+    ;;
   *)
     exec "$cmd" "$@"
     ;;

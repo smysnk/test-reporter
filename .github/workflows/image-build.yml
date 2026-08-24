@@ -1,18 +1,8 @@
 name: Build Unified Image
 
+run-name: Build Unified Image
+
 on:
-  workflow_call:
-    inputs:
-      image_tag:
-        description: "Branch or release tag to publish alongside the sha tag"
-        required: false
-        default: main
-        type: string
-      push_image:
-        description: "Push the built image to the target registry"
-        required: false
-        default: true
-        type: boolean
   workflow_dispatch:
     inputs:
       image_tag:
@@ -25,6 +15,22 @@ on:
         required: false
         default: true
         type: boolean
+  workflow_call:
+    inputs:
+      image_tag:
+        description: "Branch or release tag to publish alongside the sha tag"
+        required: false
+        default: main
+        type: string
+      push_image:
+        description: "Push the built image to the target registry"
+        required: false
+        default: true
+        type: boolean
+    outputs:
+      image_digest:
+        description: Immutable digest of the built image
+        value: ${{ jobs.build.outputs.image_digest }}
 
 env:
   # To publish to public Docker Hub instead of GHCR, set:
@@ -47,6 +53,8 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      image_digest: ${{ steps.build.outputs.digest }}
 
     steps:
       - name: Check out repository
@@ -87,6 +95,7 @@ jobs:
             type=sha,format=long
 
       - name: Build and publish unified web/server image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -95,5 +104,7 @@ jobs:
           push: ${{ inputs.push_image }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            TEST_STATION_APP_REVISION=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -1,0 +1,33 @@
+{
+  "title": "Test Station Runtime and Performance",
+  "uid": "test-station-runtime",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    { "type": "timeseries", "title": "Request rate and errors", "targets": [
+      { "expr": "sum by (route) (rate(test_station_http_requests_total[5m]))", "legendFormat": "{{route}} rate" },
+      { "expr": "sum by (route) (rate(test_station_http_requests_total{outcome=\"error\"}[5m]))", "legendFormat": "{{route}} errors" }
+    ] },
+    { "type": "timeseries", "title": "Request latency", "targets": [
+      { "expr": "sum by (route) (rate(test_station_http_request_duration_ms_sum[5m])) / clamp_min(sum by (route) (rate(test_station_http_request_duration_ms_count[5m])), 1)", "legendFormat": "{{route}} mean ms" }
+    ] },
+    { "type": "timeseries", "title": "Database and pool", "targets": [
+      { "expr": "rate(test_station_database_query_duration_ms_sum[5m]) / clamp_min(rate(test_station_database_query_duration_ms_count[5m]), 1)", "legendFormat": "query mean ms" },
+      { "expr": "rate(test_station_database_pool_wait_ms_sum[5m]) / clamp_min(rate(test_station_database_pool_wait_ms_count[5m]), 1)", "legendFormat": "pool wait mean ms" },
+      { "expr": "increase(test_station_database_timeouts_total[5m])", "legendFormat": "timeouts" }
+    ] },
+    { "type": "timeseries", "title": "Ingest outcomes and projection lag", "targets": [
+      { "expr": "sum by (outcome) (rate(test_station_ingest_requests_total[5m]))", "legendFormat": "{{outcome}}" },
+      { "expr": "test_station_projection_lag_ms", "legendFormat": "projection lag ms" }
+    ] },
+    { "type": "timeseries", "title": "Report cache and fallback", "targets": [
+      { "expr": "sum by (outcome) (rate(test_station_web_report_requests_total[5m]))", "legendFormat": "{{outcome}}" }
+    ] },
+    { "type": "timeseries", "title": "Pod CPU, memory, and restarts", "targets": [
+      { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"test-station\",container!=\"\"}[5m]))", "legendFormat": "{{pod}} cpu" },
+      { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"test-station\",container!=\"\"})", "legendFormat": "{{pod}} memory" },
+      { "expr": "sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace=\"test-station\"}[1h]))", "legendFormat": "{{pod}} restarts" }
+    ] }
+  ]
+}

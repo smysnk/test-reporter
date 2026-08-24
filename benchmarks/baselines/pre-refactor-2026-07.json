@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1",
+  "id": "pre-refactor-2026-07",
+  "status": "partial-capture",
+  "description": "Frozen baseline cohort for the ingestion and result-view performance refactor.",
+  "requiredExecutions": 3,
+  "warmupSamplesPerExecution": 1,
+  "measuredSamplesPerExecution": 5,
+  "profiles": [
+    "controlled.chromium.1440x1024.small.authenticated",
+    "controlled.chromium.1440x1024.medium.authenticated",
+    "controlled.chromium.1440x1024.large.authenticated",
+    "observational.chromium.1440x1024.production.authenticated"
+  ],
+  "fixtureChecksums": {
+    "small-100": "14d59f72d10628c03a7701caafd4bd6aa4340959d062cb30af5879c51bdd7430",
+    "medium-1000": "dbe009e7b3366483c2801d44845f94004deecaefeabe894c23c906303b736303",
+    "large-10000": "4e2c130ac8c6ecc13b0c0d51dd139adb852bb1033293875c103ab702b397d65c"
+  },
+  "artifacts": [{
+    "kind": "local-observational-snapshot",
+    "path": "artifacts/e2e-performance/pre-refactor-snapshot-zero/latest.json",
+    "sha256": "6cfa9e5778bad4099834edc8beed4d04bc68f9fcc8165bd87c9b6a7aee3b4a61",
+    "retention": "local-only; must be replaced by immutable workflow artifacts"
+  }],
+  "capture": {
+    "generatedAt": "2026-07-22T19:08:42.274Z",
+    "baseURL": "https://test-station.smysnk.com",
+    "viewport": "1440x1024",
+    "completedScenarios": ["home-load"],
+    "measuredSamples": 1,
+    "homeReadyMs": 776.4,
+    "decodedBodySizeBytes": 234644,
+    "statusNote": "Directional pre-refactor evidence only. The required three executions with five measured samples, immutable workflow artifacts, exact revision, and authenticated controlled tiers remain pending."
+  }
+}
