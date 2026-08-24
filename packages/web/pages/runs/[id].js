@@ -549,7 +549,11 @@ function OperationsRunDetail({ data }) {
         compact: true,
       },
       Array.isArray(run.suites) && run.suites.length > 0
-        ? React.createElement(ProgressiveSuiteList, { runId: run.id, suites: run.suites })
+        ? React.createElement(ProgressiveSuiteList, {
+          runId: run.id,
+          suites: run.suites,
+          initialPages: data?.initialSuitePages,
+        })
         : React.createElement(EmptyState, {
           title: 'No suites stored',
           copy: 'This run did not expose suite-level detail.',
@@ -558,9 +562,9 @@ function OperationsRunDetail({ data }) {
   );
 }
 
-function ProgressiveSuiteList({ runId, suites }) {
+function ProgressiveSuiteList({ runId, suites, initialPages = {} }) {
   const [expandedSuiteId, setExpandedSuiteId] = React.useState(null);
-  const [testsBySuite, setTestsBySuite] = React.useState({});
+  const [testsBySuite, setTestsBySuite] = React.useState(() => initialPages || {});
   const [loadingSuiteId, setLoadingSuiteId] = React.useState(null);
   const [error, setError] = React.useState(null);
   const [statusFilter, setStatusFilter] = React.useState('');

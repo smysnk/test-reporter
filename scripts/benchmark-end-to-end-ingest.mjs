@@ -17,7 +17,7 @@ export async function benchmarkEndToEndIngest({ endpoint, apiKey, samples = 5, f
     let heapHighWaterBytes = 0;
     for (let sample = 0; sample < samples; sample += 1) {
       const startedAt = performance.now();
-      const response = await fetchImpl(endpoint, {
+      const response = await fetchWithRetry(fetchImpl, endpoint, {
         method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': apiKey },
         body: JSON.stringify({ projectKey: 'test-station-performance-fixture', report, source: { provider: 'performance-ingest-benchmark', runId: `${process.env.GITHUB_RUN_ID || 'local'}-${tier.name}-${sample}`, completedAt: new Date(Date.UTC(2026, 6, 23, 0, tier.count / 100, sample)).toISOString(), branch: 'performance-fixtures', isPublic: true }, submission: { kind: 'combined', producerKey: 'e2e-ingest-benchmark', submissionKey: `${tier.name}-${sample}` }, artifacts: [] }),
       });
@@ -35,6 +35,22 @@ export async function benchmarkEndToEndIngest({ endpoint, apiKey, samples = 5, f
     tests.push({ name: `${tier.name} end-to-end ingest`, fullName: `Test Station ${tier.name} end-to-end ingest`, status: 'passed', durationMs: Math.round(percentile(durations, 0.95)), failureMessages: [], assertions: [], setup: [], mocks: [], rawDetails: { durations, payloadBytes } });
   }
   return { status: 'passed', durationMs: tests.reduce((sum, test) => sum + test.durationMs, 0), summary: { total: tests.length, passed: tests.length, failed: 0, skipped: 0 }, tests, warnings: [], performanceStats, rawArtifacts: [] };
+}
+
+async function fetchWithRetry(fetchImpl, endpoint, options, maxAttempts = 3) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetchImpl(endpoint, options);
+      if (response.ok || ![429, 502, 503, 504].includes(response.status) || attempt === maxAttempts) return response;
+      lastError = new Error(`Ingest temporarily unavailable (${response.status})`);
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) throw error;
+    }
+    await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+  }
+  throw lastError || new Error('Ingest request failed');
 }
 function percentile(values, ratio) { const sorted = [...values].sort((a, b) => a - b); return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)]; }
 
