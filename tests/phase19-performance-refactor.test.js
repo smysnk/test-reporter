@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 import { createServer, resolveServerRole } from '../packages/server/index.js';
 import {
@@ -115,6 +116,13 @@ test('phase checkpoints require immutable evidence and reject red critical metri
 
   checkpoint.metrics[0].artifact = 'artifacts/latest.json';
   assert.match(validatePhaseCheckpoint(checkpoint).join('\n'), /mutable artifact reference/);
+});
+
+test('self benchmark preserves raw samples and applies budgets after p95 aggregation', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/self-benchmark.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /TEST_STATION_E2E_ENFORCE_BUDGETS=false/);
+  assert.match(workflow, /aggregate-performance-samples\.mjs/);
+  assert.match(workflow, /Generate and validate phase checkpoint/);
 });
 
 function listen(server) {

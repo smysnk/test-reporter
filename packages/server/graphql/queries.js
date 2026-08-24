@@ -476,7 +476,11 @@ export const queryResolvers = {
     run: (_root, args, context) => context.queryService.findRun({ ...args, actor: context.actor }),
     runPackages: (_root, args, context) => context.queryService.listRunPackages({ ...args, actor: context.actor }),
     runModules: (_root, args, context) => context.queryService.listRunModules({ ...args, actor: context.actor }),
-    runFiles: (_root, args, context) => context.queryService.listRunFiles({ ...args, actor: context.actor }),
+    runFiles: (_root, args, context, info) => context.queryService.listRunFiles({
+      ...args,
+      actor: context.actor,
+      includeTests: selectionIncludesField(info, 'tests'),
+    }),
     tests: (_root, args, context) => context.queryService.listTestsForRun({ ...args, actor: context.actor }),
     testsForSuite: (_root, args, context) => context.queryService.listTestsForSuiteRun({ ...args, actor: context.actor }),
     runPerformanceStats: (_root, args, context) => context.queryService.listRunPerformanceStats({ ...args, actor: context.actor }),
@@ -546,4 +550,18 @@ function resolveViewer(context) {
   return context?.actor && context.actor.isGuest !== true
     ? context.actor
     : null;
+}
+
+function selectionIncludesField(info, fieldName) {
+  const pending = [...(info?.fieldNodes || [])];
+  const fragments = info?.fragments || {};
+  while (pending.length > 0) {
+    const node = pending.pop();
+    for (const selection of node?.selectionSet?.selections || []) {
+      if (selection.kind === 'Field' && selection.name?.value === fieldName) return true;
+      if (selection.kind === 'InlineFragment') pending.push(selection);
+      if (selection.kind === 'FragmentSpread' && fragments[selection.name?.value]) pending.push(fragments[selection.name.value]);
+    }
+  }
+  return false;
 }

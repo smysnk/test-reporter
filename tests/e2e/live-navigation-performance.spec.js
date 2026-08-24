@@ -115,8 +115,8 @@ test('benchmarks the public home page with live data', async ({ page }, testInfo
     profiling: await collectProfilingSnapshot(page, 'overview-page-ready'),
   };
 
-  assertBudget('homeReadyMs', record.metrics.homeReadyMs);
   await recordBenchmark(testInfo, record);
+  assertBudget('homeReadyMs', record.metrics.homeReadyMs);
 });
 
 test('benchmarks sidebar project focus and project-page load', async ({ page }, testInfo) => {
@@ -182,10 +182,10 @@ test('benchmarks sidebar project focus and project-page load', async ({ page }, 
     },
   };
 
+  await recordBenchmark(testInfo, record);
   assertBudget('projectFocusMs', record.metrics.projectFocusMs);
   assertBudget('clearProjectFocusMs', record.metrics.clearProjectFocusMs);
   assertBudget('projectPageNavigationMs', record.metrics.projectPageReadyMs);
-  await recordBenchmark(testInfo, record);
 });
 
 test('benchmarks runner report readiness, operations view, and project-page navigation', async ({ page }, testInfo) => {
@@ -278,13 +278,13 @@ test('benchmarks runner report readiness, operations view, and project-page navi
     },
   };
 
+  await recordBenchmark(testInfo, record);
   assertBudget('runNavigationMs', record.metrics.runNavigationMs);
   assertBudget('runnerReportReadyMs', record.metrics.runnerReportReadyMs);
   assertBudget('operationsViewSwitchMs', record.metrics.operationsViewSwitchMs);
   if (Number.isFinite(record.metrics.suiteExpansionMs)) assertBudget('suiteExpansionMs', record.metrics.suiteExpansionMs);
   if (Number.isFinite(record.metrics.paginatedTestFetchMs)) assertBudget('paginatedTestFetchMs', record.metrics.paginatedTestFetchMs);
   assertBudget('projectPageNavigationMs', record.metrics.projectPageNavigationMs);
-  await recordBenchmark(testInfo, record);
 });
 
 async function goToPublicHome(page) {

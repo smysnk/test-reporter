@@ -130,6 +130,9 @@ jobs:
           overall_status=0
           for sample in 0 1 2 3 4 5; do
             export TEST_STATION_E2E_OUTPUT_DIR="artifacts/e2e-performance/samples/${sample}"
+            # Budgets are p95 gates. Preserve every raw sample and enforce them
+            # only after the five measured executions have been aggregated.
+            export TEST_STATION_E2E_ENFORCE_BUDGETS=false
             yarn test:e2e:performance
             status=$?
             if [ "$sample" -gt 0 ] && [ "$status" -ne 0 ]; then overall_status=$status; fi

@@ -38,6 +38,7 @@ import {
 } from './runReportTemplate.js';
 
 export const ADMIN_PAGE_UNAUTHORIZED = Symbol('test-station.admin-page-unauthorized');
+const INITIAL_HOME_RUN_LIMIT = 20;
 const renderedReportCache = new Map();
 const renderedReportCacheDirectory = path.join(os.tmpdir(), 'test-station-rendered-reports');
 
@@ -161,9 +162,9 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
     viewer: data.viewer || data.me || null,
     projects: Array.isArray(data.projects) ? data.projects : [],
     runs: Array.isArray(data.runFeed)
-      ? data.runFeed.slice(0, 30).map(normalizeRunFeedEntry)
+      ? data.runFeed.slice(0, INITIAL_HOME_RUN_LIMIT).map(normalizeRunFeedEntry)
       : [],
-    hasMoreRuns: Array.isArray(data.runFeed) && data.runFeed.length > 30,
+    hasMoreRuns: Array.isArray(data.runFeed) && data.runFeed.length > INITIAL_HOME_RUN_LIMIT,
   };
 }
 

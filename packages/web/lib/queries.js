@@ -22,7 +22,7 @@ export const WEB_HOME_QUERY = `
       passedTests
       failedTests
     }
-    runFeed(limit: 31) {
+    runFeed(limit: 21) {
       id
       externalKey
       status

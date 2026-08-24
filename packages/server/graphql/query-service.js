@@ -116,29 +116,36 @@ export function createGraphqlQueryService(options = {}) {
   const benchmarkQueryCache = !cacheEnabled
     ? null
     : options.benchmarkQueryCache || getDefaultBenchmarkQueryCache();
+  // The service is created once per GraphQL request. Sibling resolvers often
+  // need the same authorization scope, run, suites, coverage snapshot, and raw
+  // report, so keep those promises request-local instead of repeating large
+  // reads while a single operation is in flight.
+  const requestMemo = new Map();
 
   return {
     async listProjects({ actor }) {
-      const projects = await loadAll(models.Project);
-      const visibleProjects = await accessService.filterProjects({ actor, projects });
-      const overviews = models.ProjectOverview && visibleProjects.length > 0
-        ? await loadAll(models.ProjectOverview, {
-          where: { projectId: visibleProjects.map((project) => project.id) },
-        })
-        : [];
-      const overviewMap = mapBy(overviews, 'projectId');
-      return visibleProjects.map((project) => ({
-        ...project,
-        overview: overviewMap.get(project.id) || null,
-        runCount: toInteger(overviewMap.get(project.id)?.runCount) ?? 0,
-        latestRunId: overviewMap.get(project.id)?.latestRunId || null,
-        latestStatus: overviewMap.get(project.id)?.latestStatus || null,
-        latestCompletedAt: overviewMap.get(project.id)?.latestCompletedAt || null,
-        latestLinesPct: toNumber(overviewMap.get(project.id)?.latestLinesPct),
-        totalTests: toInteger(overviewMap.get(project.id)?.totalTests) ?? 0,
-        passedTests: toInteger(overviewMap.get(project.id)?.passedTests) ?? 0,
-        failedTests: toInteger(overviewMap.get(project.id)?.failedTests) ?? 0,
-      })).sort(compareByName);
+      return memoizeRequestValue(requestMemo, `projects:${actorCacheKey(actor)}`, async () => {
+        const projects = await loadAll(models.Project);
+        const visibleProjects = await accessService.filterProjects({ actor, projects });
+        const overviews = models.ProjectOverview && visibleProjects.length > 0
+          ? await loadAll(models.ProjectOverview, {
+            where: { projectId: visibleProjects.map((project) => project.id) },
+          })
+          : [];
+        const overviewMap = mapBy(overviews, 'projectId');
+        return visibleProjects.map((project) => ({
+          ...project,
+          overview: overviewMap.get(project.id) || null,
+          runCount: toInteger(overviewMap.get(project.id)?.runCount) ?? 0,
+          latestRunId: overviewMap.get(project.id)?.latestRunId || null,
+          latestStatus: overviewMap.get(project.id)?.latestStatus || null,
+          latestCompletedAt: overviewMap.get(project.id)?.latestCompletedAt || null,
+          latestLinesPct: toNumber(overviewMap.get(project.id)?.latestLinesPct),
+          totalTests: toInteger(overviewMap.get(project.id)?.totalTests) ?? 0,
+          passedTests: toInteger(overviewMap.get(project.id)?.passedTests) ?? 0,
+          failedTests: toInteger(overviewMap.get(project.id)?.failedTests) ?? 0,
+        })).sort(compareByName);
+      });
     },
 
     async findProject({ id, key, slug, actor }) {
@@ -354,79 +361,86 @@ export function createGraphqlQueryService(options = {}) {
     },
 
     async findRun({ id = null, externalKey = null, actor }) {
-      const projects = await this.listProjects({ actor });
-      const projectMap = mapBy(projects, 'id');
-      const visibleProjectIds = Array.from(projectMap.keys());
-      if (visibleProjectIds.length === 0 || (!id && !externalKey)) {
-        return null;
-      }
+      const cacheKey = `run:${actorCacheKey(actor)}:${id || ''}:${externalKey || ''}`;
+      return memoizeRequestValue(requestMemo, cacheKey, async () => {
+        const projects = await this.listProjects({ actor });
+        const projectMap = mapBy(projects, 'id');
+        const visibleProjectIds = Array.from(projectMap.keys());
+        if (visibleProjectIds.length === 0 || (!id && !externalKey)) {
+          return null;
+        }
 
-      const run = await loadOne(models.Run, {
-        where: {
-          projectId: visibleProjectIds,
-          ...(id ? { id } : {}),
-          ...(externalKey ? { externalKey } : {}),
-        },
-        attributes: RUN_LIST_ATTRIBUTES,
-      });
-
-      if (!run) {
-        return null;
-      }
-
-      const activeCoverageSubmissionIds = await loadActiveSubmissionIds(models, [run.id], ['coverage', 'combined']);
-      return decorateRun(run, {
-        project: projectMap.get(run.projectId) || null,
-        projectVersion: run.projectVersionId
-          ? await loadOne(models.ProjectVersion, {
-            where: { id: run.projectVersionId },
-          })
-          : null,
-        coverageSnapshot: await loadOne(models.CoverageSnapshot, {
+        const run = await loadOne(models.Run, {
           where: {
-            runId: run.id,
-            ...(activeCoverageSubmissionIds.length > 0 ? { reportSubmissionId: activeCoverageSubmissionIds } : {}),
+            projectId: visibleProjectIds,
+            ...(id ? { id } : {}),
+            ...(externalKey ? { externalKey } : {}),
           },
-          order: [['createdAt', 'DESC']],
-        }),
+          attributes: RUN_LIST_ATTRIBUTES,
+        });
+
+        if (!run) {
+          return null;
+        }
+
+        const activeCoverageSubmissionIds = await loadActiveSubmissionIds(models, [run.id], ['coverage', 'combined']);
+        return decorateRun(run, {
+          project: projectMap.get(run.projectId) || null,
+          projectVersion: run.projectVersionId
+            ? await loadOne(models.ProjectVersion, {
+              where: { id: run.projectVersionId },
+            })
+            : null,
+          coverageSnapshot: await loadOne(models.CoverageSnapshot, {
+            where: {
+              runId: run.id,
+              ...(activeCoverageSubmissionIds.length > 0 ? { reportSubmissionId: activeCoverageSubmissionIds } : {}),
+            },
+            order: [['createdAt', 'DESC']],
+          }),
+        });
       });
     },
 
     async listSuitesForRun({ runId, actor }) {
-      const run = await this.findRun({ id: runId, actor });
-      if (!run) {
-        return [];
-      }
+      return memoizeRequestValue(requestMemo, `suites:${actorCacheKey(actor)}:${runId}`, async () => {
+        const run = await this.findRun({ id: runId, actor });
+        if (!run) {
+          return [];
+        }
 
-      const activeSubmissionIds = await loadActiveSubmissionIds(models, [runId], ['tests']);
-      const suites = await loadAll(models.SuiteRun, {
-        where: {
-          runId,
-          ...(activeSubmissionIds.length > 0 ? { reportSubmissionId: activeSubmissionIds } : {}),
-        },
+        const activeSubmissionIds = await loadActiveSubmissionIds(models, [runId], ['tests']);
+        const suites = await loadAll(models.SuiteRun, {
+          where: {
+            runId,
+            ...(activeSubmissionIds.length > 0 ? { reportSubmissionId: activeSubmissionIds } : {}),
+          },
+        });
+        return suites
+          .filter((suite) => suite.runId === runId)
+          .sort(compareSuites)
+          .map((suite) => ({
+            ...suite,
+            artifacts: [],
+          }));
       });
-      return suites
-        .filter((suite) => suite.runId === runId)
-        .sort(compareSuites)
-        .map((suite) => ({
-          ...suite,
-          artifacts: [],
-        }));
     },
 
     async getCoverageSnapshotForRun({ runId, actor }) {
-      const run = await this.findRun({ id: runId, actor });
-      if (!run) {
-        return null;
-      }
+      return memoizeRequestValue(requestMemo, `coverage-snapshot:${actorCacheKey(actor)}:${runId}`, async () => {
+        const run = await this.findRun({ id: runId, actor });
+        if (!run) {
+          return null;
+        }
 
-      const activeSubmissionIds = await loadActiveSubmissionIds(models, [runId], ['coverage', 'combined']);
-      return loadOne(models.CoverageSnapshot, {
-        where: {
-          runId,
-          ...(activeSubmissionIds.length > 0 ? { reportSubmissionId: activeSubmissionIds } : {}),
-        },
-        order: [['createdAt', 'DESC']],
+        const activeSubmissionIds = await loadActiveSubmissionIds(models, [runId], ['coverage', 'combined']);
+        return loadOne(models.CoverageSnapshot, {
+          where: {
+            runId,
+            ...(activeSubmissionIds.length > 0 ? { reportSubmissionId: activeSubmissionIds } : {}),
+          },
+          order: [['createdAt', 'DESC']],
+        });
       });
     },
 
@@ -593,7 +607,7 @@ export function createGraphqlQueryService(options = {}) {
       }));
     },
 
-    async listRunFiles({ runId, actor, packageName = null, moduleName = null, status = null }) {
+    async listRunFiles({ runId, actor, packageName = null, moduleName = null, status = null, includeTests = true }) {
       const run = await this.findRun({ id: runId, actor });
       if (!run) {
         return [];
@@ -603,7 +617,10 @@ export function createGraphqlQueryService(options = {}) {
       const suiteMap = mapBy(suites, 'id');
       const suiteIds = Array.from(suiteMap.keys());
       const tests = suiteIds.length > 0
-        ? await loadAll(models.TestExecution, { where: { suiteRunId: suiteIds } })
+        ? await loadAll(models.TestExecution, {
+          where: { suiteRunId: suiteIds },
+          ...(includeTests ? {} : { attributes: ['id', 'suiteRunId', 'status', 'filePath', 'moduleName'] }),
+        })
         : [];
       const coverageSnapshot = await this.getCoverageSnapshotForRun({ runId, actor });
       const coverageFiles = coverageSnapshot
@@ -627,7 +644,7 @@ export function createGraphqlQueryService(options = {}) {
         file.packageName ||= suite.packageName || null;
         file.moduleName ||= test.moduleName || null;
         file.language ||= detectLanguage(test.filePath);
-        file.tests.push(decorateTestExecution(test, suite));
+        file.tests.push(includeTests ? decorateTestExecution(test, suite) : { status: test.status });
       }
 
       for (const coverageFile of coverageFiles.filter((entry) => entry.coverageSnapshotId === coverageSnapshot?.id)) {
@@ -749,25 +766,27 @@ export function createGraphqlQueryService(options = {}) {
     },
 
     async getActiveRunReport({ runId, actor, kind = 'tests' }) {
-      const run = await this.findRun({ id: runId, actor });
-      if (!run) return null;
-      if (!models.ReportSubmission) {
-        const legacyRun = await loadOne(models.Run, { where: { id: runId }, attributes: ['rawReport'] });
-        return legacyRun?.rawReport || null;
-      }
-      const activeSubmissionIds = await loadActiveSubmissionIds(models, [runId], [kind]);
-      if (activeSubmissionIds.length === 0) {
-        if (!models.Run?.sequelize) {
+      return memoizeRequestValue(requestMemo, `active-report:${actorCacheKey(actor)}:${runId}:${kind}`, async () => {
+        const run = await this.findRun({ id: runId, actor });
+        if (!run) return null;
+        if (!models.ReportSubmission) {
           const legacyRun = await loadOne(models.Run, { where: { id: runId }, attributes: ['rawReport'] });
           return legacyRun?.rawReport || null;
         }
-        return null;
-      }
-      const submission = await loadOne(models.ReportSubmission, {
-        where: { id: activeSubmissionIds[0] },
-        attributes: ['id', 'schemaVersion', 'rawReport'],
+        const activeSubmissionIds = await loadActiveSubmissionIds(models, [runId], [kind]);
+        if (activeSubmissionIds.length === 0) {
+          if (!models.Run?.sequelize) {
+            const legacyRun = await loadOne(models.Run, { where: { id: runId }, attributes: ['rawReport'] });
+            return legacyRun?.rawReport || null;
+          }
+          return null;
+        }
+        const submission = await loadOne(models.ReportSubmission, {
+          where: { id: activeSubmissionIds[0] },
+          attributes: ['id', 'schemaVersion', 'rawReport'],
+        });
+        return submission?.rawReport || null;
       });
-      return submission?.rawReport || null;
     },
 
     async listPerformanceTrend({ actor, projectId = null, projectKey = null, statGroup, statName, seriesIds = null, runnerKey = null, limit = DEFAULT_LIMIT }) {
@@ -1699,6 +1718,20 @@ async function loadActiveSubmissionIds(models, runIds, kinds = null) {
     order: [['receivedAt', 'DESC']],
   });
   return submissions.map((submission) => submission.id).filter(Boolean);
+}
+
+function actorCacheKey(actor) {
+  if (!actor || actor.isGuest === true) return 'guest';
+  const roles = Array.isArray(actor.roleKeys) ? [...actor.roleKeys].sort().join(',') : '';
+  const groups = Array.isArray(actor.groupKeys) ? [...actor.groupKeys].sort().join(',') : '';
+  return [actor.id || actor.userId || actor.email || 'member', actor.isAdmin === true ? 'admin' : 'member', roles, groups].join(':');
+}
+
+function memoizeRequestValue(cache, key, loader) {
+  if (!cache.has(key)) {
+    cache.set(key, Promise.resolve().then(loader));
+  }
+  return cache.get(key);
 }
 
 async function loadAll(model, options = undefined) {
