@@ -30,6 +30,13 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
       ? `/api/runs/${encodeURIComponent(runId)}/suite-tests?suiteRunId=${encodeURIComponent(firstSuiteId)}`
       : null,
   );
+  const initialSuiteNextCursor = initialSuitePage.data?.nextCursor || null;
+  const initialSuiteNextPage = useRunResource(
+    initialSuiteNextCursor,
+    runId && firstSuiteId && initialSuiteNextCursor && activeTemplateMode === 'web'
+      ? `/api/runs/${encodeURIComponent(runId)}/suite-tests?suiteRunId=${encodeURIComponent(firstSuiteId)}&after=${encodeURIComponent(initialSuiteNextCursor)}`
+      : null,
+  );
   const resolvedData = {
     ...(data || {}),
     ...(insights.data || {}),
@@ -37,6 +44,9 @@ export default function RunDetailPage({ data, templateMode = 'runner' }) {
     run: operations.data?.run || data?.run || null,
     initialSuitePages: firstSuiteId && initialSuitePage.data
       ? { [firstSuiteId]: initialSuitePage.data }
+      : {},
+    prefetchedNextSuitePages: firstSuiteId && initialSuiteNextCursor && initialSuiteNextPage.data
+      ? { [firstSuiteId]: { after: initialSuiteNextCursor, page: initialSuiteNextPage.data } }
       : {},
   };
   const run = resolvedData?.run || null;
@@ -563,6 +573,7 @@ function OperationsRunDetail({ data }) {
           runId: run.id,
           suites: run.suites,
           initialPages: data?.initialSuitePages,
+          prefetchedNextPages: data?.prefetchedNextSuitePages,
         })
         : React.createElement(EmptyState, {
           title: 'No suites stored',
@@ -572,13 +583,14 @@ function OperationsRunDetail({ data }) {
   );
 }
 
-function ProgressiveSuiteList({ runId, suites, initialPages = {} }) {
+function ProgressiveSuiteList({ runId, suites, initialPages = {}, prefetchedNextPages = {} }) {
   const [expandedSuiteId, setExpandedSuiteId] = React.useState(null);
   const [testsBySuite, setTestsBySuite] = React.useState(() => initialPages || {});
   const [loadingSuiteId, setLoadingSuiteId] = React.useState(null);
   const [error, setError] = React.useState(null);
   const [statusFilter, setStatusFilter] = React.useState('');
   const [searchFilter, setSearchFilter] = React.useState('');
+  const [nextPagesBySuite, setNextPagesBySuite] = React.useState(() => prefetchedNextPages || {});
   const requestRef = React.useRef(null);
   const filterKeyRef = React.useRef(`${statusFilter}\0${searchFilter}`);
   const initialPageEntry = Object.entries(initialPages || {})[0] || [];
@@ -592,6 +604,16 @@ function ProgressiveSuiteList({ runId, suites, initialPages = {} }) {
       : { ...current, [initialPageSuiteId]: initialPage });
   }, [initialPage, initialPageSuiteId]);
 
+  const prefetchedNextEntry = Object.entries(prefetchedNextPages || {})[0] || [];
+  const prefetchedNextSuiteId = prefetchedNextEntry[0] || null;
+  const prefetchedNextPage = prefetchedNextEntry[1] || null;
+  React.useEffect(() => {
+    if (!prefetchedNextSuiteId || !prefetchedNextPage) return;
+    setNextPagesBySuite((current) => current[prefetchedNextSuiteId]
+      ? current
+      : { ...current, [prefetchedNextSuiteId]: prefetchedNextPage });
+  }, [prefetchedNextPage, prefetchedNextSuiteId]);
+
   const loadSuitePage = React.useCallback(async (suite, append = false) => {
     const existing = testsBySuite[suite.id] || { tests: [], hasMore: false, nextCursor: null };
     const params = new URLSearchParams({ suiteRunId: suite.id });
@@ -604,8 +626,11 @@ function ProgressiveSuiteList({ runId, suites, initialPages = {} }) {
     setLoadingSuiteId(suite.id);
     setError(null);
     try {
-      const response = await fetch(`/api/runs/${encodeURIComponent(runId)}/suite-tests?${params.toString()}`, { signal: controller.signal });
-      const payload = await readJsonResponse(response);
+      const prefetched = append && nextPagesBySuite[suite.id]?.after === existing.nextCursor
+        ? nextPagesBySuite[suite.id].page
+        : null;
+      const payload = prefetched || await fetch(`/api/runs/${encodeURIComponent(runId)}/suite-tests?${params.toString()}`, { signal: controller.signal })
+        .then(readJsonResponse);
       setTestsBySuite((current) => ({
         ...current,
         [suite.id]: {
@@ -616,12 +641,15 @@ function ProgressiveSuiteList({ runId, suites, initialPages = {} }) {
           nextCursor: payload.nextCursor || null,
         },
       }));
+      if (prefetched) {
+        setNextPagesBySuite((current) => ({ ...current, [suite.id]: undefined }));
+      }
     } catch (loadError) {
       if (loadError?.name !== 'AbortError') setError(loadError instanceof Error ? loadError.message : 'Unable to load suite tests');
     } finally {
       if (!controller.signal.aborted) setLoadingSuiteId(null);
     }
-  }, [runId, searchFilter, statusFilter, testsBySuite]);
+  }, [nextPagesBySuite, runId, searchFilter, statusFilter, testsBySuite]);
 
   React.useEffect(() => () => requestRef.current?.abort(), []);
 
