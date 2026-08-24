@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { createPerformanceFixture } from '../scripts/generate-performance-fixture.mjs';
@@ -61,12 +62,15 @@ test('performance converter emits stable Test Station performance stats and budg
   });
 });
 
-test('ingest payload supports a synthetic performance source run identity', () => {
-  const reportPath = path.resolve(import.meta.dirname, 'fixtures/phase2/artifacts/report/report.json');
+test('ingest payload supports a synthetic performance source run identity', (context) => {
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'test-station-performance-payload-'));
+  context.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
+  const reportPath = path.join(outputDir, 'report.json');
+  fs.writeFileSync(reportPath, `${JSON.stringify(createPerformanceFixture({ testCount: 100, seed: 'payload-fixture' }))}\n`);
   const payload = createIngestPayload({
     reportPath,
     projectKey: 'test-station',
-    outputDir: path.dirname(reportPath),
+    outputDir,
     sourceRunId: '123:web-performance:1',
     targetCommit: 'deadbeef',
     submission: {
