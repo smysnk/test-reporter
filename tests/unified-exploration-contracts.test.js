@@ -16,7 +16,7 @@ const cohorts = {
   passed: { status: 'passed', publicationKinds: ['tests'], summary: { failedTests: 0 } },
   failed: { status: 'failed', publicationKinds: ['tests'], summary: { failedTests: 2 }, artifactCount: 3, hasReportArtifact: true },
   coverage: { status: 'unknown', publicationKinds: ['coverage'], coverageSnapshot: { linesPct: 81.2 } },
-  performance: { status: 'unknown', publicationKinds: ['combined'], performanceAvailable: true },
+  performance: { status: 'unknown', publicationKinds: ['performance'], performanceAvailable: true },
   combined: { status: 'passed', publicationKinds: ['combined'], summary: { totalTests: 12, failedTests: 0 } },
   missing: { status: null, publicationKinds: null, summary: { failedTests: null } },
 };

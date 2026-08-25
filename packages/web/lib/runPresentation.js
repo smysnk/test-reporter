@@ -42,8 +42,7 @@ export function buildRunPresentation(run = {}) {
   const hasTests = publicationKinds.includes('tests')
     || (Array.isArray(run.suites) && run.suites.length > 0)
     || (summaryTotal !== null && summaryTotal > 0);
-  const hasCoverage = publicationKinds.includes('coverage')
-    || Boolean(run.coverageSnapshot);
+  const hasCoverage = Boolean(run.coverageSnapshot);
   const hasPerformance = publicationKinds.includes('performance') || run.performanceAvailable === true;
   const artifactCount = finite(run.artifactCount)
     ?? (Array.isArray(run.artifacts) ? run.artifacts.length : 0);
@@ -91,10 +90,12 @@ export function buildRunPresentation(run = {}) {
 
 export function compactRunPresentation(run = {}) {
   const presentation = buildRunPresentation(run);
-  if (presentation.overallStatus === 'benchmark') {
+  const publicationKinds = normalizePublicationKinds(run.publicationKinds);
+  const hasTestPublication = publicationKinds.some((kind) => kind === 'tests' || kind === 'combined');
+  if (!hasTestPublication && publicationKinds.includes('performance')) {
     return { kind: 'performance', label: 'Benchmark', status: 'benchmark', symbol: 'B' };
   }
-  if (presentation.overallStatus === 'coverage') {
+  if (!hasTestPublication && publicationKinds.includes('coverage')) {
     return { kind: 'coverage', label: 'Coverage', status: 'coverage', symbol: 'C' };
   }
   const status = normalizeRunStatus(presentation.overallStatus);

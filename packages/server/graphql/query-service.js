@@ -139,6 +139,7 @@ export function createGraphqlQueryService(options = {}) {
         where: {
           runId,
           ...(activeSubmissionIds.length > 0 ? { reportSubmissionId: activeSubmissionIds } : {}),
+          statGroup: { [Op.like]: 'benchmark.%' },
         },
         attributes: ['id'],
       });

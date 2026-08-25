@@ -167,7 +167,11 @@ test('unified explorer resources remain bounded and reject cross-run child ident
     CoverageFile: createFindAllModel([{ id:'coverage-file-1', coverageSnapshotId:'coverage-1', projectPackageId:'package-1', projectModuleId:'module-1', path:'src/a.js', linesCovered:8, linesTotal:10, linesPct:80, metadata:{} }]),
     ErrorOccurrence: createFindAllModel([{ id:'error-1', runId:'run-1', testExecutionId:'test-1', reportSubmissionId:'submission-1', message:'boom', stack:'Error: boom' }]),
     Artifact: createFindAllModel([{ id:'artifact-1', runId:'run-1', testExecutionId:'test-1', reportSubmissionId:'submission-1', kind:'log', label:'failure.log' }]),
-    PerformanceStat: createFindAllModel([{ id:'stat-1', runId:'run-1', reportSubmissionId:'submission-1', statGroup:'benchmark.node', statName:'elapsed_ms', numericValue:12 }]),
+    PerformanceStat: {
+      async findOne({ where }) {
+        return where.runId === 'run-1' ? { id:'stat-1' } : null;
+      },
+    },
   };
   const service = createGraphqlQueryService({ models, benchmarkQueryCache:false });
   const actor = { isGuest:true };
