@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import { formatDateTime, parseDateValue } from '../../lib/format.js';
 import styles from './Workspace.module.css';
 
 export function statusClass(status) {
@@ -41,10 +42,12 @@ export function formatDuration(value) {
   const ms = Number(value);
   return ms >= 1000 ? `${(ms / 1000).toFixed(ms >= 10000 ? 1 : 2)}s` : `${Math.round(ms)}ms`;
 }
+export function parseWorkspaceDate(value) {
+  return parseDateValue(value);
+}
 export function formatDate(value) {
-  if (!value) return 'n/a';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'n/a' : date.toLocaleString();
+  const formatted = formatDateTime(value);
+  return formatted === 'Unavailable' ? 'n/a' : formatted;
 }
 
 export function RunLink({ runId, children, query = null, className = styles.link }) {

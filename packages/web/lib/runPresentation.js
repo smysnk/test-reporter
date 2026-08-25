@@ -38,10 +38,13 @@ export function normalizePublicationKinds(values) {
 
 export function buildRunPresentation(run = {}) {
   const publicationKinds = normalizePublicationKinds(run.publicationKinds);
-  const hasTests = publicationKinds.some((kind) => kind === 'tests' || kind === 'combined');
-  const hasCoverage = publicationKinds.some((kind) => kind === 'coverage' || kind === 'combined')
+  const summaryTotal = finite(run.summary?.totalTests) ?? finite(run.summary?.total);
+  const hasTests = publicationKinds.includes('tests')
+    || (Array.isArray(run.suites) && run.suites.length > 0)
+    || (summaryTotal !== null && summaryTotal > 0);
+  const hasCoverage = publicationKinds.includes('coverage')
     || Boolean(run.coverageSnapshot);
-  const hasPerformance = publicationKinds.some((kind) => kind === 'performance' || kind === 'combined');
+  const hasPerformance = publicationKinds.includes('performance') || run.performanceAvailable === true;
   const artifactCount = finite(run.artifactCount)
     ?? (Array.isArray(run.artifacts) ? run.artifacts.length : 0);
   const failedTests = finite(run.failedTests)

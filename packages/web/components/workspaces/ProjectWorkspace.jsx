@@ -6,7 +6,7 @@ import { useBffResource } from '../../hooks/useBffResource.js';
 import { buildOperationsSummary, resolveRunPresentation } from '../../lib/operationsOverview.js';
 import { parseProjectWorkspaceState } from '../../lib/workspaceRouting.js';
 import {
-  formatDate, formatDuration, formatNumber, formatPct, ResourceState, RunLink,
+  formatDate, formatDuration, formatNumber, formatPct, parseWorkspaceDate, ResourceState, RunLink,
   StatusPill, styles, SummaryStrip, WorkspaceTabs,
 } from './WorkspacePrimitives.jsx';
 
@@ -126,7 +126,7 @@ function RunInspector({ run, close }) {
 function runsWithinDays(runs, days) {
   const cutoff = Date.now() - (days * 24 * 60 * 60 * 1000);
   return runs.filter((run) => {
-    const completed = Date.parse(run.completedAt || run.startedAt || '');
+    const completed = parseWorkspaceDate(run.completedAt || run.startedAt).getTime();
     return Number.isFinite(completed) && completed >= cutoff;
   });
 }

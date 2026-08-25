@@ -131,6 +131,20 @@ export function createGraphqlQueryService(options = {}) {
       return (await loadPublicationKindsByRunId(models, [runId])).get(runId) || [];
     },
 
+    async hasRunPerformance({ runId, actor }) {
+      const run = await this.findRun({ id: runId, actor });
+      if (!run) return false;
+      const activeSubmissionIds = await loadActiveSubmissionIds(models, [runId], ['performance', 'combined']);
+      const stat = await loadOne(models.PerformanceStat, {
+        where: {
+          runId,
+          ...(activeSubmissionIds.length > 0 ? { reportSubmissionId: activeSubmissionIds } : {}),
+        },
+        attributes: ['id'],
+      });
+      return Boolean(stat);
+    },
+
     async listProjects({ actor }) {
       return memoizeRequestValue(requestMemo, `projects:${actorCacheKey(actor)}`, async () => {
         const projects = await loadAll(models.Project);

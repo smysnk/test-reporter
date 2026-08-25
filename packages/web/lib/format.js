@@ -15,7 +15,7 @@ export function formatDateTime(value) {
   }).format(date);
 }
 
-function parseDateValue(value) {
+export function parseDateValue(value) {
   if (typeof value === 'string') {
     const normalized = value.trim();
     if (/^\d+$/.test(normalized)) {

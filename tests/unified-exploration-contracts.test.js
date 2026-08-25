@@ -16,8 +16,8 @@ const cohorts = {
   passed: { status: 'passed', publicationKinds: ['tests'], summary: { failedTests: 0 } },
   failed: { status: 'failed', publicationKinds: ['tests'], summary: { failedTests: 2 }, artifactCount: 3, hasReportArtifact: true },
   coverage: { status: 'unknown', publicationKinds: ['coverage'], coverageSnapshot: { linesPct: 81.2 } },
-  performance: { status: 'unknown', publicationKinds: ['performance'] },
-  combined: { status: 'passed', publicationKinds: ['combined'], summary: { failedTests: 0 } },
+  performance: { status: 'unknown', publicationKinds: ['combined'], performanceAvailable: true },
+  combined: { status: 'passed', publicationKinds: ['combined'], summary: { totalTests: 12, failedTests: 0 } },
   missing: { status: null, publicationKinds: null, summary: { failedTests: null } },
 };
 
@@ -32,6 +32,7 @@ test('run presentation selects useful real-data modes for every fixture cohort',
   assert.equal(buildRunPresentation(cohorts.coverage).defaultView, 'coverage');
   assert.equal(buildRunPresentation(cohorts.performance).defaultView, 'performance');
   assert.equal(buildRunPresentation(cohorts.combined).defaultView, 'tests');
+  assert.deepEqual(buildRunPresentation(cohorts.combined).availableViews, ['summary', 'tests']);
   assert.deepEqual(buildRunPresentation(cohorts.missing), {
     overallStatus: 'unknown',
     testStatus: 'missing',

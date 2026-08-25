@@ -625,7 +625,7 @@ export const RUN_WORKSPACE_QUERY = `
   query WebRunWorkspace($runId: ID!) {
     run(id: $runId) {
       id externalKey status branch commitSha sourceProvider sourceRunId sourceUrl triggeredBy
-      startedAt completedAt durationMs summary publicationKinds
+      startedAt completedAt durationMs summary publicationKinds performanceAvailable
       project { key slug name repositoryUrl defaultBranch }
       projectVersion { versionKey buildNumber }
       coverageSnapshot {

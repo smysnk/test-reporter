@@ -158,6 +158,7 @@ export const queryTypeDefs = `#graphql
     summary: JSON
     metadata: JSON
     publicationKinds: [String!]!
+    performanceAvailable: Boolean!
     project: Project
     projectVersion: ProjectVersion
     coverageSnapshot: CoverageSnapshot
@@ -569,6 +570,7 @@ export const queryResolvers = {
   },
   Run: {
     publicationKinds: (run, _args, context) => context.queryService.getRunPublicationKinds({ runId: run.id, actor: context.actor }),
+    performanceAvailable: (run, _args, context) => context.queryService.hasRunPerformance({ runId: run.id, actor: context.actor }),
     rawReport: (run, _args, context) => context.queryService.getActiveRunReport({
       runId: run.id,
       kind: 'tests',
