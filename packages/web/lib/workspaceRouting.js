@@ -61,3 +61,13 @@ export function compactWorkspaceQuery(state = {}) {
   return Object.fromEntries(Object.entries(state)
     .filter(([key, value]) => !['requestedView', 'redirected'].includes(key) && value !== null && value !== undefined && value !== ''));
 }
+
+export function buildLegacyRunWorkspaceDestination(runId, query = {}, template = 'runner') {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (key === 'id' || key === 'template' || value === null || value === undefined || value === '') continue;
+    for (const entry of Array.isArray(value) ? value : [value]) params.append(key, String(entry));
+  }
+  params.set('view', template === 'runner' ? 'report' : 'summary');
+  return `/runs/${encodeURIComponent(runId)}?${params.toString()}`;
+}

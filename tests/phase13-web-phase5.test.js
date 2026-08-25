@@ -37,6 +37,7 @@ import {
 import { buildAdminPageResult, buildOverviewPageResult, buildProjectPageResult, buildRunPageResult } from '../packages/web/lib/pageProps.js';
 import { WEB_HOME_QUERY, PROJECT_ACTIVITY_QUERY, PROJECT_BENCHMARK_OVERVIEW_QUERY, PERFORMANCE_TREND_QUERY, RUN_DETAIL_QUERY, RUN_HEADER_QUERY, RUN_PROJECT_HISTORY_QUERY } from '../packages/web/lib/queries.js';
 import { resolvePublicRuntimeConfig } from '../packages/web/lib/runtimeConfig.js';
+import { buildLegacyRunWorkspaceDestination } from '../packages/web/lib/workspaceRouting.js';
 import {
   ADMIN_PAGE_UNAUTHORIZED,
   executeWebGraphql,
@@ -3218,8 +3219,10 @@ test('legacy run template URLs redirect into addressable unified workspace modes
   assert.equal(resolveRunTemplateMode('web'), 'web');
   assert.equal(buildRunTemplateHref('run-1', 'runner'), '/runs/run-1');
   assert.equal(buildRunTemplateHref('run-1', 'web'), '/runs/run-1?template=web');
+  assert.equal(buildLegacyRunWorkspaceDestination('run-1', { template:'runner' }, 'runner'), '/runs/run-1?view=report');
+  assert.equal(buildLegacyRunWorkspaceDestination('run 1', { template:'web', test:'test-1', tag:['a','b'] }, 'web'), '/runs/run%201?test=test-1&tag=a&tag=b&view=summary');
   assert.match(runPageSource, /context\.query\?\.template === 'runner'/);
-  assert.match(runPageSource, /context\.query\.template === 'runner' \? 'report' : 'summary'/);
+  assert.match(runPageSource, /buildLegacyRunWorkspaceDestination/);
   assert.match(runPageSource, /loadRunWorkspaceFallback/);
   assert.doesNotMatch(runPageSource, /\bloadRunWorkspace\b/);
   assert.doesNotMatch(runPageSource, /loadRunExplorerPage/);

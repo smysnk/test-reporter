@@ -5,6 +5,7 @@ import { buildRunPageResult } from '../../lib/pageProps.js';
 import { buildServerTimingHeader, createPageLoadProfiler } from '../../lib/pageProfiling.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../../lib/requestTrace.js';
 import { buildTransientRunWorkspace, loadRunWorkspaceFallback } from '../../lib/serverGraphql.js';
+import { buildLegacyRunWorkspaceDestination } from '../../lib/workspaceRouting.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
 
 export default function RunPage({ data }) {
@@ -15,10 +16,9 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   const session = await getWebSession(context.req, context.res);
   const runId = typeof context.params?.id === 'string' ? context.params.id : '';
   if (context.query?.template === 'runner' || context.query?.template === 'web') {
-    const { template: _template, ...query } = context.query;
     return {
       redirect: {
-        destination: { pathname: `/runs/${runId}`, query: { ...query, view: context.query.template === 'runner' ? 'report' : 'summary' } },
+        destination: buildLegacyRunWorkspaceDestination(runId, context.query, context.query.template),
         permanent: false,
       },
     };
