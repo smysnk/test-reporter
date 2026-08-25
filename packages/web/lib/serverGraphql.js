@@ -26,6 +26,7 @@ import {
   PROJECT_BY_SLUG_QUERY,
   RUN_PROJECT_HISTORY_QUERY,
   RUN_HEADER_QUERY,
+  RUN_FAILURE_EVIDENCE_QUERY,
   RUN_SCOPE_TREND_CATALOG_QUERY,
   RUN_DETAIL_QUERY,
   RUN_REPORT_QUERY,
@@ -39,7 +40,7 @@ import {
 } from './runReportTemplate.js';
 
 export const ADMIN_PAGE_UNAUTHORIZED = Symbol('test-station.admin-page-unauthorized');
-const INITIAL_HOME_RUN_LIMIT = 10;
+const INITIAL_HOME_RUN_LIMIT = 50;
 const renderedReportCache = new Map();
 const renderedReportCacheDirectory = path.join(os.tmpdir(), 'test-station-rendered-reports');
 
@@ -180,9 +181,26 @@ export async function loadWebRunFeedPage({ session, after = null, projectKey = n
   });
   const entries = Array.isArray(result.data.runFeed) ? result.data.runFeed : [];
   return {
-    runs: entries.slice(0, 30).map(normalizeRunFeedEntry),
-    hasMoreRuns: entries.length > 30,
+    runs: entries.slice(0, 50).map(normalizeRunFeedEntry),
+    hasMoreRuns: entries.length > 50,
   };
+}
+
+export async function loadRunFailureEvidence({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: RUN_FAILURE_EVIDENCE_QUERY,
+    variables: { runId },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  if (!result.data.runFailureEvidence) {
+    const error = new Error('Run not found');
+    error.statusCode = 404;
+    throw error;
+  }
+  return result.data.runFailureEvidence;
 }
 
 function normalizeRunFeedEntry(entry) {
@@ -190,6 +208,7 @@ function normalizeRunFeedEntry(entry) {
         id: entry.id,
         externalKey: entry.externalKey,
         status: entry.status,
+        publicationKinds: Array.isArray(entry.publicationKinds) ? entry.publicationKinds : [],
         branch: entry.branch,
         commitSha: entry.commitSha,
         sourceRunId: entry.sourceRunId,

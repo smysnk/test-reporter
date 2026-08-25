@@ -47,6 +47,7 @@ import {
   loadProjectExplorerPage,
   loadProjectActivity,
   loadRunExplorerPage,
+  loadRunFailureEvidence,
   loadRunInsights,
   loadRunOperationsData,
   loadRunReportHtml,
@@ -55,9 +56,22 @@ import {
   resolveWebServerUrl,
 } from '../packages/web/lib/serverGraphql.js';
 
+test('web failure evidence loader uses the narrow run query', async () => {
+  const evidence = { runId: 'run-1', status: 'failed', failedTest: { id: 'test-1' } };
+  const fetchImpl = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    assert.match(request.query, /query WebRunFailureEvidence/);
+    assert.deepEqual(request.variables, { runId: 'run-1' });
+    assert.doesNotMatch(request.query, /runPackages|coverageFiles|performanceTrends/);
+    return new Response(JSON.stringify({ data: { runFailureEvidence: evidence } }), { status: 200 });
+  };
+
+  assert.deepEqual(await loadRunFailureEvidence({ session: null, runId: 'run-1', fetchImpl }), evidence);
+});
+
 test('web pagination loaders use one-row lookahead and return stable cursors', async () => {
   const suiteTests = Array.from({ length: 101 }, (_, index) => ({ id: `test-${String(index + 1).padStart(3, '0')}`, fullName: `test ${index + 1}` }));
-  const runFeed = Array.from({ length: 31 }, (_, index) => ({
+  const runFeed = Array.from({ length: 51 }, (_, index) => ({
     id: `run-${index + 1}`,
     externalKey: `run-${index + 1}`,
     cursor: `cursor-${index + 1}`,
@@ -96,9 +110,9 @@ test('web pagination loaders use one-row lookahead and return stable cursors', a
   assert.equal(testPage.nextCursor, 'test-100');
 
   const feedPage = await loadWebRunFeedPage({ session: null, after: 'cursor-0', fetchImpl });
-  assert.equal(feedPage.runs.length, 30);
+  assert.equal(feedPage.runs.length, 50);
   assert.equal(feedPage.hasMoreRuns, true);
-  assert.equal(feedPage.runs.at(-1).cursor, 'cursor-30');
+  assert.equal(feedPage.runs.at(-1).cursor, 'cursor-50');
 });
 import { buildRunTemplateHref, resolveRunTemplateMode } from '../packages/web/lib/runTemplateRouting.js';
 import { buildSignInRedirectUrl, isProtectedWebPath, normalizeCallbackTarget } from '../packages/web/lib/routeProtection.js';
@@ -116,9 +130,13 @@ import { createGraphqlProxyHandler } from '../packages/web/pages/api/graphql-pro
 import { createRunReportHandler } from '../packages/web/pages/api/runs/[id]/report.js';
 import nextConfig from '../packages/web/next.config.mjs';
 import { BenchmarkExplorer, PerformanceDomainSummary, ProjectBenchmarkExplorer, RunBenchmarkDeltaSummary, RunBenchmarkSummary } from '../packages/web/components/BenchmarkBits.js';
+import { OperationsSummaryStrip } from '../packages/web/components/OperationsSummaryStrip.js';
 import { RunBuildChip, RunSourceLink } from '../packages/web/components/WebBits.js';
 import {
   buildHomeExplorerModel,
+  buildOperationsSummary,
+  buildProjectActivityRows,
+  resolveRunPresentation,
   resolveInitialVisibleRunCount,
   resolveNextVisibleRunCount,
 } from '../packages/web/lib/homeExplorer.js';
@@ -2412,7 +2430,7 @@ test('web run build chip and GraphQL queries include build metadata and source l
   assert.match(html, /build #88/);
   assert.match(html, /https:\/\/github\.com\/example\/test-station\/actions\/runs\/1001/);
   assert.match(WEB_HOME_QUERY, /viewer/);
-  assert.match(WEB_HOME_QUERY, /runFeed\(limit:\s*11\)\s*\{/);
+  assert.match(WEB_HOME_QUERY, /runFeed\(limit:\s*51\)\s*\{/);
   assert.match(WEB_HOME_QUERY, /sourceRunId/);
   assert.match(WEB_HOME_QUERY, /sourceUrl/);
   assert.match(WEB_HOME_QUERY, /buildNumber/);
@@ -3025,8 +3043,63 @@ test('web home explorer run window helpers cap the initial slice and grow increm
   assert.equal(resolveNextVisibleRunCount(18, 80, 12), 30);
 });
 
+test('web operations overview distinguishes benchmark and coverage publications from test status', () => {
+  assert.deepEqual(resolveRunPresentation({ status: 'unknown', publicationKinds: ['performance'] }), {
+    kind: 'performance',
+    label: 'Benchmark',
+    status: 'benchmark',
+    symbol: 'B',
+  });
+  assert.deepEqual(resolveRunPresentation({ status: 'unknown', publicationKinds: ['coverage'] }), {
+    kind: 'coverage',
+    label: 'Coverage',
+    status: 'coverage',
+    symbol: 'C',
+  });
+  assert.equal(resolveRunPresentation({ status: 'passed', publicationKinds: ['tests', 'performance'] }).label, 'Passed');
+
+  assert.deepEqual(buildOperationsSummary([
+    { status: 'passed', publicationKinds: ['tests'], coverageSnapshot: { linesPct: 91 } },
+    { status: 'failed', publicationKinds: ['tests'] },
+    { status: 'unknown', publicationKinds: ['performance'] },
+  ]), {
+    total: 3,
+    passed: 1,
+    failed: 1,
+    terminal: 2,
+    passRate: 50,
+    benchmarks: 1,
+    coveragePublications: 0,
+    latestCoverage: 91,
+    medianDurationMs: null,
+  });
+});
+
+test('operations summary renders stable unavailable states', () => {
+  const summaryHtml = renderToStaticMarkup(React.createElement(OperationsSummaryStrip, {
+    summary: {
+      total: 0, passed: 0, failed: 0, terminal: 0, passRate: null,
+      latestCoverage: null, medianDurationMs: null,
+    },
+    windowDays: 14,
+  }));
+  assert.match(summaryHtml, /14-day operations summary/);
+  assert.match(summaryHtml, /N\/A/);
+});
+
+test('web operations activity matrix keeps a bounded newest-first run window per project', () => {
+  const projects = [{ id: 'project-a', slug: 'alpha' }, { id: 'project-b', slug: 'beta' }];
+  const rows = buildProjectActivityRows(projects, [
+    { id: 'alpha-old', project: { slug: 'alpha' }, completedAt: '2026-03-01T00:00:00.000Z' },
+    { id: 'beta-new', project: { slug: 'beta' }, completedAt: '2026-03-03T00:00:00.000Z' },
+    { id: 'alpha-new', project: { slug: 'alpha' }, completedAt: '2026-03-02T00:00:00.000Z' },
+  ], 1);
+
+  assert.deepEqual(rows.map((row) => row.runs.map((run) => run.id)), [['alpha-new'], ['beta-new']]);
+});
+
 test('web home exposes an explicit interactive hydration marker', () => {
-  const homePageSource = fs.readFileSync(new URL('../packages/web/pages/index.js', import.meta.url), 'utf8');
+  const homePageSource = fs.readFileSync(new URL('../packages/web/components/OperationsOverview.js', import.meta.url), 'utf8');
 
   assert.match(homePageSource, /data-page-interactive/);
   assert.match(homePageSource, /setIsHydrated\(true\)/);

@@ -9,6 +9,7 @@ const baseURL = process.env.TEST_STATION_E2E_BASE_URL || 'https://test-station.s
 const enforceBudgets = process.env.TEST_STATION_E2E_ENFORCE_BUDGETS === 'true';
 const budgetConfig = {
   homeReadyMs: readBudget('TEST_STATION_E2E_BUDGET_HOME_READY_MS', 1_000),
+  evidenceRequestMs: readBudget('TEST_STATION_E2E_BUDGET_EVIDENCE_REQUEST_MS', 750),
   projectFocusMs: readBudget('TEST_STATION_E2E_BUDGET_PROJECT_FOCUS_MS', 1_000),
   clearProjectFocusMs: readBudget('TEST_STATION_E2E_BUDGET_PROJECT_CLEAR_MS', 1_000),
   runNavigationMs: readBudget('TEST_STATION_E2E_BUDGET_RUN_NAVIGATION_MS', 1_000),
@@ -144,7 +145,7 @@ test('benchmarks sidebar project focus and project-page load', async ({ page }, 
     },
     async () => {
       await expect(clearButton).toHaveAttribute('aria-pressed', 'true');
-      await expect(page.getByText('Operations overview', { exact: true })).toBeVisible();
+      await expect(page.getByText('All recent publications', { exact: true })).toBeVisible();
     },
   );
   const clearProjectFocusProfiling = await collectProfilingSnapshot(page, 'overview-page-ready');
@@ -186,6 +187,37 @@ test('benchmarks sidebar project focus and project-page load', async ({ page }, 
   assertBudget('projectFocusMs', record.metrics.projectFocusMs);
   assertBudget('clearProjectFocusMs', record.metrics.clearProjectFocusMs);
   assertBudget('projectPageNavigationMs', record.metrics.projectPageReadyMs);
+});
+
+test('benchmarks in-context failure evidence without navigating away', async ({ page }, testInfo) => {
+  await goToPublicHome(page);
+  const failedRow = page.locator('.operations-table__row').filter({ has: page.locator('.web-pill--failed') }).first();
+  test.skip(await failedRow.count() === 0, 'No failed public run is visible to benchmark failure evidence.');
+  const runId = await failedRow.getAttribute('data-run-id');
+  const evidenceRequestMs = await measureInteraction(
+    async () => failedRow.click(),
+    async () => {
+      await expect(page.getByRole('complementary', { name: 'Run inspector' })).toBeVisible();
+      await expect(page.locator('.operations-inspector__loading')).toHaveCount(0);
+    },
+  );
+  const record = {
+    scenario: 'failure-evidence-selection',
+    route: page.url(),
+    metrics: {
+      evidenceRequestMs,
+      ...await collectBrowserMetrics(page),
+    },
+    context: {
+      runId,
+      inspectorError: await page.locator('.operations-inspector__error').count() > 0,
+      inspectorHasEvidence: await page.locator('.operations-inspector__test-name').count() > 0,
+    },
+    profiling: await collectProfilingSnapshot(page, 'overview-page-ready'),
+  };
+
+  await recordBenchmark(testInfo, record);
+  assertBudget('evidenceRequestMs', record.metrics.evidenceRequestMs);
 });
 
 test('benchmarks runner report readiness, operations view, and project-page navigation', async ({ page }, testInfo) => {

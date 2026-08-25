@@ -26,6 +26,74 @@ test('query service resolves build number from stored source fallbacks', () => {
   }), 12);
 });
 
+test('run failure evidence is narrowly projected and preserves project authorization', async () => {
+  const project = {
+    id: 'project-1', key: 'workspace', slug: 'workspace', name: 'Workspace', isPublic: false,
+  };
+  const queryService = createGraphqlQueryService({
+    benchmarkQueryCache: false,
+    accessService: {
+      async filterProjects({ actor, projects }) {
+        return actor?.id === 'member-1' ? projects : [];
+      },
+    },
+    models: {
+      Project: createFindAllModel([project]),
+      ProjectOverview: createFindAllModel([]),
+      Run: createFindAllModel([{
+        id: 'run-1', projectId: project.id, projectVersionId: 'version-1', externalKey: 'workspace-104',
+        status: 'failed', branch: 'main', commitSha: 'abcdef0123456789', triggeredBy: 'push',
+        sourceUrl: 'https://github.com/example/workspace/actions/runs/104',
+        completedAt: '2026-08-25T17:00:00.000Z', summary: { totalTests: 10, failedTests: 1 },
+      }]),
+      ProjectVersion: createFindAllModel([{ id: 'version-1', projectId: project.id, buildNumber: 104 }]),
+      CoverageSnapshot: createFindAllModel([]),
+      SuiteRun: createFindAllModel([{
+        id: 'suite-1', runId: 'run-1', reportSubmissionId: 'submission-tests',
+        suiteIdentifier: 'node', name: 'Node', status: 'failed', assertions: 10,
+      }]),
+      TestExecution: createFindAllModel([{
+        id: 'test-1', suiteRunId: 'suite-1', reportSubmissionId: 'submission-tests',
+        testIdentifier: 'worker-retry', name: 'retries the worker', fullName: 'worker retries the failed job',
+        status: 'failed', durationMs: 14, assertions: [], setup: [], mocks: [],
+      }]),
+      ErrorOccurrence: createFindAllModel([{
+        id: 'error-1', runId: 'run-1', testExecutionId: 'test-1', reportSubmissionId: 'submission-tests',
+        level: 'error', code: 'ERR_RETRY', message: 'expected retry count to equal 2', stack: 'AssertionError: expected 2',
+      }]),
+      Artifact: createFindAllModel([{
+        id: 'artifact-1', runId: 'run-1', reportSubmissionId: 'submission-tests', kind: 'report',
+        label: 'Runner report', href: '/api/runs/run-1/report', relativePath: 'index.html',
+      }]),
+      RunActiveSubmission: createFindAllModel([{
+        runId: 'run-1', kind: 'tests', reportSubmissionId: 'submission-tests', selectedAt: '2026-08-25T17:00:01.000Z',
+      }]),
+      ReportSubmission: createFindAllModel([]),
+    },
+  });
+
+  const evidence = await queryService.getRunFailureEvidence({ runId: 'run-1', actor: { id: 'member-1' } });
+  assert.deepEqual({
+    runId: evidence.runId,
+    projectKey: evidence.projectKey,
+    buildNumber: evidence.buildNumber,
+    reportUrl: evidence.reportUrl,
+    failedTestId: evidence.failedTest?.id,
+    errorCode: evidence.error?.code,
+    errorMessage: evidence.error?.message,
+  }, {
+    runId: 'run-1',
+    projectKey: 'workspace',
+    buildNumber: 104,
+    reportUrl: '/api/runs/run-1/report',
+    failedTestId: 'test-1',
+    errorCode: 'ERR_RETRY',
+    errorMessage: 'expected retry count to equal 2',
+  });
+
+  assert.equal(await queryService.getRunFailureEvidence({ runId: 'run-1', actor: { id: 'intruder' } }), null);
+});
+
 test('public badge summary resolves tests and coverage from their latest active submissions independently', async () => {
   const queryService = createGraphqlQueryService({
     benchmarkQueryCache: false,
@@ -129,6 +197,16 @@ test('GraphQL exposes guest-safe public reads and hides private resources', asyn
         }
         privateRun: run(id: "run-1") {
           id
+        }
+        publicFailureEvidence: runFailureEvidence(runId: "run-public-1") {
+          runId
+          projectKey
+          status
+          reportUrl
+          failedTest { id }
+        }
+        privateFailureEvidence: runFailureEvidence(runId: "run-1") {
+          runId
         }
         runPackages(runId: "run-public-1") {
           name
@@ -255,6 +333,14 @@ test('GraphQL exposes guest-safe public reads and hides private resources', asyn
   assert.equal(response.payload.data.publicRun.suites[0].tests[0].fullName, 'public site passes');
   assert.equal(response.payload.data.publicRun.artifacts[0].href, 'raw/public-site/public-site.log');
   assert.equal(response.payload.data.privateRun, null);
+  assert.deepEqual(response.payload.data.publicFailureEvidence, {
+    runId: 'run-public-1',
+    projectKey: 'public-site',
+    status: 'passed',
+    reportUrl: 'raw/public-site/public-site.log',
+    failedTest: null,
+  });
+  assert.equal(response.payload.data.privateFailureEvidence, null);
   assert.deepEqual(response.payload.data.runPackages, [
     {
       name: 'public-site',
@@ -1752,6 +1838,53 @@ test('listRuns queries the lightweight feed fields with DB-side limit and relate
     runId: ['run-2', 'run-1'],
   });
   assert.deepEqual(runs[0].summary, { totalTests: 3, passedTests: 3, failedTests: 0 });
+});
+
+test('run feed exposes active publication kinds for projected runs', async () => {
+  const queryService = createGraphqlQueryService({
+    accessService: {
+      async filterProjects({ projects }) {
+        return projects;
+      },
+    },
+    models: {
+      Project: createFindAllModel([{
+        id: 'project-1',
+        key: 'workspace',
+        slug: 'workspace',
+        name: 'Workspace',
+        isPublic: true,
+      }]),
+      RunOverview: createFindAllModel([{
+        runId: 'run-benchmark',
+        projectId: 'project-1',
+        projectVersionId: null,
+        externalKey: 'workspace:manual:benchmark',
+        status: 'unknown',
+        completedAt: '2026-03-15T12:00:00.000Z',
+        totalTests: 0,
+        passedTests: 0,
+        failedTests: 0,
+        skippedTests: 0,
+      }]),
+      RunActiveSubmission: createFindAllModel([
+        { runId: 'run-benchmark', kind: 'performance', reportSubmissionId: 'submission-1' },
+      ]),
+      ProjectVersion: createFindAllModel([]),
+      Group: createFindAllModel([]),
+      ProjectGroupAccess: createFindAllModel([]),
+      ProjectRoleAccess: createFindAllModel([]),
+      Role: createFindAllModel([]),
+    },
+  });
+
+  const feed = await queryService.listRunFeed({
+    actor: { id: 'guest', isGuest: true, isAdmin: false, roleKeys: [], groupKeys: [] },
+    limit: 10,
+  });
+
+  assert.deepEqual(feed[0].publicationKinds, ['performance']);
+  assert.equal(feed[0].status, 'unknown');
 });
 
 test('listRuns returns the full visible run set when no limit is provided', async () => {

@@ -7,6 +7,7 @@ import { buildSignInRedirectUrl } from '../lib/routeProtection.js';
 
 export function WebShell({ children, viewer = null, session = null }) {
   const router = useRouter();
+  const isOperationsOverview = router.pathname === '/';
   const selectedProjectSlug = useSelector((state) => state.explorer.selectedProjectSlug);
   const selectedRunId = useSelector((state) => state.explorer.selectedRunId);
   const resolvedViewer = viewer || null;
@@ -47,20 +48,22 @@ export function WebShell({ children, viewer = null, session = null }) {
 
   return React.createElement(
     'div',
-    { className: 'web-shell' },
+    { className: isOperationsOverview ? 'web-shell web-shell--operations' : 'web-shell' },
     React.createElement(
       'header',
       { className: 'web-shell__header' },
       React.createElement(
         'div',
         null,
-        React.createElement('p', { className: 'web-shell__eyebrow' }, 'Test Station Web'),
-        React.createElement('h1', { className: 'web-shell__title' }, 'Execution history, failures, and coverage drift'),
-        React.createElement(
-          'p',
-          { className: 'web-shell__copy' },
-          'Track projects, inspect individual runs, and move from regression signals to raw evidence without leaving the web.',
-        ),
+        React.createElement('p', { className: 'web-shell__eyebrow' }, isOperationsOverview ? 'TS' : 'Test Station Web'),
+        React.createElement('h1', { className: 'web-shell__title' }, isOperationsOverview ? 'Test Station' : 'Execution history, failures, and coverage drift'),
+        isOperationsOverview
+          ? null
+          : React.createElement(
+            'p',
+            { className: 'web-shell__copy' },
+            'Track projects, inspect individual runs, and move from regression signals to raw evidence without leaving the web.',
+          ),
       ),
       React.createElement(
         'div',

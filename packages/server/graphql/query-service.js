@@ -3,6 +3,7 @@ import {
   CoverageFile,
   CoverageSnapshot,
   CoverageTrendPoint,
+  ErrorOccurrence,
   Group,
   PerformanceStat,
   Project,
@@ -90,6 +91,7 @@ export function createGraphqlQueryService(options = {}) {
     CoverageFile,
     CoverageSnapshot,
     CoverageTrendPoint,
+    ErrorOccurrence,
     Group,
     PerformanceStat,
     Project,
@@ -133,12 +135,15 @@ export function createGraphqlQueryService(options = {}) {
           })
           : [];
         const overviewMap = mapBy(overviews, 'projectId');
+        const latestRunIds = overviews.map((overview) => overview.latestRunId).filter(Boolean);
+        const publicationKindsByRunId = await loadPublicationKindsByRunId(models, latestRunIds);
         return visibleProjects.map((project) => ({
           ...project,
           overview: overviewMap.get(project.id) || null,
           runCount: toInteger(overviewMap.get(project.id)?.runCount) ?? 0,
           latestRunId: overviewMap.get(project.id)?.latestRunId || null,
           latestStatus: overviewMap.get(project.id)?.latestStatus || null,
+          latestPublicationKinds: publicationKindsByRunId.get(overviewMap.get(project.id)?.latestRunId) || [],
           latestCompletedAt: overviewMap.get(project.id)?.latestCompletedAt || null,
           latestLinesPct: toNumber(overviewMap.get(project.id)?.latestLinesPct),
           totalTests: toInteger(overviewMap.get(project.id)?.totalTests) ?? 0,
@@ -197,9 +202,11 @@ export function createGraphqlQueryService(options = {}) {
         const versions = mapBy(versionIds.length > 0
           ? await loadAll(models.ProjectVersion, { where: { id: versionIds } })
           : [], 'id');
+        const publicationKindsByRunId = await loadPublicationKindsByRunId(models, overviews.map((entry) => entry.runId));
         return overviews.map((entry) => decorateProjectedRun(entry, {
           project: projectMap.get(entry.projectId) || null,
           projectVersion: versions.get(entry.projectVersionId) || null,
+          publicationKinds: publicationKindsByRunId.get(entry.runId) || [],
         }));
       }
       let runs = await loadAll(models.Run, {
@@ -277,6 +284,7 @@ export function createGraphqlQueryService(options = {}) {
         totalTests: toInteger(run.summary?.totalTests),
         passedTests: toInteger(run.summary?.passedTests),
         failedTests: toInteger(run.summary?.failedTests),
+        publicationKinds: Array.isArray(run.publicationKinds) ? run.publicationKinds : [],
         cursor: encodeRunCursor(run),
       }));
     },
@@ -538,6 +546,55 @@ export function createGraphqlQueryService(options = {}) {
         .filter((artifact) => (testExecutionId ? artifact.testExecutionId === testExecutionId : true))
         .filter((artifact) => activeSubmissionIds.length === 0 || activeSubmissionIds.includes(artifact.reportSubmissionId))
         .sort(compareArtifacts);
+    },
+
+    async getRunFailureEvidence({ runId, actor }) {
+      const run = await this.findRun({ id: runId, actor });
+      if (!run) return null;
+
+      const failedTests = await this.listTestsForRun({ runId, actor, status: 'failed', limit: 1 });
+      const failedTest = failedTests[0] || null;
+      const activeTestSubmissionIds = await loadActiveSubmissionIds(models, [runId], ['tests', 'combined']);
+      const error = models.ErrorOccurrence
+        ? await loadOne(models.ErrorOccurrence, {
+          where: {
+            runId,
+            ...(failedTest?.id ? { testExecutionId: failedTest.id } : {}),
+            ...(activeTestSubmissionIds.length > 0 ? { reportSubmissionId: activeTestSubmissionIds } : {}),
+          },
+          order: [['firstSeenAt', 'DESC'], ['id', 'DESC']],
+        })
+        : null;
+      const artifacts = await this.listArtifacts({ actor, runId });
+      const reportArtifact = artifacts.find((artifact) => (
+        artifact.href
+        || artifact.sourceUrl
+        || artifact.relativePath === 'index.html'
+        || String(artifact.relativePath || '').endsWith('/index.html')
+      )) || null;
+
+      return {
+        runId: run.id,
+        externalKey: run.externalKey,
+        status: run.status,
+        projectKey: run.project?.key || '',
+        projectSlug: run.project?.slug || '',
+        projectName: run.project?.name || run.externalKey,
+        branch: run.branch || null,
+        commitSha: run.commitSha || null,
+        buildNumber: resolveRunBuildNumber(run, run.projectVersion),
+        triggeredBy: run.triggeredBy || null,
+        completedAt: run.completedAt || null,
+        sourceUrl: run.sourceUrl || null,
+        reportUrl: reportArtifact?.href || reportArtifact?.sourceUrl || null,
+        failedTest,
+        error: error ? {
+          level: error.level || null,
+          code: error.code || null,
+          message: error.message,
+          stack: error.stack || null,
+        } : null,
+      };
     },
 
     async listReleaseNotes({ actor, projectId = null, projectKey = null, versionId = null, versionKey = null }) {
@@ -1286,7 +1343,29 @@ function decorateProjectedRun(overview, related) {
     projectVersion,
     coverageSnapshot: Number.isFinite(overview.linesPct) ? { linesPct: overview.linesPct } : null,
     hasReportArtifact: Boolean(overview.hasReportArtifact),
+    publicationKinds: Array.isArray(related.publicationKinds) ? related.publicationKinds : [],
   };
+}
+
+async function loadPublicationKindsByRunId(models, runIds) {
+  const uniqueRunIds = Array.from(new Set((Array.isArray(runIds) ? runIds : []).filter(Boolean)));
+  const result = new Map();
+  if (uniqueRunIds.length === 0 || !models.RunActiveSubmission) {
+    return result;
+  }
+
+  const selections = await loadAll(models.RunActiveSubmission, {
+    where: { runId: uniqueRunIds },
+    attributes: ['runId', 'kind'],
+  });
+  for (const selection of selections) {
+    if (!selection.runId || !selection.kind) continue;
+    const kinds = result.get(selection.runId) || [];
+    if (!kinds.includes(selection.kind)) kinds.push(selection.kind);
+    result.set(selection.runId, kinds);
+  }
+  for (const kinds of result.values()) kinds.sort();
+  return result;
 }
 
 export function resolveRunBuildNumber(run, projectVersion = run?.projectVersion || null) {

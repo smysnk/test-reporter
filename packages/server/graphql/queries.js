@@ -24,6 +24,7 @@ export const queryTypeDefs = `#graphql
     runCount: Int!
     latestRunId: ID
     latestStatus: String
+    latestPublicationKinds: [String!]!
     latestCompletedAt: String
     latestLinesPct: Float
     totalTests: Int!
@@ -184,7 +185,33 @@ export const queryTypeDefs = `#graphql
     totalTests: Int
     passedTests: Int
     failedTests: Int
+    publicationKinds: [String!]!
     cursor: String
+  }
+
+  type RunFailureError {
+    level: String
+    code: String
+    message: String!
+    stack: String
+  }
+
+  type RunFailureEvidence {
+    runId: ID!
+    externalKey: String!
+    status: String!
+    projectKey: String!
+    projectSlug: String!
+    projectName: String!
+    branch: String
+    commitSha: String
+    buildNumber: Int
+    triggeredBy: String
+    completedAt: String
+    sourceUrl: String
+    reportUrl: String
+    failedTest: TestExecution
+    error: RunFailureError
   }
 
   type RunPackageSummary {
@@ -439,6 +466,7 @@ export const queryTypeDefs = `#graphql
     runFeed(limit: Int, after: String, projectKey: String, status: String): [RunFeedEntry!]!
     runs(projectId: ID, projectKey: String, status: String, limit: Int): [Run!]!
     run(id: ID, externalKey: String): Run
+    runFailureEvidence(runId: ID!): RunFailureEvidence
     runPackages(runId: ID!): [RunPackageSummary!]!
     runModules(runId: ID!): [RunModuleSummary!]!
     runFiles(runId: ID!, packageName: String, moduleName: String, status: String): [RunFile!]!
@@ -474,6 +502,7 @@ export const queryResolvers = {
     runFeed: (_root, args, context) => context.queryService.listRunFeed({ ...args, actor: context.actor }),
     runs: (_root, args, context) => context.queryService.listRuns({ ...args, actor: context.actor }),
     run: (_root, args, context) => context.queryService.findRun({ ...args, actor: context.actor }),
+    runFailureEvidence: (_root, args, context) => context.queryService.getRunFailureEvidence({ ...args, actor: context.actor }),
     runPackages: (_root, args, context) => context.queryService.listRunPackages({ ...args, actor: context.actor }),
     runModules: (_root, args, context) => context.queryService.listRunModules({ ...args, actor: context.actor }),
     runFiles: (_root, args, context, info) => context.queryService.listRunFiles({

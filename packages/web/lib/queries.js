@@ -16,13 +16,14 @@ export const WEB_HOME_QUERY = `
       runCount
       latestRunId
       latestStatus
+      latestPublicationKinds
       latestCompletedAt
       latestLinesPct
       totalTests
       passedTests
       failedTests
     }
-    runFeed(limit: 11) {
+    runFeed(limit: 51) {
       id
       externalKey
       status
@@ -43,6 +44,7 @@ export const WEB_HOME_QUERY = `
       totalTests
       passedTests
       failedTests
+      publicationKinds
       cursor
     }
   }
@@ -50,7 +52,7 @@ export const WEB_HOME_QUERY = `
 
 export const WEB_RUN_FEED_PAGE_QUERY = `
   query WebRunFeedPage($after: String, $projectKey: String) {
-    runFeed(limit: 31, after: $after, projectKey: $projectKey) {
+    runFeed(limit: 51, after: $after, projectKey: $projectKey) {
       id
       externalKey
       status
@@ -71,7 +73,44 @@ export const WEB_RUN_FEED_PAGE_QUERY = `
       totalTests
       passedTests
       failedTests
+      publicationKinds
       cursor
+    }
+  }
+`;
+
+export const RUN_FAILURE_EVIDENCE_QUERY = `
+  query WebRunFailureEvidence($runId: ID!) {
+    runFailureEvidence(runId: $runId) {
+      runId
+      externalKey
+      status
+      projectKey
+      projectSlug
+      projectName
+      branch
+      commitSha
+      buildNumber
+      triggeredBy
+      completedAt
+      sourceUrl
+      reportUrl
+      failedTest {
+        id
+        fullName
+        status
+        moduleName
+        filePath
+        line
+        column
+        failureMessages
+      }
+      error {
+        level
+        code
+        message
+        stack
+      }
     }
   }
 `;

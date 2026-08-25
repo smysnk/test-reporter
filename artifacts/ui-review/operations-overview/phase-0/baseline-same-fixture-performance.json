@@ -1,0 +1,146 @@
+{
+  "generatedAt": "2026-08-25T18:28:58.758Z",
+  "baseURL": "http://127.0.0.1:3412",
+  "viewport": {
+    "width": 1440,
+    "height": 1024
+  },
+  "budgets": {
+    "homeReadyMs": 1000,
+    "evidenceRequestMs": 750,
+    "projectFocusMs": 1000,
+    "clearProjectFocusMs": 1000,
+    "runNavigationMs": 1000,
+    "runnerReportReadyMs": 2000,
+    "operationsViewSwitchMs": 1500,
+    "projectPageNavigationMs": 1500,
+    "suiteExpansionMs": 300,
+    "paginatedTestFetchMs": 500
+  },
+  "benchmarks": [
+    {
+      "scenario": "home-load",
+      "route": "http://127.0.0.1:3412/",
+      "metrics": {
+        "homeReadyMs": 205.5,
+        "timeToFirstByteMs": 14.9,
+        "responseEndMs": 16.4,
+        "domContentLoadedMs": 104.6,
+        "loadEventMs": 104.6,
+        "firstContentfulPaintMs": 80,
+        "largestContentfulPaintMs": null,
+        "cumulativeLayoutShift": 0.8327,
+        "longTaskCount": 0,
+        "longTaskDurationMs": 0,
+        "interactionLatencyMs": 0,
+        "decodedBodySizeBytes": 27598,
+        "transferSizeBytes": 4186,
+        "domNodeCount": 271,
+        "jsHeapUsedBytes": 10000000,
+        "resourceRequestCount": 0,
+        "resourceTransferSizeBytes": 0,
+        "resourceDecodedBodySizeBytes": 0,
+        "graphqlRequestCount": 0,
+        "graphqlTransferSizeBytes": 0,
+        "bffRequestCount": 0,
+        "bffTransferSizeBytes": 0
+      },
+      "context": {
+        "visibleRunCount": 10,
+        "visibleProjectCount": 3
+      },
+      "profiling": {
+        "serverPageProfile": {
+          "pageType": "overview",
+          "route": "/",
+          "totalMs": 1.4,
+          "steps": [
+            {
+              "name": "home-feed-query",
+              "startMs": 0,
+              "durationMs": 1.4,
+              "details": {
+                "query": "WEB_HOME_QUERY",
+                "requestTrace": {
+                  "requestId": "webgql-b92d1d5a266a4ec3b1bf8c44c1e46acd",
+                  "traceId": "webreq-08f81a2d4b35405cb7572854e0a0b990",
+                  "parentRequestId": "webreq-08f81a2d4b35405cb7572854e0a0b990"
+                },
+                "responseTrace": {
+                  "trace": null,
+                  "serverTiming": "graphql;dur=4.2",
+                  "upstreamRequestId": null,
+                  "upstreamTraceId": null,
+                  "upstreamParentRequestId": null
+                },
+                "responseProfile": null
+              }
+            }
+          ],
+          "trace": {
+            "requestId": "webreq-08f81a2d4b35405cb7572854e0a0b990",
+            "traceId": "webreq-08f81a2d4b35405cb7572854e0a0b990",
+            "parentRequestId": null
+          },
+          "visibleProjectCount": 3,
+          "visibleRunCount": 10,
+          "serverTiming": "overview;dur=1.4, home-feed-query;dur=1.4"
+        },
+        "currentPageTrace": {
+          "requestId": "webreq-08f81a2d4b35405cb7572854e0a0b990",
+          "traceId": "webreq-08f81a2d4b35405cb7572854e0a0b990",
+          "parentRequestId": null
+        },
+        "matchingPageMark": {
+          "name": "overview-page-ready",
+          "route": "/",
+          "documentMs": 163.1,
+          "routeMs": null,
+          "details": {
+            "focusMode": "all-runs",
+            "selectedProjectSlug": null,
+            "visibleProjectCount": 3,
+            "visibleRunCount": 10,
+            "totalRunCount": 10
+          }
+        },
+        "recentPageMarks": [
+          {
+            "name": "overview-page-ready",
+            "route": "/",
+            "documentMs": 163.1,
+            "routeMs": null,
+            "details": {
+              "focusMode": "all-runs",
+              "selectedProjectSlug": null,
+              "visibleProjectCount": 3,
+              "visibleRunCount": 10,
+              "totalRunCount": 10
+            }
+          }
+        ],
+        "recentRequestTraces": [
+          {
+            "type": "page-response",
+            "route": "/",
+            "trace": {
+              "requestId": "webreq-08f81a2d4b35405cb7572854e0a0b990",
+              "traceId": "webreq-08f81a2d4b35405cb7572854e0a0b990",
+              "parentRequestId": null
+            },
+            "serverTiming": "overview;dur=1.4, home-feed-query;dur=1.4",
+            "pageType": "overview",
+            "totalMs": 1.4
+          }
+        ],
+        "recentRouteTransitions": [],
+        "recentResources": [],
+        "resourceSummary": {
+          "graphqlRequests": [],
+          "nextDataRequests": [],
+          "runnerReportRequests": []
+        }
+      }
+    }
+  ]
+}

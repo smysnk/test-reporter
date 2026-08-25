@@ -1,0 +1,375 @@
+{
+  "generatedAt": "2026-08-25T18:31:49.012Z",
+  "baseURL": "http://127.0.0.1:3410",
+  "viewport": {
+    "width": 1440,
+    "height": 1024
+  },
+  "budgets": {
+    "homeReadyMs": 1000,
+    "evidenceRequestMs": 750,
+    "projectFocusMs": 1000,
+    "clearProjectFocusMs": 1000,
+    "runNavigationMs": 1000,
+    "runnerReportReadyMs": 2000,
+    "operationsViewSwitchMs": 1500,
+    "projectPageNavigationMs": 1500,
+    "suiteExpansionMs": 300,
+    "paginatedTestFetchMs": 500
+  },
+  "benchmarks": [
+    {
+      "scenario": "home-load",
+      "route": "http://127.0.0.1:3410/",
+      "metrics": {
+        "homeReadyMs": 253.5,
+        "timeToFirstByteMs": 57.2,
+        "responseEndMs": 57.7,
+        "domContentLoadedMs": 95.8,
+        "loadEventMs": 95.9,
+        "firstContentfulPaintMs": 84,
+        "largestContentfulPaintMs": 192,
+        "cumulativeLayoutShift": 0.9317,
+        "longTaskCount": 1,
+        "longTaskDurationMs": 56,
+        "interactionLatencyMs": 0,
+        "decodedBodySizeBytes": 86390,
+        "transferSizeBytes": 8353,
+        "domNodeCount": 813,
+        "jsHeapUsedBytes": 10000000,
+        "resourceRequestCount": 0,
+        "resourceTransferSizeBytes": 0,
+        "resourceDecodedBodySizeBytes": 0,
+        "graphqlRequestCount": 0,
+        "graphqlTransferSizeBytes": 0,
+        "bffRequestCount": 0,
+        "bffTransferSizeBytes": 0
+      },
+      "context": {
+        "visibleRunCount": 50,
+        "visibleProjectCount": 3
+      },
+      "profiling": {
+        "serverPageProfile": {
+          "pageType": "overview",
+          "route": "/",
+          "totalMs": 2.2,
+          "steps": [
+            {
+              "name": "home-feed-query",
+              "startMs": 0,
+              "durationMs": 2.2,
+              "details": {
+                "query": "WEB_HOME_QUERY",
+                "requestTrace": {
+                  "requestId": "webgql-b41dd4ccaedc402f88022ee969dabaa2",
+                  "traceId": "webreq-b8b2560bade74b94905175bed40b185d",
+                  "parentRequestId": "webreq-b8b2560bade74b94905175bed40b185d"
+                },
+                "responseTrace": {
+                  "trace": null,
+                  "serverTiming": "graphql;dur=4.2",
+                  "upstreamRequestId": null,
+                  "upstreamTraceId": null,
+                  "upstreamParentRequestId": null
+                },
+                "responseProfile": null
+              }
+            }
+          ],
+          "trace": {
+            "requestId": "webreq-b8b2560bade74b94905175bed40b185d",
+            "traceId": "webreq-b8b2560bade74b94905175bed40b185d",
+            "parentRequestId": null
+          },
+          "visibleProjectCount": 3,
+          "visibleRunCount": 50,
+          "serverTiming": "overview;dur=2.2, home-feed-query;dur=2.2"
+        },
+        "currentPageTrace": {
+          "requestId": "webreq-b8b2560bade74b94905175bed40b185d",
+          "traceId": "webreq-b8b2560bade74b94905175bed40b185d",
+          "parentRequestId": null
+        },
+        "matchingPageMark": {
+          "name": "overview-page-ready",
+          "route": "/",
+          "documentMs": 178.4,
+          "routeMs": null,
+          "details": {
+            "focusMode": "all-runs",
+            "overviewMode": "runs",
+            "selectedProjectSlug": null,
+            "selectedRunId": null,
+            "visibleProjectCount": 3,
+            "visibleRunCount": 50,
+            "totalRunCount": 50,
+            "windowDays": 14
+          }
+        },
+        "recentPageMarks": [
+          {
+            "name": "overview-page-ready",
+            "route": "/",
+            "documentMs": 178.4,
+            "routeMs": null,
+            "details": {
+              "focusMode": "all-runs",
+              "overviewMode": "runs",
+              "selectedProjectSlug": null,
+              "selectedRunId": null,
+              "visibleProjectCount": 3,
+              "visibleRunCount": 50,
+              "totalRunCount": 50,
+              "windowDays": 14
+            }
+          }
+        ],
+        "recentRequestTraces": [
+          {
+            "type": "page-response",
+            "route": "/",
+            "trace": {
+              "requestId": "webreq-b8b2560bade74b94905175bed40b185d",
+              "traceId": "webreq-b8b2560bade74b94905175bed40b185d",
+              "parentRequestId": null
+            },
+            "serverTiming": "overview;dur=2.2, home-feed-query;dur=2.2",
+            "pageType": "overview",
+            "totalMs": 2.2
+          }
+        ],
+        "recentRouteTransitions": [],
+        "recentResources": [],
+        "resourceSummary": {
+          "graphqlRequests": [],
+          "nextDataRequests": [],
+          "runnerReportRequests": []
+        }
+      }
+    },
+    {
+      "scenario": "failure-evidence-selection",
+      "route": "http://127.0.0.1:3410/?inspectRun=run-004",
+      "metrics": {
+        "evidenceRequestMs": 107.3,
+        "timeToFirstByteMs": 53.1,
+        "responseEndMs": 53.4,
+        "domContentLoadedMs": 98,
+        "loadEventMs": 98,
+        "firstContentfulPaintMs": 88,
+        "largestContentfulPaintMs": 200,
+        "cumulativeLayoutShift": 0.9317,
+        "longTaskCount": 1,
+        "longTaskDurationMs": 59,
+        "interactionLatencyMs": 32,
+        "decodedBodySizeBytes": 86390,
+        "transferSizeBytes": 8353,
+        "domNodeCount": 850,
+        "jsHeapUsedBytes": 11200000,
+        "resourceRequestCount": 1,
+        "resourceTransferSizeBytes": 1282,
+        "resourceDecodedBodySizeBytes": 982,
+        "graphqlRequestCount": 0,
+        "graphqlTransferSizeBytes": 0,
+        "bffRequestCount": 1,
+        "bffTransferSizeBytes": 1282
+      },
+      "context": {
+        "runId": "run-004",
+        "inspectorError": false,
+        "inspectorHasEvidence": true
+      },
+      "profiling": {
+        "serverPageProfile": {
+          "pageType": "overview",
+          "route": "/",
+          "totalMs": 2.1,
+          "steps": [
+            {
+              "name": "home-feed-query",
+              "startMs": 0,
+              "durationMs": 2.1,
+              "details": {
+                "query": "WEB_HOME_QUERY",
+                "requestTrace": {
+                  "requestId": "webgql-a340ac58a2e14c9bbed803acfacdc0a2",
+                  "traceId": "webreq-b3c838b549ea4c4480945a6b33cc42b6",
+                  "parentRequestId": "webreq-b3c838b549ea4c4480945a6b33cc42b6"
+                },
+                "responseTrace": {
+                  "trace": null,
+                  "serverTiming": "graphql;dur=4.2",
+                  "upstreamRequestId": null,
+                  "upstreamTraceId": null,
+                  "upstreamParentRequestId": null
+                },
+                "responseProfile": null
+              }
+            }
+          ],
+          "trace": {
+            "requestId": "webreq-b3c838b549ea4c4480945a6b33cc42b6",
+            "traceId": "webreq-b3c838b549ea4c4480945a6b33cc42b6",
+            "parentRequestId": null
+          },
+          "visibleProjectCount": 3,
+          "visibleRunCount": 50,
+          "serverTiming": "overview;dur=2.1, home-feed-query;dur=2.1"
+        },
+        "currentPageTrace": {
+          "requestId": "webreq-b3c838b549ea4c4480945a6b33cc42b6",
+          "traceId": "webreq-b3c838b549ea4c4480945a6b33cc42b6",
+          "parentRequestId": null
+        },
+        "matchingPageMark": {
+          "name": "overview-page-ready",
+          "route": "/?inspectRun=run-004",
+          "documentMs": 343.1,
+          "routeMs": 58.8,
+          "details": {
+            "focusMode": "all-runs",
+            "overviewMode": "runs",
+            "selectedProjectSlug": null,
+            "selectedRunId": "run-004",
+            "visibleProjectCount": 3,
+            "visibleRunCount": 50,
+            "totalRunCount": 50,
+            "windowDays": 14
+          }
+        },
+        "recentPageMarks": [
+          {
+            "name": "overview-page-ready",
+            "route": "/",
+            "documentMs": 184.3,
+            "routeMs": null,
+            "details": {
+              "focusMode": "all-runs",
+              "overviewMode": "runs",
+              "selectedProjectSlug": null,
+              "selectedRunId": null,
+              "visibleProjectCount": 3,
+              "visibleRunCount": 50,
+              "totalRunCount": 50,
+              "windowDays": 14
+            }
+          },
+          {
+            "name": "overview-page-ready",
+            "route": "/?inspectRun=run-004",
+            "documentMs": 343.1,
+            "routeMs": 58.8,
+            "details": {
+              "focusMode": "all-runs",
+              "overviewMode": "runs",
+              "selectedProjectSlug": null,
+              "selectedRunId": "run-004",
+              "visibleProjectCount": 3,
+              "visibleRunCount": 50,
+              "totalRunCount": 50,
+              "windowDays": 14
+            }
+          }
+        ],
+        "recentRequestTraces": [
+          {
+            "type": "page-response",
+            "route": "/",
+            "trace": {
+              "requestId": "webreq-b3c838b549ea4c4480945a6b33cc42b6",
+              "traceId": "webreq-b3c838b549ea4c4480945a6b33cc42b6",
+              "parentRequestId": null
+            },
+            "serverTiming": "overview;dur=2.1, home-feed-query;dur=2.1",
+            "pageType": "overview",
+            "totalMs": 2.1
+          }
+        ],
+        "recentRouteTransitions": [
+          {
+            "id": 1,
+            "from": "/",
+            "to": "/?inspectRun=run-004",
+            "status": "completed",
+            "durationMs": 62.1,
+            "details": {
+              "sourceRoute": "/"
+            },
+            "completionDetails": null,
+            "error": null,
+            "marks": [
+              {
+                "name": "routeChangeStart",
+                "atMs": 0.2,
+                "details": {
+                  "url": "/?inspectRun=run-004"
+                }
+              },
+              {
+                "name": "beforeHistoryChange",
+                "atMs": 0.2,
+                "details": {
+                  "url": "/?inspectRun=run-004"
+                }
+              },
+              {
+                "name": "routeChangeComplete",
+                "atMs": 62.1,
+                "details": {
+                  "url": "/?inspectRun=run-004"
+                }
+              }
+            ],
+            "pageMarks": [
+              {
+                "name": "overview-page-ready",
+                "route": "/?inspectRun=run-004",
+                "documentMs": 343.1,
+                "routeMs": 58.8,
+                "details": {
+                  "focusMode": "all-runs",
+                  "overviewMode": "runs",
+                  "selectedProjectSlug": null,
+                  "selectedRunId": "run-004",
+                  "visibleProjectCount": 3,
+                  "visibleRunCount": 50,
+                  "totalRunCount": 50,
+                  "windowDays": 14
+                }
+              }
+            ]
+          }
+        ],
+        "recentResources": [
+          {
+            "name": "/api/runs/run-004/failure-evidence",
+            "initiatorType": "fetch",
+            "startTimeMs": 343,
+            "responseEndMs": 346.1,
+            "durationMs": 3.1,
+            "transferSizeBytes": 1282,
+            "encodedBodySizeBytes": 982,
+            "decodedBodySizeBytes": 982
+          }
+        ],
+        "resourceSummary": {
+          "graphqlRequests": [],
+          "nextDataRequests": [],
+          "runnerReportRequests": [
+            {
+              "name": "/api/runs/run-004/failure-evidence",
+              "initiatorType": "fetch",
+              "startTimeMs": 343,
+              "responseEndMs": 346.1,
+              "durationMs": 3.1,
+              "transferSizeBytes": 1282,
+              "encodedBodySizeBytes": 982,
+              "decodedBodySizeBytes": 982
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
