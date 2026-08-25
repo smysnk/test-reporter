@@ -487,6 +487,28 @@ export async function loadRunWorkspace({ session, runId, fetchImpl = fetch, requ
   return { run, presentation };
 }
 
+export async function loadRunWorkspaceFallback({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
+  const result = await measureProfileStep(profiler, 'run-workspace-fallback-query', () => executeWebGraphqlRequest({
+    session,
+    query: RUN_HEADER_QUERY,
+    variables: { runId },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  }), (response) => ({ query: 'RUN_HEADER_QUERY', runId, degraded: true, ...response?.meta }));
+  const run = result.data.run || null;
+  if (!run) return null;
+  return {
+    run: { ...run, artifacts: [] },
+    presentation: buildRunPresentation({
+      ...run,
+      artifactCount: 0,
+      reportAvailable: (run.publicationKinds || []).some((kind) => kind === 'tests' || kind === 'combined'),
+    }),
+    degraded: true,
+  };
+}
+
 export async function loadRunFailuresPage({ session, runId, limit = 100, after = null, search = null, fetchImpl = fetch, requestId = null, requestTrace = null }) {
   const result = await executeWebGraphqlRequest({
     session,

@@ -47,6 +47,7 @@ import {
   loadProjectExplorerPage,
   loadProjectActivity,
   loadRunExplorerPage,
+  loadRunWorkspaceFallback,
   loadRunFailureEvidence,
   loadRunInsights,
   loadRunOperationsData,
@@ -55,6 +56,23 @@ import {
   loadWebRunFeedPage,
   resolveWebServerUrl,
 } from '../packages/web/lib/serverGraphql.js';
+
+test('run workspace fallback preserves a renderable shell after a detailed read failure', async () => {
+  const fetchImpl = async (_url, options) => {
+    const request = JSON.parse(options.body);
+    assert.match(request.query, /query WebRunHeader/);
+    return new Response(JSON.stringify({ data: { run: {
+      id:'run-1', externalKey:'workspace-1', status:'passed', publicationKinds:['tests'],
+      summary:{ totalTests:10, passedTests:10, failedTests:0 }, suites:[{ id:'suite-1' }],
+      project:{ key:'workspace', slug:'workspace', name:'Workspace' }, coverageSnapshot:null,
+    } } }), { status:200 });
+  };
+
+  const result = await loadRunWorkspaceFallback({ session:null, runId:'run-1', fetchImpl });
+  assert.equal(result.degraded, true);
+  assert.deepEqual(result.presentation.availableViews, ['summary', 'tests', 'report']);
+  assert.deepEqual(result.run.artifacts, []);
+});
 
 test('web failure evidence loader uses the narrow run query', async () => {
   const evidence = { runId: 'run-1', status: 'failed', failedTest: { id: 'test-1' } };
@@ -3193,6 +3211,7 @@ test('legacy run template URLs redirect into addressable unified workspace modes
   assert.match(runPageSource, /context\.query\?\.template === 'runner'/);
   assert.match(runPageSource, /context\.query\.template === 'runner' \? 'report' : 'summary'/);
   assert.match(runPageSource, /loadRunWorkspace/);
+  assert.match(runPageSource, /loadRunWorkspaceFallback/);
   assert.doesNotMatch(runPageSource, /loadRunExplorerPage/);
 });
 

@@ -56,7 +56,16 @@ function summarizePaths(reads) {
 
 async function timedFetch(fetchImpl, url, options) {
   const startedAt = performance.now();
-  try { const response = await fetchImpl(url, options); await response.arrayBuffer(); return { url: new URL(url).pathname, status: response.status, durationMs: round(performance.now() - startedAt) }; }
+  try {
+    const response = await fetchImpl(url, options);
+    const body = await response.arrayBuffer();
+    return {
+      url: new URL(url).pathname,
+      status: response.status,
+      durationMs: round(performance.now() - startedAt),
+      ...(response.status >= 500 ? { responsePreview: new TextDecoder().decode(body.slice(0, 1_024)) } : {}),
+    };
+  }
   catch (error) { return { url: new URL(url).pathname, status: 0, durationMs: round(performance.now() - startedAt), error: error?.name || 'FetchError' }; }
 }
 function percentile(values, ratio) { const sorted = [...values].sort((a, b) => a - b); return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)] || 0; }

@@ -56,6 +56,7 @@ export function RunWorkspace({ initialData }) {
       { label:'Skipped', value:formatNumber(summary.skippedTests) }, { label:'Suites', value:formatNumber(run.suites?.length) },
       { label:'Coverage', value:formatPct(run.coverageSnapshot?.linesPct) }, { label:'Duration', value:formatDuration(run.durationMs) },
     ]} />
+    {data?.degraded ? <div className={styles.notice} role="status">Showing the run shell while detailed data refreshes.</div> : null}
     <ResourceState resource={shell} label="run workspace">
       {state.view === 'summary' ? <SummaryMode run={run} presentation={presentation} update={update} /> : null}
       {state.view === 'tests' ? <TestsMode run={run} state={state} update={update} /> : null}

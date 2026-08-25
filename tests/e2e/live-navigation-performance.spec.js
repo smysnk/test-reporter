@@ -166,10 +166,11 @@ test('benchmarks sidebar project focus and project-page load', async ({ page }, 
     },
     async () => {
       await page.waitForURL(new RegExp(`/projects/${escapeRegExp(projectSlug)}$`), { timeout: 45_000 });
-      await expect(page.getByText('Test Runs', { exact: true })).toBeVisible({ timeout: 45_000 });
+      await expect(page.locator('[data-perf-id="project-workspace"]')).toBeVisible({ timeout: 45_000 });
+      await expect(page.getByRole('heading', { name: 'Recent runs', exact: true })).toBeVisible({ timeout: 45_000 });
     },
   );
-  const projectPageProfiling = await collectProfilingSnapshot(page, 'project-page-ready');
+  const projectPageProfiling = await collectProfilingSnapshot(page, 'project-workspace-shell-ready');
 
   const record = {
     scenario: 'sidebar-focus-and-project-load',

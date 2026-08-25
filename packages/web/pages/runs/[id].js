@@ -4,7 +4,7 @@ import { getWebSession } from '../../lib/auth.js';
 import { buildRunPageResult } from '../../lib/pageProps.js';
 import { buildServerTimingHeader, createPageLoadProfiler } from '../../lib/pageProfiling.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../../lib/requestTrace.js';
-import { loadRunWorkspace } from '../../lib/serverGraphql.js';
+import { loadRunWorkspace, loadRunWorkspaceFallback } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
 
 export default function RunPage({ data }) {
@@ -26,7 +26,13 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   const requestTrace = resolveWebRequestTrace(context.req);
   applyTraceHeadersToNextResponse(context.res, requestTrace);
   const profiler = createPageLoadProfiler({ pageType:'run', route:`/runs/${runId}` });
-  const data = await loadRunWorkspace({ session, runId, requestTrace, profiler });
+  let data;
+  try {
+    data = await loadRunWorkspace({ session, runId, requestTrace, profiler });
+  } catch (error) {
+    console.error(`[run-workspace:ssr-fallback] requestId=${requestTrace.requestId} runId=${runId} error=${error instanceof Error ? error.message : 'unknown'}`);
+    data = await loadRunWorkspaceFallback({ session, runId, requestTrace, profiler });
+  }
   const pageProfile = profiler.finalize({ trace:requestTrace, runId, suiteCount:data?.run?.suites?.length || 0, artifactCount:data?.run?.artifacts?.length || 0 });
   const serverTiming = buildServerTimingHeader(pageProfile);
   if (serverTiming) context.res.setHeader('Server-Timing', serverTiming);
