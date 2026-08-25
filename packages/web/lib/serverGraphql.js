@@ -509,6 +509,27 @@ export async function loadRunWorkspaceFallback({ session, runId, fetchImpl = fet
   };
 }
 
+export function buildTransientRunWorkspace(runId) {
+  const run = {
+    id: runId,
+    externalKey: `Run ${runId}`,
+    status: 'unknown',
+    publicationKinds: [],
+    summary: null,
+    project: null,
+    projectVersion: null,
+    coverageSnapshot: null,
+    suites: [],
+    artifacts: [],
+  };
+  return {
+    run,
+    presentation: buildRunPresentation(run),
+    degraded: true,
+    transient: true,
+  };
+}
+
 export async function loadRunFailuresPage({ session, runId, limit = 100, after = null, search = null, fetchImpl = fetch, requestId = null, requestTrace = null }) {
   const result = await executeWebGraphqlRequest({
     session,

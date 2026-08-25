@@ -48,6 +48,7 @@ import {
   loadProjectActivity,
   loadRunExplorerPage,
   loadRunWorkspaceFallback,
+  buildTransientRunWorkspace,
   loadRunFailureEvidence,
   loadRunInsights,
   loadRunOperationsData,
@@ -72,6 +73,15 @@ test('run workspace fallback preserves a renderable shell after a detailed read 
   assert.equal(result.degraded, true);
   assert.deepEqual(result.presentation.availableViews, ['summary', 'tests', 'report']);
   assert.deepEqual(result.run.artifacts, []);
+});
+
+test('transient run workspace remains renderable while replacement ingestion holds the detailed read path', () => {
+  const result = buildTransientRunWorkspace('run-1');
+  assert.equal(result.transient, true);
+  assert.equal(result.degraded, true);
+  assert.equal(result.run.id, 'run-1');
+  assert.equal(result.run.status, 'unknown');
+  assert.deepEqual(result.presentation.availableViews, ['summary']);
 });
 
 test('web failure evidence loader uses the narrow run query', async () => {

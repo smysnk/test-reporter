@@ -36,6 +36,11 @@ export function RunWorkspace({ initialData }) {
   React.useEffect(() => {
     if (typeof performance !== 'undefined' && run) performance.mark('run-workspace-shell-ready');
   }, [run]);
+  React.useEffect(() => {
+    if (!data?.transient || !shell.error) return undefined;
+    const retry = setTimeout(shell.retry, 1000);
+    return () => clearTimeout(retry);
+  }, [data?.transient, shell.error, shell.retry]);
   if (!run || !presentation) return <div className={styles.state}>Run unavailable.</div>;
   const summary = run.summary || {};
   const tabItems = presentation.availableViews.map((view) => ({
@@ -56,7 +61,7 @@ export function RunWorkspace({ initialData }) {
       { label:'Skipped', value:formatNumber(summary.skippedTests) }, { label:'Suites', value:formatNumber(run.suites?.length) },
       { label:'Coverage', value:formatPct(run.coverageSnapshot?.linesPct) }, { label:'Duration', value:formatDuration(run.durationMs) },
     ]} />
-    {data?.degraded ? <div className={styles.notice} role="status">Showing the run shell while detailed data refreshes.</div> : null}
+    {data?.degraded ? <div className={styles.notice} role="status">{data?.transient ? 'This run is being refreshed. Retrying detailed data automatically.' : 'Showing the run shell while detailed data refreshes.'}</div> : null}
     <ResourceState resource={shell} label="run workspace">
       {state.view === 'summary' ? <SummaryMode run={run} presentation={presentation} update={update} /> : null}
       {state.view === 'tests' ? <TestsMode run={run} state={state} update={update} /> : null}

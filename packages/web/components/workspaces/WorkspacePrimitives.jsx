@@ -50,8 +50,8 @@ export function formatDate(value) {
   return formatted === 'Unavailable' ? 'n/a' : formatted;
 }
 
-export function RunLink({ runId, children, query = null, className = styles.link }) {
-  return <Link className={className} href={{ pathname: `/runs/${runId}`, query: query || {} }}>{children}</Link>;
+export function RunLink({ runId, children, query = null, className = styles.link, perfId = null }) {
+  return <Link className={className} href={{ pathname: `/runs/${runId}`, query: query || {} }} data-perf-id={perfId}>{children}</Link>;
 }
 
 export { styles };
