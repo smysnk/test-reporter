@@ -328,6 +328,9 @@ async function goToPublicHome(page, { requireInteractive = true } = {}) {
     test.skip(true, 'Live performance benchmarks require public pages or a pre-authenticated storage state.');
   }
 
+  await page.locator('[data-perf-id="sidebar-all-runs"], .web-explorer__sidebar-list > button')
+    .first()
+    .waitFor({ state: 'visible', timeout: 15_000 });
   const allRunsButton = await getAllRunsButton(page);
   await expect(allRunsButton).toBeVisible();
   if (requireInteractive) {
@@ -523,7 +526,7 @@ async function getAllRunsButton(page) {
     return byDataHook.first();
   }
 
-  return page.getByRole('button', { name: /All recent runs/i });
+  return page.getByRole('button', { name: /All (?:projects|recent runs)/i });
 }
 
 async function getProjectButtons(page) {
@@ -563,7 +566,7 @@ async function getRunRows(page) {
 }
 
 async function getSidebarButtonTitle(locator) {
-  const titleNode = locator.locator('.web-explorer__sidebar-title');
+  const titleNode = locator.locator('.operations-project__name, .web-explorer__sidebar-title');
   if (await titleNode.count() > 0) {
     return ((await titleNode.first().textContent()) || '').trim();
   }

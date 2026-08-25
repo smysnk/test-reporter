@@ -144,7 +144,7 @@ async function getAllRunsButton(page) {
     return byDataHook.first();
   }
 
-  return page.getByRole('button', { name: /All recent runs/i });
+  return page.getByRole('button', { name: /All (?:projects|recent runs)/i });
 }
 
 async function getFirstRunRow(page) {
