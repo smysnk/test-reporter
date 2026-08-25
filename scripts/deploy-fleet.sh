@@ -159,6 +159,11 @@ kubectl -n "$FLEET_NAMESPACE" get bundledeployment -o wide || true
 
 echo "Waiting for Fleet GitRepo/${NAME} to become Ready"
 if [[ -n "${TEST_STATION_TARGET_COMMIT:-}" ]]; then
+  current_force_sync="$(kubectl -n "$FLEET_NAMESPACE" get "gitrepo/${NAME}" -o jsonpath='{.spec.forceSyncGeneration}' 2>/dev/null || true)"
+  if [[ ! "$current_force_sync" =~ ^[0-9]+$ ]]; then current_force_sync="0"; fi
+  next_force_sync="$((current_force_sync + 1))"
+  echo "Forcing GitRepo/${NAME} reconciliation generation ${next_force_sync}"
+  kubectl -n "$FLEET_NAMESPACE" patch "gitrepo/${NAME}" --type merge -p "{\"spec\":{\"forceSyncGeneration\":${next_force_sync}}}"
   for attempt in $(seq 1 120); do
     observed_commit="$(kubectl -n "$FLEET_NAMESPACE" get "gitrepo/${NAME}" -o jsonpath='{.status.commit}' 2>/dev/null || true)"
     if [[ "$observed_commit" == "$TEST_STATION_TARGET_COMMIT" ]]; then break; fi
