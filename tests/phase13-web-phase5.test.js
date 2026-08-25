@@ -3220,8 +3220,8 @@ test('legacy run template URLs redirect into addressable unified workspace modes
   assert.equal(buildRunTemplateHref('run-1', 'web'), '/runs/run-1?template=web');
   assert.match(runPageSource, /context\.query\?\.template === 'runner'/);
   assert.match(runPageSource, /context\.query\.template === 'runner' \? 'report' : 'summary'/);
-  assert.match(runPageSource, /loadRunWorkspace/);
   assert.match(runPageSource, /loadRunWorkspaceFallback/);
+  assert.doesNotMatch(runPageSource, /\bloadRunWorkspace\b/);
   assert.doesNotMatch(runPageSource, /loadRunExplorerPage/);
 });
 

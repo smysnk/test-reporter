@@ -229,7 +229,7 @@ test('benchmarks in-context failure evidence without navigating away', async ({ 
   assertBudget('evidenceRequestMs', record.metrics.evidenceRequestMs);
 });
 
-test('benchmarks runner report readiness, operations view, and project-page navigation', async ({ page }, testInfo) => {
+test('benchmarks unified run report readiness and project-page navigation', async ({ page }, testInfo) => {
   await goToPublicHome(page);
   const projectSlug = await resolveBenchmarkProjectSlug(page);
   test.skip(!projectSlug, 'Unable to resolve a project slug for the live benchmark.');
@@ -240,58 +240,26 @@ test('benchmarks runner report readiness, operations view, and project-page navi
   const runLink = page.locator('[data-perf-id^="project-run-link:"]').first();
   await expect(runLink).toBeVisible({ timeout: 45_000 });
   const runNavigation = await navigateByHrefWithFallback(page, runLink, /\/runs\/[^/?#]+$/);
-  await expect(page.getByRole('link', { name: 'Runner report', exact: true })).toBeVisible();
+  await expect(page.locator('[data-perf-id="run-workspace"]')).toBeVisible();
   const runPageProfiling = await collectProfilingSnapshot(page, 'run-page-ready');
   const runId = getRunIdFromUrl(page.url());
 
-  const runnerFrame = page.frameLocator('iframe.web-runner-frame');
+  const reportTab = page.getByRole('tab', { name: /Runner report/ });
+  await expect(reportTab).toBeVisible();
+  const runnerFrameElement = page.locator('iframe[title^="Runner report for"]');
+  const runnerFrame = page.frameLocator('iframe[title^="Runner report for"]');
   const runnerReportReadyMs = await measureInteraction(
-    async () => {},
+    async () => reportTab.click(),
     async () => {
-      await expect(page.locator('iframe.web-runner-frame')).toBeVisible();
+      await expect(runnerFrameElement).toBeVisible();
       await expect(runnerFrame.locator('main')).toBeVisible();
     },
   );
   const runnerReportProfiling = await collectProfilingSnapshot(page, 'runner-frame-height-ready');
 
-  const operationsViewLink = page.getByRole('link', { name: 'Operations view' });
-  const operationsReadyStart = performance.now();
-  const operationsNavigation = await navigateByHrefWithFallback(
-    page,
-    operationsViewLink,
-    new RegExp(`/runs/${escapeRegExp(runId)}\\?template=web`),
-  );
-  await expect(page.getByText('Run-to-run comparison', { exact: true })).toBeVisible();
-  const operationsViewSwitchMs = round(performance.now() - operationsReadyStart);
-  const operationsProfiling = await collectProfilingSnapshot(page, 'run-operations-ready');
-  const suiteLoadButton = page.getByRole('button', { name: 'Load tests' }).first();
-  let suiteExpansionMs = null;
-  let paginatedTestFetchMs = null;
-  let renderedTestRows = 0;
-  if (await suiteLoadButton.count() > 0) {
-    suiteExpansionMs = await measureInteraction(
-      async () => suiteLoadButton.click(),
-      async () => {
-        await expect(page.getByRole('button', { name: 'Collapse tests' }).first()).toBeVisible();
-        await expect(page.getByText('Loading tests…', { exact: true })).toHaveCount(0);
-      },
-    );
-    const nextPageButton = page.getByRole('button', { name: /Load next 100/ }).first();
-    if (await nextPageButton.count() > 0) {
-      paginatedTestFetchMs = await measureInteraction(
-        async () => nextPageButton.click(),
-        async () => {
-          await expect(page.getByRole('button', { name: /Loading more/ })).toHaveCount(0);
-          await expect(page.getByRole('list', { name: '200 loaded tests' })).toBeVisible();
-        },
-      );
-    }
-    renderedTestRows = await page.locator('.web-list .web-list .web-list__item').count();
-  }
-
-  const projectLink = page.locator('[data-perf-id="run-project-link"], .web-run-detail__header a[href^="/projects/"]').first();
+  const projectLink = page.locator('main a[href^="/projects/"]').first();
   const projectNavigation = await navigateByHrefWithFallback(page, projectLink, /\/projects\/[^/?#]+$/);
-  await expect(page.getByText('Test Runs', { exact: true })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText('Recent runs', { exact: true })).toBeVisible({ timeout: 45_000 });
   const projectPageProfiling = await collectProfilingSnapshot(page, 'project-page-ready');
 
   const record = {
@@ -300,23 +268,17 @@ test('benchmarks runner report readiness, operations view, and project-page navi
     metrics: {
       runNavigationMs: runNavigation.durationMs,
       runnerReportReadyMs,
-      operationsViewSwitchMs,
-      suiteExpansionMs,
-      paginatedTestFetchMs,
       projectPageNavigationMs: projectNavigation.durationMs,
       ...await collectBrowserMetrics(page),
     },
     context: {
       runId,
       runNavigationMode: runNavigation.mode,
-      operationsViewSwitchMode: operationsNavigation.mode,
-      renderedTestRows,
       projectPageNavigationMode: projectNavigation.mode,
     },
     profiling: {
       runPage: runPageProfiling,
       runnerReport: runnerReportProfiling,
-      operationsView: operationsProfiling,
       projectPage: projectPageProfiling,
     },
   };
@@ -324,9 +286,6 @@ test('benchmarks runner report readiness, operations view, and project-page navi
   await recordBenchmark(testInfo, record);
   assertBudget('runNavigationMs', record.metrics.runNavigationMs);
   assertBudget('runnerReportReadyMs', record.metrics.runnerReportReadyMs);
-  assertBudget('operationsViewSwitchMs', record.metrics.operationsViewSwitchMs);
-  if (Number.isFinite(record.metrics.suiteExpansionMs)) assertBudget('suiteExpansionMs', record.metrics.suiteExpansionMs);
-  if (Number.isFinite(record.metrics.paginatedTestFetchMs)) assertBudget('paginatedTestFetchMs', record.metrics.paginatedTestFetchMs);
   assertBudget('projectPageNavigationMs', record.metrics.projectPageNavigationMs);
 });
 

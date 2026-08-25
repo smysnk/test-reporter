@@ -4,7 +4,7 @@ import { getWebSession } from '../../lib/auth.js';
 import { buildRunPageResult } from '../../lib/pageProps.js';
 import { buildServerTimingHeader, createPageLoadProfiler } from '../../lib/pageProfiling.js';
 import { applyTraceHeadersToNextResponse, resolveWebRequestTrace } from '../../lib/requestTrace.js';
-import { buildTransientRunWorkspace, loadRunWorkspace, loadRunWorkspaceFallback } from '../../lib/serverGraphql.js';
+import { buildTransientRunWorkspace, loadRunWorkspaceFallback } from '../../lib/serverGraphql.js';
 import { setRuntimeConfig, setSelectedProjectSlug, setSelectedRunId, setViewMode, wrapper } from '../../store/index.js';
 
 export default function RunPage({ data }) {
@@ -28,15 +28,10 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
   const profiler = createPageLoadProfiler({ pageType:'run', route:`/runs/${runId}` });
   let data;
   try {
-    data = await loadRunWorkspace({ session, runId, requestTrace, profiler });
+    data = await loadRunWorkspaceFallback({ session, runId, requestTrace, profiler });
   } catch (error) {
-    console.error(`[run-workspace:ssr-fallback] requestId=${requestTrace.requestId} runId=${runId} error=${error instanceof Error ? error.message : 'unknown'}`);
-    try {
-      data = await loadRunWorkspaceFallback({ session, runId, requestTrace, profiler });
-    } catch (fallbackError) {
-      console.error(`[run-workspace:ssr-transient-shell] requestId=${requestTrace.requestId} runId=${runId} error=${fallbackError instanceof Error ? fallbackError.message : 'unknown'}`);
-    }
-    if (!data) data = buildTransientRunWorkspace(runId);
+    console.error(`[run-workspace:ssr-transient-shell] requestId=${requestTrace.requestId} runId=${runId} error=${error instanceof Error ? error.message : 'unknown'}`);
+    data = buildTransientRunWorkspace(runId);
   }
   const pageProfile = profiler.finalize({ trace:requestTrace, runId, suiteCount:data?.run?.suites?.length || 0, artifactCount:data?.run?.artifacts?.length || 0 });
   const serverTiming = buildServerTimingHeader(pageProfile);
