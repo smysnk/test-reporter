@@ -43,7 +43,7 @@ export function buildRunPresentation(run = {}) {
     || (Array.isArray(run.suites) && run.suites.length > 0)
     || (summaryTotal !== null && summaryTotal > 0);
   const hasCoverage = Boolean(run.coverageSnapshot);
-  const hasPerformance = publicationKinds.includes('performance') || run.performanceAvailable === true;
+  const hasPerformance = run.performanceAvailable === true;
   const artifactCount = finite(run.artifactCount)
     ?? (Array.isArray(run.artifacts) ? run.artifacts.length : 0);
   const failedTests = finite(run.failedTests)
