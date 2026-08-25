@@ -8,6 +8,32 @@ export function sendApiError(res, { status = 500, code = 'INTERNAL_ERROR', messa
   });
 }
 
+export function sendApiResource(res, data, {
+  status = 200,
+  requestId = null,
+  generatedAt = new Date().toISOString(),
+  staleAt = null,
+  cache = 'private, max-age=15, stale-while-revalidate=45',
+  meta = {},
+} = {}) {
+  res.setHeader('Cache-Control', cache);
+  return res.status(status).json({
+    data,
+    meta: {
+      requestId: requestId || null,
+      generatedAt,
+      staleAt,
+      ...meta,
+    },
+  });
+}
+
+export function isApiResourceEnvelope(value) {
+  return Boolean(value && typeof value === 'object' && 'data' in value
+    && value.meta && typeof value.meta === 'object'
+    && typeof value.meta.generatedAt === 'string');
+}
+
 export function requireGet(req, res, requestId = null) {
   if (req.method === 'GET') return true;
   res.setHeader('Allow', 'GET');

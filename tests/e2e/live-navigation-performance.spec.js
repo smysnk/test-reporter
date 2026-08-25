@@ -18,6 +18,14 @@ const budgetConfig = {
   projectPageNavigationMs: readBudget('TEST_STATION_E2E_BUDGET_PROJECT_PAGE_NAVIGATION_MS', 1_500),
   suiteExpansionMs: readBudget('TEST_STATION_E2E_BUDGET_SUITE_EXPANSION_MS', 300),
   paginatedTestFetchMs: readBudget('TEST_STATION_E2E_BUDGET_PAGINATED_TEST_FETCH_MS', 500),
+  failureListMs: readBudget('TEST_STATION_E2E_BUDGET_FAILURE_LIST_MS', 500),
+  failureEvidenceMs: readBudget('TEST_STATION_E2E_BUDGET_FAILURE_EVIDENCE_MS', 500),
+  coverageFilePageMs: readBudget('TEST_STATION_E2E_BUDGET_COVERAGE_FILE_PAGE_MS', 500),
+  coverageFileInspectorMs: readBudget('TEST_STATION_E2E_BUDGET_COVERAGE_FILE_INSPECTOR_MS', 500),
+  artifactPageMs: readBudget('TEST_STATION_E2E_BUDGET_ARTIFACT_PAGE_MS', 500),
+  workspaceInteractiveMs: readBudget('TEST_STATION_E2E_BUDGET_WORKSPACE_INTERACTIVE_MS', 1_500),
+  domNodes: readBudget('TEST_STATION_E2E_BUDGET_DOM_NODES', 3_500),
+  transferredBytes: readBudget('TEST_STATION_E2E_BUDGET_TRANSFERRED_BYTES', 500_000),
 };
 
 test.describe.configure({ mode: 'serial' });

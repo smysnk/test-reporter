@@ -3172,19 +3172,17 @@ test('web embedded runner preview bounds and projects test evidence without muta
   assert.equal(report.packages[0].suites[0].tests.length, 3);
 });
 
-test('web focused run view avoids nested scroll containers around the report', () => {
-  const appStylesSource = fs.readFileSync(new URL('../packages/web/pages/_app.js', import.meta.url), 'utf8');
+test('unified runner report mode keeps the report in the shared run workspace', () => {
   const runPageSource = fs.readFileSync(new URL('../packages/web/pages/runs/[id].js', import.meta.url), 'utf8');
+  const runWorkspaceSource = fs.readFileSync(new URL('../packages/web/components/workspaces/RunWorkspace.jsx', import.meta.url), 'utf8');
 
-  assert.match(appStylesSource, /\.web-table-wrap\s*\{[\s\S]*overflow:\s*visible;/);
-  assert.doesNotMatch(appStylesSource, /\.web-table-wrap\s*\{[\s\S]*overflow-x:\s*auto;/);
-  assert.match(runPageSource, /scrolling:\s*'no'/);
-  assert.doesNotMatch(runPageSource, /Exact runner HTML report/);
-  assert.match(runPageSource, /Open full runner report/);
-  assert.match(runPageSource, /report\?view=compact/);
+  assert.match(runPageSource, /RunWorkspace/);
+  assert.match(runWorkspaceSource, /scrolling="no"/);
+  assert.match(runWorkspaceSource, /Runner report/);
+  assert.match(runWorkspaceSource, /\/api\/runs\/\$\{encodeURIComponent\(run\.id\)\}\/report/);
 });
 
-test('web run template routing defaults to the runner report and keeps the operations view addressable', () => {
+test('legacy run template URLs redirect into addressable unified workspace modes', () => {
   const runPageSource = fs.readFileSync(new URL('../packages/web/pages/runs/[id].js', import.meta.url), 'utf8');
 
   assert.equal(resolveRunTemplateMode(undefined), 'runner');
@@ -3192,14 +3190,10 @@ test('web run template routing defaults to the runner report and keeps the opera
   assert.equal(resolveRunTemplateMode('web'), 'web');
   assert.equal(buildRunTemplateHref('run-1', 'runner'), '/runs/run-1');
   assert.equal(buildRunTemplateHref('run-1', 'web'), '/runs/run-1?template=web');
-  assert.match(runPageSource, /const activeTemplateMode = resolveRunTemplateMode\(router\.query\?\.template \?\? templateMode\)/);
-  assert.equal((runPageSource.match(/shallow: true/g) || []).length, 2);
-  assert.match(runPageSource, /requestIdleCallback\(reveal, \{ timeout: 1_000 \}\)/);
-  assert.match(runPageSource, /initialSuiteNextPage/);
-  assert.match(runPageSource, /prefetchedNextSuitePages/);
-  assert.match(runPageSource, /showOperationsDetails[\s\S]*Loading detailed panels…/);
-  assert.match(runPageSource, /Show \$\{runPerformanceStats\.length\} recorded rows/);
-  assert.match(runPageSource, /runFiles\.slice\(0, 30\)/);
+  assert.match(runPageSource, /context\.query\?\.template === 'runner'/);
+  assert.match(runPageSource, /context\.query\.template === 'runner' \? 'report' : 'summary'/);
+  assert.match(runPageSource, /loadRunWorkspace/);
+  assert.doesNotMatch(runPageSource, /loadRunExplorerPage/);
 });
 
 function createRunnerReportFixture() {

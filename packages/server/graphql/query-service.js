@@ -125,6 +125,12 @@ export function createGraphqlQueryService(options = {}) {
   const requestMemo = new Map();
 
   return {
+    async getRunPublicationKinds({ runId, actor }) {
+      const run = await this.findRun({ id: runId, actor });
+      if (!run) return [];
+      return (await loadPublicationKindsByRunId(models, [runId])).get(runId) || [];
+    },
+
     async listProjects({ actor }) {
       return memoizeRequestValue(requestMemo, `projects:${actorCacheKey(actor)}`, async () => {
         const projects = await loadAll(models.Project);
@@ -162,7 +168,7 @@ export function createGraphqlQueryService(options = {}) {
       )) || null;
     },
 
-    async listRuns({ actor, projectId = null, projectKey = null, status = null, limit = null, after = null }) {
+    async listRuns({ actor, projectId = null, projectKey = null, status = null, branch = null, search = null, limit = null, after = null }) {
       const projects = await this.listProjects({ actor });
       const scopedProjects = projects.filter((project) => (
         (projectId ? project.id === projectId : true)
@@ -193,6 +199,12 @@ export function createGraphqlQueryService(options = {}) {
             projectId: Array.from(projectMap.keys()),
             completedAt: { [Op.ne]: null },
             ...(status ? { status } : {}),
+            ...(branch ? { branch } : {}),
+            ...(search ? { [Op.or]: [
+              { externalKey: { [Op.iLike]: `%${search}%` } },
+              { branch: { [Op.iLike]: `%${search}%` } },
+              { commitSha: { [Op.iLike]: `%${search}%` } },
+            ] } : {}),
             ...projectionCursorWhere,
           },
           order: [['completedAt', 'DESC'], ['runId', 'DESC']],
@@ -213,6 +225,12 @@ export function createGraphqlQueryService(options = {}) {
         where: {
           projectId: Array.from(projectMap.keys()),
           ...(status ? { status } : {}),
+          ...(branch ? { branch } : {}),
+          ...(search ? { [Op.or]: [
+            { externalKey: { [Op.iLike]: `%${search}%` } },
+            { branch: { [Op.iLike]: `%${search}%` } },
+            { commitSha: { [Op.iLike]: `%${search}%` } },
+          ] } : {}),
           ...cursorWhere,
         },
         order: [
@@ -225,6 +243,8 @@ export function createGraphqlQueryService(options = {}) {
       runs = runs.filter((run) => (
         projectMap.has(run.projectId)
         && (status ? run.status === status : true)
+        && (branch ? run.branch === branch : true)
+        && (search ? `${run.externalKey || ''} ${run.branch || ''} ${run.commitSha || ''}`.toLowerCase().includes(String(search).toLowerCase()) : true)
       ));
 
       const runIds = runs.map((run) => run.id).filter(Boolean);
@@ -260,8 +280,8 @@ export function createGraphqlQueryService(options = {}) {
         .slice(0, requestedLimit || runs.length);
     },
 
-    async listRunFeed({ actor, limit = null, after = null, projectKey = null, status = null }) {
-      const runs = await this.listRuns({ actor, limit, after, projectKey, status });
+    async listRunFeed({ actor, limit = null, after = null, projectKey = null, status = null, branch = null, search = null }) {
+      const runs = await this.listRuns({ actor, limit, after, projectKey, status, branch, search });
 
       return runs.map((run) => ({
         buildNumber: resolveRunBuildNumber(run, run.projectVersion),
@@ -513,7 +533,172 @@ export function createGraphqlQueryService(options = {}) {
         .slice(0, normalizeRunLimit(limit) || tests.length);
     },
 
-    async listArtifacts({ actor, runId = null, suiteRunId = null, testExecutionId = null }) {
+    async getTestExplorerDetail({ runId, testExecutionId, actor }) {
+      const run = await this.findRun({ id: runId, actor });
+      if (!run) return null;
+      const test = await loadOne(models.TestExecution, { where: { id: testExecutionId } });
+      if (!test) return null;
+      const suite = await loadOne(models.SuiteRun, { where: { id: test.suiteRunId } });
+      if (!suite || suite.runId !== runId) return null;
+      const owner = test.projectModuleId
+        ? (await loadOne(models.ProjectModule, { where: { id: test.projectModuleId } }))?.owner || null
+        : null;
+      const activeSubmissionIds = await loadActiveSubmissionIds(models, [runId], ['tests', 'combined']);
+      const errors = models.ErrorOccurrence
+        ? await loadAll(models.ErrorOccurrence, {
+          where: {
+            runId,
+            testExecutionId,
+            ...(activeSubmissionIds.length > 0 ? { reportSubmissionId: activeSubmissionIds } : {}),
+          },
+          order: [['firstSeenAt', 'DESC'], ['id', 'DESC']],
+          limit: 20,
+        })
+        : [];
+      const artifacts = await this.listArtifacts({ actor, runId, testExecutionId, limit: 50 });
+      return {
+        test: decorateTestExecution(test, suite),
+        suite: {
+          id: suite.id,
+          label: suite.label,
+          runtime: suite.runtime,
+          command: suite.command || null,
+          cwd: suite.cwd || null,
+        },
+        owner,
+        errors,
+        artifacts,
+      };
+    },
+
+    async listRunFailures({ runId, actor, limit = 100, after = null, search = null }) {
+      const run = await this.findRun({ id: runId, actor });
+      if (!run) return null;
+      const suites = await this.listSuitesForRun({ runId, actor });
+      const suiteMap = mapBy(suites, 'id');
+      const suiteIds = [...suiteMap.keys()];
+      if (suiteIds.length === 0) return { failures: [], hasMore: false, nextCursor: null, facets: { suites: [], files: [] } };
+      const pageLimit = Math.min(normalizeLimit(limit), 100);
+      const failureWhere = {
+        suiteRunId: suiteIds,
+        status: 'failed',
+        ...(search ? { fullName: { [Op.iLike]: `%${search}%` } } : {}),
+      };
+      const total = await countRows(models.TestExecution, failureWhere);
+      const rows = await loadAll(models.TestExecution, {
+        where: {
+          ...failureWhere,
+          ...(after ? { id: { [Op.gt]: after } } : {}),
+        },
+        order: [['id', 'ASC']],
+        limit: pageLimit + 1,
+      });
+      const filtered = rows
+        .filter((test) => suiteMap.has(test.suiteRunId) && test.status === 'failed')
+        .filter((test) => !after || String(test.id).localeCompare(String(after)) > 0)
+        .filter((test) => !search || String(test.fullName || test.name || '').toLowerCase().includes(String(search).toLowerCase()));
+      const page = filtered.slice(0, pageLimit).map((test) => decorateTestExecution(test, suiteMap.get(test.suiteRunId)));
+      return {
+        failures: page,
+        total,
+        hasMore: filtered.length > pageLimit,
+        nextCursor: page.at(-1)?.id || null,
+        facets: {
+          suites: [...new Set(page.map((entry) => entry.suiteLabel).filter(Boolean))].sort(),
+          files: [...new Set(page.map((entry) => entry.filePath).filter(Boolean))].sort(),
+        },
+      };
+    },
+
+    async listCoverageFilePage({ runId, actor, limit = 100, after = null, search = null, below = null, sort = 'lines-asc' }) {
+      const run = await this.findRun({ id: runId, actor });
+      if (!run) return null;
+      const snapshot = await this.getCoverageSnapshotForRun({ runId, actor });
+      if (!snapshot) return { snapshot: null, files: [], hasMore: false, nextCursor: null, facets: { packages: [], modules: [] } };
+      const pageLimit = Math.min(normalizeLimit(limit), 100);
+      const safeSort = ['lines-asc', 'lines-desc', 'path-asc'].includes(sort) ? sort : 'lines-asc';
+      const cursor = decodeCoverageCursor(after, safeSort);
+      const order = safeSort === 'path-asc'
+        ? [['path', 'ASC'], ['id', 'ASC']]
+        : [['linesPct', safeSort === 'lines-desc' ? 'DESC' : 'ASC'], ['id', 'ASC']];
+      const threshold = toNumber(below);
+      const coverageWhere = {
+        coverageSnapshotId: snapshot.id,
+        ...(search ? { path: { [Op.iLike]: `%${search}%` } } : {}),
+        ...(threshold !== null ? { linesPct: { [Op.lt]: threshold } } : {}),
+      };
+      const total = await countRows(models.CoverageFile, coverageWhere);
+      const rows = await loadAll(models.CoverageFile, {
+        where: {
+          ...coverageWhere,
+          ...buildCoverageCursorWhere(cursor, safeSort),
+        },
+        order,
+        limit: pageLimit + 1,
+      });
+      const filtered = rows
+        .filter((file) => file.coverageSnapshotId === snapshot.id)
+        .filter((file) => !cursor || compareCoverageFileCursor(file, cursor, safeSort) > 0)
+        .filter((file) => !search || String(file.path || '').toLowerCase().includes(String(search).toLowerCase()))
+        .filter((file) => threshold === null || (toNumber(file.linesPct) !== null && toNumber(file.linesPct) < threshold))
+        .sort((left, right) => compareCoverageFiles(left, right, safeSort));
+      const rawPage = filtered.slice(0, pageLimit);
+      const packageIds = [...new Set(rawPage.map((entry) => entry.projectPackageId).filter(Boolean))];
+      const moduleIds = [...new Set(rawPage.map((entry) => entry.projectModuleId).filter(Boolean))];
+      const packages = mapBy(packageIds.length ? await loadAll(models.ProjectPackage, { where: { id: packageIds } }) : [], 'id');
+      const modules = mapBy(moduleIds.length ? await loadAll(models.ProjectModule, { where: { id: moduleIds } }) : [], 'id');
+      const files = rawPage.map((file) => ({
+        id: file.id,
+        path: file.path,
+        packageName: packages.get(file.projectPackageId)?.name || null,
+        moduleName: modules.get(file.projectModuleId)?.name || null,
+        owner: modules.get(file.projectModuleId)?.owner || null,
+        ...normalizeCoverageFile(file),
+      }));
+      return {
+        snapshot,
+        files,
+        total,
+        hasMore: filtered.length > pageLimit,
+        nextCursor: rawPage.length ? encodeCoverageCursor(rawPage.at(-1), safeSort) : null,
+        facets: {
+          packages: [...new Set(files.map((entry) => entry.packageName).filter(Boolean))].sort(),
+          modules: [...new Set(files.map((entry) => entry.moduleName).filter(Boolean))].sort(),
+        },
+      };
+    },
+
+    async getCoverageFileDetail({ runId, coverageFileId, actor }) {
+      const run = await this.findRun({ id: runId, actor });
+      if (!run) return null;
+      const snapshot = await this.getCoverageSnapshotForRun({ runId, actor });
+      if (!snapshot) return null;
+      const file = await loadOne(models.CoverageFile, { where: { id: coverageFileId } });
+      if (!file || file.coverageSnapshotId !== snapshot.id) return null;
+      const moduleRecord = file.projectModuleId
+        ? await loadOne(models.ProjectModule, { where: { id: file.projectModuleId } })
+        : null;
+      const packageRecord = file.projectPackageId
+        ? await loadOne(models.ProjectPackage, { where: { id: file.projectPackageId } })
+        : null;
+      const relatedTests = await this.listTestsForRun({ runId, actor, filePath: file.path, limit: 20 });
+      const comparison = await this.getRunCoverageComparison({ runId, actor });
+      const change = comparison?.fileChanges?.find((entry) => entry.filePath === file.path) || null;
+      return {
+        file: {
+          id: file.id,
+          path: file.path,
+          packageName: packageRecord?.name || null,
+          moduleName: moduleRecord?.name || null,
+          owner: moduleRecord?.owner || null,
+          ...normalizeCoverageFile(file),
+        },
+        change,
+        relatedTests,
+      };
+    },
+
+    async listArtifacts({ actor, runId = null, suiteRunId = null, testExecutionId = null, limit = null, after = null, kind = null, search = null }) {
       if (!runId && !suiteRunId && !testExecutionId) {
         return [];
       }
@@ -537,15 +722,22 @@ export function createGraphqlQueryService(options = {}) {
           runId: authorizedRunId,
           ...(suiteRunId ? { suiteRunId } : {}),
           ...(testExecutionId ? { testExecutionId } : {}),
+          ...(after ? { id: { [Op.gt]: after } } : {}),
+          ...(kind ? { kind } : {}),
           ...(activeSubmissionIds.length > 0 ? { reportSubmissionId: activeSubmissionIds } : {}),
         },
-        order: [['createdAt', 'DESC']],
+        order: normalizeRunLimit(limit) || after ? [['id', 'ASC']] : [['createdAt', 'DESC']],
+        ...(normalizeRunLimit(limit) ? { limit: normalizeRunLimit(limit) } : {}),
       }))
         .filter((artifact) => artifact.runId === authorizedRunId)
         .filter((artifact) => (suiteRunId ? artifact.suiteRunId === suiteRunId : true))
         .filter((artifact) => (testExecutionId ? artifact.testExecutionId === testExecutionId : true))
+        .filter((artifact) => !after || String(artifact.id).localeCompare(String(after)) > 0)
+        .filter((artifact) => !kind || artifact.kind === kind)
+        .filter((artifact) => !search || `${artifact.label || ''} ${artifact.relativePath || ''}`.toLowerCase().includes(String(search).toLowerCase()))
         .filter((artifact) => activeSubmissionIds.length === 0 || activeSubmissionIds.includes(artifact.reportSubmissionId))
-        .sort(compareArtifacts);
+        .sort(normalizeRunLimit(limit) || after ? compareIds : compareArtifacts)
+        .slice(0, normalizeRunLimit(limit) || Number.MAX_SAFE_INTEGER);
     },
 
     async getRunFailureEvidence({ runId, actor }) {
@@ -1868,6 +2060,12 @@ async function loadOne(model, options = undefined) {
   return null;
 }
 
+async function countRows(model, where) {
+  if (!model || typeof model.count !== 'function') return null;
+  const value = await model.count({ where });
+  return Number.isFinite(Number(value)) ? Number(value) : null;
+}
+
 function toPlainRecord(row) {
   if (!row) {
     return null;
@@ -1945,6 +2143,53 @@ function decodeRunCursor(value) {
   } catch {
     return null;
   }
+}
+
+function encodeCoverageCursor(file, sort) {
+  return Buffer.from(JSON.stringify({
+    sort,
+    id: String(file.id),
+    path: String(file.path || ''),
+    linesPct: toNumber(file.linesPct),
+  })).toString('base64url');
+}
+
+function decodeCoverageCursor(value, sort) {
+  if (typeof value !== 'string' || !value) return null;
+  try {
+    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'));
+    return parsed?.sort === sort && parsed?.id ? parsed : null;
+  } catch { return null; }
+}
+
+function buildCoverageCursorWhere(cursor, sort) {
+  if (!cursor) return {};
+  if (sort === 'path-asc') {
+    return { [Op.or]: [
+      { path: { [Op.gt]: cursor.path } },
+      { path: cursor.path, id: { [Op.gt]: cursor.id } },
+    ] };
+  }
+  if (!Number.isFinite(cursor.linesPct)) return { id: { [Op.gt]: cursor.id } };
+  const comparison = sort === 'lines-desc' ? Op.lt : Op.gt;
+  return { [Op.or]: [
+    { linesPct: { [comparison]: cursor.linesPct } },
+    { linesPct: cursor.linesPct, id: { [Op.gt]: cursor.id } },
+  ] };
+}
+
+function compareCoverageFiles(left, right, sort) {
+  if (sort === 'path-asc') return String(left.path || '').localeCompare(String(right.path || '')) || String(left.id).localeCompare(String(right.id));
+  const leftValue = toNumber(left.linesPct);
+  const rightValue = toNumber(right.linesPct);
+  if (leftValue === null && rightValue !== null) return 1;
+  if (leftValue !== null && rightValue === null) return -1;
+  if (leftValue !== rightValue) return sort === 'lines-desc' ? rightValue - leftValue : leftValue - rightValue;
+  return String(left.id).localeCompare(String(right.id));
+}
+
+function compareCoverageFileCursor(file, cursor, sort) {
+  return compareCoverageFiles(file, { id: cursor.id, path: cursor.path, linesPct: cursor.linesPct }, sort);
 }
 
 function resolveCoverageTrendScope({ packageName, moduleName, filePath }) {
@@ -2097,6 +2342,10 @@ function compareTests(left, right) {
 
 function compareArtifacts(left, right) {
   return (left.label || left.relativePath || '').localeCompare(right.label || right.relativePath || '');
+}
+
+function compareIds(left, right) {
+  return String(left.id || '').localeCompare(String(right.id || ''));
 }
 
 function compareReleaseNotesNewestFirst(left, right) {

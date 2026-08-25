@@ -1,3 +1,5 @@
+import { compactRunPresentation } from './runPresentation.js';
+
 export const OPERATIONS_WINDOW_DAYS = 14;
 export const OPERATIONS_PAGE_SIZE = 50;
 
@@ -32,25 +34,7 @@ function dateKey(value, timeZone = 'UTC') {
 }
 
 export function resolveRunPresentation(run) {
-  const publicationKinds = Array.isArray(run?.publicationKinds) ? run.publicationKinds : [];
-  const normalizedStatus = typeof run?.status === 'string' && run.status.trim()
-    ? run.status.trim().toLowerCase()
-    : 'unknown';
-
-  if (!publicationKinds.includes('tests') && publicationKinds.includes('performance')) {
-    return { kind: 'performance', label: 'Benchmark', status: 'benchmark', symbol: 'B' };
-  }
-  if (!publicationKinds.includes('tests') && publicationKinds.includes('coverage')) {
-    return { kind: 'coverage', label: 'Coverage', status: 'coverage', symbol: 'C' };
-  }
-
-  const symbols = { passed: '✓', failed: '×', partial: '!', warning: '!', skipped: '–', unknown: '?' };
-  return {
-    kind: 'tests',
-    label: normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1),
-    status: normalizedStatus,
-    symbol: symbols[normalizedStatus] || '?',
-  };
+  return compactRunPresentation(run);
 }
 
 export function buildDateWindow({ now = new Date(), days = OPERATIONS_WINDOW_DAYS, timeZone = 'UTC' } = {}) {

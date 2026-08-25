@@ -8,6 +8,7 @@ import * as initialMigration from '../packages/server/migrations/20260309_0001_i
 import * as performanceQueryIndexesMigration from '../packages/server/migrations/20260513_0005_performance_query_indexes.js';
 import * as reportSubmissionsMigration from '../packages/server/migrations/20260722_0006_report_submissions_and_read_indexes.js';
 import * as boundedReadIndexesMigration from '../packages/server/migrations/20260824_0007_bounded_read_indexes.js';
+import * as unifiedExplorerIndexesMigration from '../packages/server/migrations/20260825_0008_unified_explorer_indexes.js';
 import { loadMigrations, runMigrations } from '../packages/server/migrations/runMigrations.js';
 import {
   Artifact,
@@ -55,6 +56,7 @@ test('loadMigrations includes the initial reporting schema migration', async () 
       performanceQueryIndexesMigration.id,
       reportSubmissionsMigration.id,
       boundedReadIndexesMigration.id,
+      unifiedExplorerIndexesMigration.id,
     ],
   );
 });

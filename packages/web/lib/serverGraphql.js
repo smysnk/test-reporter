@@ -26,14 +26,22 @@ import {
   PROJECT_BY_SLUG_QUERY,
   RUN_PROJECT_HISTORY_QUERY,
   RUN_HEADER_QUERY,
+  RUN_WORKSPACE_QUERY,
+  RUN_FAILURES_PAGE_QUERY,
+  TEST_EXPLORER_DETAIL_QUERY,
+  COVERAGE_FILE_PAGE_QUERY,
+  COVERAGE_FILE_DETAIL_QUERY,
+  ARTIFACT_PAGE_QUERY,
   RUN_FAILURE_EVIDENCE_QUERY,
   RUN_SCOPE_TREND_CATALOG_QUERY,
   RUN_DETAIL_QUERY,
+  RUN_PERFORMANCE_QUERY,
   RUN_REPORT_QUERY,
   SCOPED_COVERAGE_TREND_QUERY,
   SUITE_TESTS_QUERY,
   VIEWER_ACCESS_QUERY,
 } from './queries.js';
+import { buildRunPresentation } from './runPresentation.js';
 import {
   decorateEmbeddedRunnerReportHtml,
   prepareEmbeddedRunnerReport,
@@ -170,19 +178,21 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
   };
 }
 
-export async function loadWebRunFeedPage({ session, after = null, projectKey = null, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+export async function loadWebRunFeedPage({ session, after = null, projectKey = null, status = null, branch = null, search = null, fetchImpl = fetch, requestId = null, requestTrace = null }) {
   const result = await executeWebGraphqlRequest({
     session,
     query: WEB_RUN_FEED_PAGE_QUERY,
-    variables: { after, projectKey },
+    variables: { after, projectKey, status, branch, search },
     fetchImpl,
     requestId,
     requestTrace,
   });
   const entries = Array.isArray(result.data.runFeed) ? result.data.runFeed : [];
+  const runs = entries.slice(0, 50).map(normalizeRunFeedEntry);
   return {
-    runs: entries.slice(0, 50).map(normalizeRunFeedEntry),
+    runs,
     hasMoreRuns: entries.length > 50,
+    nextCursor: runs.at(-1)?.cursor || null,
   };
 }
 
@@ -456,6 +466,108 @@ export async function loadRunExplorerPage({
   };
 }
 
+export async function loadRunWorkspace({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
+  const result = await measureProfileStep(profiler, 'run-workspace-query', () => executeWebGraphqlRequest({
+    session,
+    query: RUN_WORKSPACE_QUERY,
+    variables: { runId },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  }), (response) => ({ query: 'RUN_WORKSPACE_QUERY', runId, ...response?.meta }));
+  const run = result.data.run || null;
+  if (!run) return null;
+  const artifacts = Array.isArray(run.artifacts) ? run.artifacts : [];
+  const presentation = buildRunPresentation({
+    ...run,
+    artifactCount: artifacts.length,
+    hasReportArtifact: artifacts.some((artifact) => artifact.relativePath === 'index.html' || String(artifact.relativePath || '').endsWith('/index.html')),
+    reportAvailable: (run.publicationKinds || []).some((kind) => kind === 'tests' || kind === 'combined'),
+  });
+  return { run, presentation };
+}
+
+export async function loadRunFailuresPage({ session, runId, limit = 100, after = null, search = null, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: RUN_FAILURES_PAGE_QUERY,
+    variables: { runId, limit: Math.min(Math.max(Number(limit) || 100, 1), 100), after, search },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  return validateObjectResource(result.data.runFailures, 'failure page');
+}
+
+export async function loadTestExplorerDetail({ session, runId, testExecutionId, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: TEST_EXPLORER_DETAIL_QUERY,
+    variables: { runId, testExecutionId },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  return validateNullableObjectResource(result.data.testExplorerDetail, 'test detail');
+}
+
+export async function loadCoverageFilePage({ session, runId, limit = 100, after = null, search = null, below = null, sort = 'lines-asc', fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const parsedBelow = below === null || below === undefined || below === '' ? null : Number(below);
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: COVERAGE_FILE_PAGE_QUERY,
+    variables: {
+      runId,
+      limit: Math.min(Math.max(Number(limit) || 100, 1), 100),
+      after,
+      search,
+      below: Number.isFinite(parsedBelow) ? parsedBelow : null,
+      sort,
+    },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  return validateObjectResource(result.data.coverageFilePage, 'coverage file page');
+}
+
+export async function loadCoverageFileDetail({ session, runId, coverageFileId, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: COVERAGE_FILE_DETAIL_QUERY,
+    variables: { runId, coverageFileId },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  return validateNullableObjectResource(result.data.coverageFileDetail, 'coverage file detail');
+}
+
+export async function loadArtifactPage({ session, runId, limit = 100, after = null, kind = null, search = null, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: ARTIFACT_PAGE_QUERY,
+    variables: { runId, limit: Math.min(Math.max(Number(limit) || 100, 1), 100), after, kind, search },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  return validateObjectResource(result.data.artifactPage, 'artifact page');
+}
+
+function validateObjectResource(value, label) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    const error = new Error(`Invalid ${label} response`);
+    error.statusCode = 502;
+    throw error;
+  }
+  return value;
+}
+
+function validateNullableObjectResource(value, label) {
+  return value === null ? null : validateObjectResource(value, label);
+}
+
 export async function loadRunInsights({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null }) {
   const headerResult = await executeWebGraphqlRequest({
     session,
@@ -518,6 +630,27 @@ export async function loadRunOperationsData({ session, runId, fetchImpl = fetch,
     failedTests: Array.isArray(data.tests) ? data.tests : [],
     runPerformanceStats: Array.isArray(data.runPerformanceStats) ? data.runPerformanceStats : [],
     coverageComparison: data.runCoverageComparison || null,
+  };
+}
+
+export async function loadRunPerformance({ session, runId, fetchImpl = fetch, requestId = null, requestTrace = null }) {
+  const result = await executeWebGraphqlRequest({
+    session,
+    query: RUN_PERFORMANCE_QUERY,
+    variables: { runId },
+    fetchImpl,
+    requestId,
+    requestTrace,
+  });
+  if (!result.data.run) {
+    const error = new Error('Run not found');
+    error.statusCode = 404;
+    error.publicMessage = 'Run not found.';
+    throw error;
+  }
+  return {
+    runId: result.data.run.id,
+    runPerformanceStats: Array.isArray(result.data.runPerformanceStats) ? result.data.runPerformanceStats : [],
   };
 }
 

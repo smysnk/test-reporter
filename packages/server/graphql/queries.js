@@ -157,6 +157,7 @@ export const queryTypeDefs = `#graphql
     rawReport: JSON
     summary: JSON
     metadata: JSON
+    publicationKinds: [String!]!
     project: Project
     projectVersion: ProjectVersion
     coverageSnapshot: CoverageSnapshot
@@ -463,8 +464,8 @@ export const queryTypeDefs = `#graphql
     projects: [Project!]!
     project(id: ID, key: String, slug: String): Project
     badgeSummary(projectKey: String!): BadgeSummary!
-    runFeed(limit: Int, after: String, projectKey: String, status: String): [RunFeedEntry!]!
-    runs(projectId: ID, projectKey: String, status: String, limit: Int): [Run!]!
+    runFeed(limit: Int, after: String, projectKey: String, status: String, branch: String, search: String): [RunFeedEntry!]!
+    runs(projectId: ID, projectKey: String, status: String, branch: String, search: String, limit: Int): [Run!]!
     run(id: ID, externalKey: String): Run
     runFailureEvidence(runId: ID!): RunFailureEvidence
     runPackages(runId: ID!): [RunPackageSummary!]!
@@ -472,6 +473,11 @@ export const queryTypeDefs = `#graphql
     runFiles(runId: ID!, packageName: String, moduleName: String, status: String): [RunFile!]!
     tests(runId: ID!, status: String, packageName: String, moduleName: String, filePath: String, limit: Int): [TestExecution!]!
     testsForSuite(runId: ID!, suiteRunId: ID!, limit: Int, after: ID, status: String, search: String): [TestExecution!]!
+    testExplorerDetail(runId: ID!, testExecutionId: ID!): JSON
+    runFailures(runId: ID!, limit: Int, after: ID, search: String): JSON
+    coverageFilePage(runId: ID!, limit: Int, after: ID, search: String, below: Float, sort: String): JSON
+    coverageFileDetail(runId: ID!, coverageFileId: ID!): JSON
+    artifactPage(runId: ID!, limit: Int, after: ID, kind: String, search: String): JSON
     runPerformanceStats(runId: ID!, statGroupPrefix: String, statNames: [String!], seriesIds: [String!]): [PerformanceStatRecord!]!
     performanceTrend(projectId: ID, projectKey: String, statGroup: String!, statName: String!, seriesIds: [String!], runnerKey: String, limit: Int): [PerformanceStatRecord!]!
     performanceTrends(projectId: ID, projectKey: String, metrics: [PerformanceMetricSelectionInput!]!, limit: Int): [PerformanceTrendSeries!]!
@@ -512,6 +518,16 @@ export const queryResolvers = {
     }),
     tests: (_root, args, context) => context.queryService.listTestsForRun({ ...args, actor: context.actor }),
     testsForSuite: (_root, args, context) => context.queryService.listTestsForSuiteRun({ ...args, actor: context.actor }),
+    testExplorerDetail: (_root, args, context) => context.queryService.getTestExplorerDetail({ ...args, actor: context.actor }),
+    runFailures: (_root, args, context) => context.queryService.listRunFailures({ ...args, actor: context.actor }),
+    coverageFilePage: (_root, args, context) => context.queryService.listCoverageFilePage({ ...args, actor: context.actor }),
+    coverageFileDetail: (_root, args, context) => context.queryService.getCoverageFileDetail({ ...args, actor: context.actor }),
+    artifactPage: async (_root, args, context) => {
+      const limit = Number.isInteger(args.limit) && args.limit > 0 ? Math.min(args.limit, 100) : 100;
+      const artifacts = await context.queryService.listArtifacts({ ...args, limit: limit + 1, actor: context.actor });
+      const page = artifacts.slice(0, limit);
+      return { artifacts: page, hasMore: artifacts.length > limit, nextCursor: page.at(-1)?.id || null };
+    },
     runPerformanceStats: (_root, args, context) => context.queryService.listRunPerformanceStats({ ...args, actor: context.actor }),
     performanceTrend: (_root, args, context) => context.queryService.listPerformanceTrend({ ...args, actor: context.actor }),
     performanceTrends: (_root, args, context) => context.queryService.listPerformanceTrends({ ...args, actor: context.actor }),
@@ -552,6 +568,7 @@ export const queryResolvers = {
     topImprovements: (summary, args) => limitSummaryEntries(summary?.topImprovements, args?.limit),
   },
   Run: {
+    publicationKinds: (run, _args, context) => context.queryService.getRunPublicationKinds({ runId: run.id, actor: context.actor }),
     rawReport: (run, _args, context) => context.queryService.getActiveRunReport({
       runId: run.id,
       kind: 'tests',

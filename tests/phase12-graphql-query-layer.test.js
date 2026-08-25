@@ -137,6 +137,57 @@ test('public badge summary resolves tests and coverage from their latest active 
   });
 });
 
+test('unified explorer resources remain bounded and reject cross-run child identifiers', async () => {
+  const models = {
+    Project: createFindAllModel([{ id:'project-1', key:'workspace', slug:'workspace', name:'Workspace', isPublic:true }]),
+    ProjectOverview: createFindAllModel([]),
+    Run: createFindAllModel([
+      { id:'run-1', projectId:'project-1', externalKey:'workspace-1', status:'failed', summary:{ totalTests:2, passedTests:1, failedTests:1 } },
+      { id:'run-2', projectId:'project-1', externalKey:'workspace-2', status:'passed', summary:{ totalTests:1, passedTests:1, failedTests:0 } },
+    ]),
+    ProjectVersion: createFindAllModel([]),
+    RunActiveSubmission: createFindAllModel([
+      { runId:'run-1', kind:'tests', reportSubmissionId:'submission-1' },
+      { runId:'run-1', kind:'coverage', reportSubmissionId:'submission-coverage-1' },
+      { runId:'run-2', kind:'tests', reportSubmissionId:'submission-2' },
+    ]),
+    ReportSubmission: createFindAllModel([]),
+    SuiteRun: createFindAllModel([
+      { id:'suite-1', runId:'run-1', reportSubmissionId:'submission-1', label:'Unit', runtime:'node-test', command:'node --test', status:'failed', warnings:[], summary:{ totalTests:2 } },
+      { id:'suite-2', runId:'run-2', reportSubmissionId:'submission-2', label:'Other', runtime:'node-test', status:'passed', warnings:[], summary:{ totalTests:1 } },
+    ]),
+    TestExecution: createFindAllModel([
+      { id:'test-1', suiteRunId:'suite-1', projectModuleId:'module-1', name:'fails', fullName:'unit fails', status:'failed', durationMs:12, filePath:'src/a.js', assertions:[], failureMessages:['boom'], setup:[], mocks:[], metadata:{} },
+      { id:'test-2', suiteRunId:'suite-2', name:'passes', fullName:'other passes', status:'passed', durationMs:4, filePath:'src/b.js', assertions:[], failureMessages:[], setup:[], mocks:[], metadata:{} },
+    ]),
+    ProjectModule: createFindAllModel([{ id:'module-1', name:'core', owner:'platform' }]),
+    ProjectPackage: createFindAllModel([{ id:'package-1', name:'workspace' }]),
+    ProjectFile: createFindAllModel([]),
+    CoverageSnapshot: createFindAllModel([{ id:'coverage-1', runId:'run-1', reportSubmissionId:'submission-coverage-1', linesPct:80 }]),
+    CoverageFile: createFindAllModel([{ id:'coverage-file-1', coverageSnapshotId:'coverage-1', projectPackageId:'package-1', projectModuleId:'module-1', path:'src/a.js', linesCovered:8, linesTotal:10, linesPct:80, metadata:{} }]),
+    ErrorOccurrence: createFindAllModel([{ id:'error-1', runId:'run-1', testExecutionId:'test-1', reportSubmissionId:'submission-1', message:'boom', stack:'Error: boom' }]),
+    Artifact: createFindAllModel([{ id:'artifact-1', runId:'run-1', testExecutionId:'test-1', reportSubmissionId:'submission-1', kind:'log', label:'failure.log' }]),
+  };
+  const service = createGraphqlQueryService({ models, benchmarkQueryCache:false });
+  const actor = { isGuest:true };
+
+  const failures = await service.listRunFailures({ runId:'run-1', actor, limit:1 });
+  assert.equal(failures.failures.length, 1);
+  assert.equal(failures.failures[0].id, 'test-1');
+
+  const detail = await service.getTestExplorerDetail({ runId:'run-1', testExecutionId:'test-1', actor });
+  assert.equal(detail.owner, 'platform');
+  assert.equal(detail.suite.command, 'node --test');
+  assert.equal(detail.artifacts[0].id, 'artifact-1');
+  assert.equal(await service.getTestExplorerDetail({ runId:'run-1', testExecutionId:'test-2', actor }), null);
+
+  const coverage = await service.listCoverageFilePage({ runId:'run-1', actor, limit:1 });
+  assert.equal(coverage.files.length, 1);
+  assert.equal(coverage.files[0].path, 'src/a.js');
+  assert.equal(coverage.files[0].owner, 'platform');
+  assert.equal(await service.getCoverageFileDetail({ runId:'run-2', coverageFileId:'coverage-file-1', actor }), null);
+});
+
 test('GraphQL exposes guest-safe public reads and hides private resources', async () => {
   const server = await createServer({
     port: 0,

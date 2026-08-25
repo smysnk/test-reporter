@@ -51,8 +51,8 @@ export const WEB_HOME_QUERY = `
 `;
 
 export const WEB_RUN_FEED_PAGE_QUERY = `
-  query WebRunFeedPage($after: String, $projectKey: String) {
-    runFeed(limit: 51, after: $after, projectKey: $projectKey) {
+  query WebRunFeedPage($after: String, $projectKey: String, $status: String, $branch: String, $search: String) {
+    runFeed(limit: 51, after: $after, projectKey: $projectKey, status: $status, branch: $branch, search: $search) {
       id
       externalKey
       status
@@ -150,6 +150,7 @@ export const PROJECT_ACTIVITY_QUERY = `
       completedAt
       durationMs
       summary
+      publicationKinds
       projectVersion {
         versionKey
         buildNumber
@@ -544,6 +545,30 @@ export const RUN_DETAIL_QUERY = `
   }
 `;
 
+export const RUN_PERFORMANCE_QUERY = `
+  query WebRunPerformance($runId: ID!) {
+    run(id: $runId) {
+      id
+      externalKey
+    }
+    runPerformanceStats(runId: $runId, statGroupPrefix: "benchmark.") {
+      id
+      runId
+      suiteRunId
+      testExecutionId
+      completedAt
+      statGroup
+      statName
+      numericValue
+      textValue
+      unit
+      seriesId
+      runnerKey
+      metadata
+    }
+  }
+`;
+
 export const SUITE_TESTS_QUERY = `
   query WebSuiteTests($runId: ID!, $suiteRunId: ID!, $limit: Int!, $after: ID, $status: String, $search: String) {
     testsForSuite(runId: $runId, suiteRunId: $suiteRunId, limit: $limit, after: $after, status: $status, search: $search) {
@@ -572,6 +597,7 @@ export const RUN_HEADER_QUERY = `
       completedAt
       durationMs
       summary
+      publicationKinds
       project {
         key
         slug
@@ -592,6 +618,55 @@ export const RUN_HEADER_QUERY = `
         id
       }
     }
+  }
+`;
+
+export const RUN_WORKSPACE_QUERY = `
+  query WebRunWorkspace($runId: ID!) {
+    run(id: $runId) {
+      id externalKey status branch commitSha sourceProvider sourceRunId sourceUrl triggeredBy
+      startedAt completedAt durationMs summary publicationKinds
+      project { key slug name repositoryUrl defaultBranch }
+      projectVersion { versionKey buildNumber }
+      coverageSnapshot {
+        id linesCovered linesTotal linesPct branchesCovered branchesTotal branchesPct
+        functionsCovered functionsTotal functionsPct statementsCovered statementsTotal statementsPct
+      }
+      suites {
+        id suiteIdentifier label packageName runtime command cwd status durationMs summary warnings
+      }
+      artifacts { id runId suiteRunId testExecutionId label relativePath href kind mediaType sourceUrl }
+    }
+  }
+`;
+
+export const RUN_FAILURES_PAGE_QUERY = `
+  query WebRunFailures($runId: ID!, $limit: Int!, $after: ID, $search: String) {
+    runFailures(runId: $runId, limit: $limit, after: $after, search: $search)
+  }
+`;
+
+export const TEST_EXPLORER_DETAIL_QUERY = `
+  query WebTestExplorerDetail($runId: ID!, $testExecutionId: ID!) {
+    testExplorerDetail(runId: $runId, testExecutionId: $testExecutionId)
+  }
+`;
+
+export const COVERAGE_FILE_PAGE_QUERY = `
+  query WebCoverageFilePage($runId: ID!, $limit: Int!, $after: ID, $search: String, $below: Float, $sort: String) {
+    coverageFilePage(runId: $runId, limit: $limit, after: $after, search: $search, below: $below, sort: $sort)
+  }
+`;
+
+export const COVERAGE_FILE_DETAIL_QUERY = `
+  query WebCoverageFileDetail($runId: ID!, $coverageFileId: ID!) {
+    coverageFileDetail(runId: $runId, coverageFileId: $coverageFileId)
+  }
+`;
+
+export const ARTIFACT_PAGE_QUERY = `
+  query WebArtifactPage($runId: ID!, $limit: Int!, $after: ID, $kind: String, $search: String) {
+    artifactPage(runId: $runId, limit: $limit, after: $after, kind: $kind, search: $search)
   }
 `;
 
