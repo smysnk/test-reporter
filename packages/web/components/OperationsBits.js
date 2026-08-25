@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatDateTime, formatRunBuildLabel, resolveRunBuildNumber } from '../lib/format.js';
-import { resolveRunPresentation } from '../lib/operationsOverview.js';
+import { operationTimestamp, resolveRunPresentation } from '../lib/operationsOverview.js';
 
 export function OperationsStatus({ run }) {
   const presentation = resolveRunPresentation(run);
@@ -23,8 +23,8 @@ export function formatOperationsSummary(run) {
 }
 
 export function formatRelativeTime(value, now = Date.now()) {
-  const parsed = Date.parse(value);
-  if (!Number.isFinite(parsed)) return 'Unavailable';
+  const parsed = operationTimestamp(value);
+  if (!parsed) return 'Unavailable';
   const elapsed = Math.max(0, now - parsed);
   for (const [duration, suffix] of [[86_400_000, 'd'], [3_600_000, 'h'], [60_000, 'm']]) {
     if (elapsed >= duration) return `${Math.floor(elapsed / duration)}${suffix} ago`;

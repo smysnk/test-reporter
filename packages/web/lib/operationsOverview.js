@@ -1,7 +1,12 @@
 export const OPERATIONS_WINDOW_DAYS = 14;
 export const OPERATIONS_PAGE_SIZE = 50;
 
-function timestamp(value) {
+export function operationTimestamp(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    const numeric = Number(value.trim());
+    return Number.isFinite(numeric) ? numeric : 0;
+  }
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -12,7 +17,9 @@ function finite(value) {
 }
 
 function dateKey(value, timeZone = 'UTC') {
-  const parsed = new Date(value);
+  const parsedTimestamp = operationTimestamp(value);
+  if (!parsedTimestamp) return null;
+  const parsed = new Date(parsedTimestamp);
   if (!Number.isFinite(parsed.getTime())) return null;
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone,
@@ -78,7 +85,7 @@ export function buildOperationsSummary(runs) {
     medianDurationMs: median(runList.map((run) => finite(run?.durationMs))),
   };
   const newestCoverageRun = [...runList]
-    .sort((left, right) => timestamp(right?.completedAt) - timestamp(left?.completedAt))
+    .sort((left, right) => operationTimestamp(right?.completedAt) - operationTimestamp(left?.completedAt))
     .find((run) => finite(run?.coverageSnapshot?.linesPct) !== null);
   result.latestCoverage = finite(newestCoverageRun?.coverageSnapshot?.linesPct);
 
@@ -127,7 +134,7 @@ export function buildActivityRows(projects, runs, dateWindow, timeZone = 'UTC') 
       cells: dateWindow.map((day) => {
         const dayRuns = projectRuns
           .filter((run) => dateKey(run?.completedAt, timeZone) === day.key)
-          .sort((left, right) => timestamp(right.completedAt) - timestamp(left.completedAt));
+          .sort((left, right) => operationTimestamp(right.completedAt) - operationTimestamp(left.completedAt));
         const counts = buildProjectDistribution(dayRuns);
         return {
           ...day,
@@ -151,7 +158,7 @@ export function buildCoverageSeries(projects, runs, dateWindow, selectedProjectS
       const latest = runList
         .filter((run) => run?.project?.slug === project.slug && dateKey(run?.completedAt, timeZone) === day.key)
         .filter((run) => finite(run?.coverageSnapshot?.linesPct) !== null)
-        .sort((left, right) => timestamp(right.completedAt) - timestamp(left.completedAt))[0];
+        .sort((left, right) => operationTimestamp(right.completedAt) - operationTimestamp(left.completedAt))[0];
       const value = finite(latest?.coverageSnapshot?.linesPct);
       if (value !== null) values.push(value);
     }
@@ -192,7 +199,7 @@ export function filterOperationRuns(runs, { search = '', status = 'all', day = n
 }
 
 function compareProjectsByActivity(left, right) {
-  const delta = timestamp(right.latestRun?.completedAt) - timestamp(left.latestRun?.completedAt);
+  const delta = operationTimestamp(right.latestRun?.completedAt) - operationTimestamp(left.latestRun?.completedAt);
   return delta || String(left.name || '').localeCompare(String(right.name || ''));
 }
 
@@ -209,7 +216,7 @@ export function buildOperationsOverviewModel({
 } = {}) {
   const projectList = Array.isArray(projects) ? projects : [];
   const runList = [...(Array.isArray(runs) ? runs : [])]
-    .sort((left, right) => timestamp(right.completedAt) - timestamp(left.completedAt));
+    .sort((left, right) => operationTimestamp(right.completedAt) - operationTimestamp(left.completedAt));
   const dateWindow = buildDateWindow({ now, days: windowDays, timeZone });
   const windowKeys = new Set(dateWindow.map((entry) => entry.key));
   const windowRuns = runList.filter((run) => windowKeys.has(dateKey(run?.completedAt, timeZone)));

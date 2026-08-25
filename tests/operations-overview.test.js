@@ -7,6 +7,7 @@ import {
   buildOperationsOverviewModel,
   buildOperationsSummary,
   filterOperationRuns,
+  operationTimestamp,
   resolveNextPage,
 } from '../packages/web/lib/operationsOverview.js';
 
@@ -91,6 +92,21 @@ test('date windows follow the viewer calendar at extreme timezone boundaries', (
     buildDateWindow({ now: new Date('2026-08-25T01:30:00.000Z'), days: 2, timeZone: 'America/Los_Angeles' }).map((day) => day.key),
     ['2026-08-23', '2026-08-24'],
   );
+});
+
+test('operations timestamps accept GraphQL numeric strings as well as ISO values', () => {
+  const completedAt = String(Date.parse('2026-08-25T17:00:00.000Z'));
+  const model = buildOperationsOverviewModel({
+    projects,
+    runs: [{ ...runs[0], completedAt }],
+    now: new Date('2026-08-25T20:00:00.000Z'),
+    timeZone: 'UTC',
+  });
+
+  assert.equal(operationTimestamp(completedAt), Date.parse('2026-08-25T17:00:00.000Z'));
+  assert.deepEqual(model.filteredRuns.map((run) => run.id), ['alpha-failed']);
+  assert.equal(model.activityRows[0].cells.at(-1).counts.failed, 1);
+  assert.equal(model.summary.failed, 1);
 });
 
 test('operations filters compose search, publication status, date, project, and page bounds', () => {

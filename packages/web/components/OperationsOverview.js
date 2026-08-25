@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useDispatch, useSelector } from 'react-redux';
 import { setSelectedProjectSlug, setSelectedRunId, setViewMode } from '../store/index.js';
-import { OPERATIONS_PAGE_SIZE, OPERATIONS_WINDOW_DAYS, buildOperationsOverviewModel, resolveNextPage } from '../lib/operationsOverview.js';
+import { OPERATIONS_PAGE_SIZE, OPERATIONS_WINDOW_DAYS, buildOperationsOverviewModel, operationTimestamp, resolveNextPage } from '../lib/operationsOverview.js';
 import { recordClientPageMark } from '../lib/pageProfiling.js';
 import { OperationsProjectRail } from './OperationsProjectRail.js';
 import { OperationsSummaryStrip } from './OperationsSummaryStrip.js';
@@ -96,7 +96,7 @@ export function OperationsOverview({ data }) {
     setLoadedRuns((current) => {
       const byId = new Map(current.map((run) => [run.id, run]));
       for (const run of incoming) byId.set(run.id, run);
-      return Array.from(byId.values()).sort((left, right) => Date.parse(right.completedAt) - Date.parse(left.completedAt));
+      return Array.from(byId.values()).sort((left, right) => operationTimestamp(right.completedAt) - operationTimestamp(left.completedAt));
     });
   }, []);
 

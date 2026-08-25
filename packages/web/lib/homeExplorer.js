@@ -1,16 +1,12 @@
 import {
   buildOperationsSummary,
   buildOperationsOverviewModel,
+  operationTimestamp,
   resolveRunPresentation,
 } from './operationsOverview.js';
 
-function toTimestamp(value) {
-  const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function compareProjectsByActivity(left, right) {
-  const activityDelta = toTimestamp(right.latestRun?.completedAt) - toTimestamp(left.latestRun?.completedAt);
+  const activityDelta = operationTimestamp(right.latestRun?.completedAt) - operationTimestamp(left.latestRun?.completedAt);
   if (activityDelta !== 0) {
     return activityDelta;
   }
@@ -30,7 +26,7 @@ export function buildProjectActivityRows(projects, runs, limit = HOME_ACTIVITY_R
     project,
     runs: runList
       .filter((run) => run?.project?.slug === project.slug)
-      .sort((left, right) => toTimestamp(right?.completedAt) - toTimestamp(left?.completedAt))
+      .sort((left, right) => operationTimestamp(right?.completedAt) - operationTimestamp(left?.completedAt))
       .slice(0, safeLimit),
   }));
 }
@@ -59,7 +55,7 @@ export function buildHomeExplorerModel({ projects, runs, selectedProjectSlug = n
     runs,
     selectedProjectSlug,
     now: (Array.isArray(runs) ? runs : []).reduce((latest, run) => (
-      toTimestamp(run?.completedAt) > toTimestamp(latest) ? run.completedAt : latest
+      operationTimestamp(run?.completedAt) > operationTimestamp(latest) ? run.completedAt : latest
     ), null) || new Date(),
   });
   const projectList = Array.isArray(projects) ? projects : [];
@@ -73,7 +69,7 @@ export function buildHomeExplorerModel({ projects, runs, selectedProjectSlug = n
           return run;
         }
 
-        return toTimestamp(run?.completedAt) > toTimestamp(latest?.completedAt) ? run : latest;
+        return operationTimestamp(run?.completedAt) > operationTimestamp(latest?.completedAt) ? run : latest;
       }, null);
       const latestRun = project.latestRunId
         ? {
