@@ -36,6 +36,33 @@ KUBECONFIG_PATH=""
 RESTART_AFTER_SYNC="0"
 WAIT_SECONDS="600"
 
+dump_rollout_diagnostics() {
+  local deployment="$1"
+  echo "Rollout diagnostics for deployment/${deployment} in namespace/${APP_NAMESPACE}" >&2
+  kubectl -n "$APP_NAMESPACE" get deployment "$deployment" -o wide >&2 || true
+  kubectl -n "$APP_NAMESPACE" describe deployment "$deployment" >&2 || true
+  local selector
+  selector="$(kubectl -n "$APP_NAMESPACE" get deployment "$deployment" -o jsonpath='{range $key,$value := .spec.selector.matchLabels}{$key}={$value},{end}' 2>/dev/null || true)"
+  selector="${selector%,}"
+  if [[ -z "$selector" ]]; then return; fi
+  kubectl -n "$APP_NAMESPACE" get pods -l "$selector" -o wide >&2 || true
+  while IFS= read -r pod; do
+    [[ -n "$pod" ]] || continue
+    kubectl -n "$APP_NAMESPACE" describe pod "$pod" >&2 || true
+    kubectl -n "$APP_NAMESPACE" logs "$pod" --all-containers --tail=200 >&2 || true
+    kubectl -n "$APP_NAMESPACE" logs "$pod" --all-containers --previous --tail=200 >&2 || true
+  done < <(kubectl -n "$APP_NAMESPACE" get pods -l "$selector" -o name 2>/dev/null)
+}
+
+wait_for_rollout() {
+  local deployment="$1"
+  echo "Waiting for rollout of deployment/${deployment} in namespace/${APP_NAMESPACE}"
+  if ! kubectl -n "$APP_NAMESPACE" rollout status deployment "$deployment" --timeout="${WAIT_SECONDS}s"; then
+    dump_rollout_diagnostics "$deployment"
+    return 1
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --gitrepo-file)
@@ -156,14 +183,9 @@ if [[ "$RESTART_AFTER_SYNC" == "1" ]]; then
   kubectl -n "$APP_NAMESPACE" rollout restart deployment "$INGEST_DEPLOYMENT"
 fi
 
-echo "Waiting for rollout of deployment/${WEB_DEPLOYMENT} in namespace/${APP_NAMESPACE}"
-kubectl -n "$APP_NAMESPACE" rollout status deployment "$WEB_DEPLOYMENT" --timeout="${WAIT_SECONDS}s"
-
-echo "Waiting for rollout of deployment/${SERVER_DEPLOYMENT} in namespace/${APP_NAMESPACE}"
-kubectl -n "$APP_NAMESPACE" rollout status deployment "$SERVER_DEPLOYMENT" --timeout="${WAIT_SECONDS}s"
-
-echo "Waiting for rollout of deployment/${INGEST_DEPLOYMENT} in namespace/${APP_NAMESPACE}"
-kubectl -n "$APP_NAMESPACE" rollout status deployment "$INGEST_DEPLOYMENT" --timeout="${WAIT_SECONDS}s"
+wait_for_rollout "$WEB_DEPLOYMENT"
+wait_for_rollout "$SERVER_DEPLOYMENT"
+wait_for_rollout "$INGEST_DEPLOYMENT"
 
 echo "Deployment complete. Current resources:"
 kubectl -n "$APP_NAMESPACE" get deploy,svc,ingress,configmap,secret
