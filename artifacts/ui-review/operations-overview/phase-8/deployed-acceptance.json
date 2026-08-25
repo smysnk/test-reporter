@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-25T19:19:33Z",
+  "target": {
+    "commit": "ff87936f068e18cd9d7b436c427aec9b43c5a8ad",
+    "image": "ghcr.io/smysnk/test-station:sha-ff87936f068e18cd9d7b436c427aec9b43c5a8ad",
+    "imageDigest": "sha256:28c6cc335a9a0df8ae2b1c88c746574b1797f15ef8ebc856856d845669dd9015",
+    "workflowRun": 32887549696,
+    "workflowUrl": "https://github.com/smysnk/test-station/actions/runs/32887549696"
+  },
+  "runtime": {
+    "healthStatus": 200,
+    "readyStatus": 200,
+    "webRevision": "ff87936f068e18cd9d7b436c427aec9b43c5a8ad",
+    "serverRevision": "ff87936f068e18cd9d7b436c427aec9b43c5a8ad",
+    "expectedMigration": "20260824_bounded_read_indexes",
+    "appliedMigration": "20260824_bounded_read_indexes",
+    "publicProjectCount": 7,
+    "initialLoadedPublications": 50,
+    "windowPublications": 12,
+    "visibleRows": 12,
+    "failedEvidenceRunId": "e4aed381-1127-4c77-a5d9-585aa6ac1c61",
+    "failedEvidenceStatus": 200,
+    "horizontalOverflowAt1660": false,
+    "horizontalOverflowAt390": false,
+    "consoleWarnings": 0,
+    "consoleErrors": 0
+  },
+  "browserP95": {
+    "sampleCount": 5,
+    "homeReadyMs": 651.6,
+    "homeBudgetMs": 1000,
+    "timeToFirstByteMs": 477.4,
+    "firstContentfulPaintMs": 588,
+    "largestContentfulPaintMs": 588,
+    "cumulativeLayoutShift": 0,
+    "decodedBodySizeBytes": 72782,
+    "domNodeCount": 326,
+    "projectFocusMs": 352.3,
+    "clearProjectFocusMs": 327.4,
+    "projectPageReadyMs": 404.1,
+    "runNavigationMs": 355,
+    "runnerReportReadyMs": 1094.7,
+    "operationsViewSwitchMs": 1047.4,
+    "suiteExpansionMs": 85.8,
+    "paginatedTestFetchMs": 98.6,
+    "projectPageNavigationMs": 138.6
+  },
+  "mixedLoad": {
+    "readers": 25,
+    "requestCount": 75,
+    "p95Ms": 4059.58,
+    "fiveXxCount": 0,
+    "failureCount": 0,
+    "ingestStatus": 200,
+    "ingestDurationMs": 4077.97,
+    "passed": true
+  },
+  "verification": {
+    "repositoryTestsPassed": 196,
+    "repositoryTestsFailed": 0,
+    "liveInteractionsPassed": 6,
+    "liveInteractionsSkipped": 2,
+    "releaseWorkflowPassed": true,
+    "deployedBenchmarkPassed": true,
+    "publicGuestAccepted": true,
+    "authenticatedAdminAccepted": false,
+    "authenticatedAdminBlocker": "Available browser sessions are signed out; Google sign-in requires explicit confirmation."
+  }
+}

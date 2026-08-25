@@ -4,11 +4,11 @@
 
 ## Status
 
-- Active implementation plan.
+- Implemented and deployed; public/guest acceptance is complete. Authenticated/admin runtime acceptance remains pending because the available browser sessions are signed out.
 - Reference image: `docs/assets/operations-overview-observability-console-concept.png`.
 - Primary route: `/`.
 - The work should be delivered in visually reviewed slices. Every slice ends with a real render, a comparison against the reference, and an interaction/test pass before the next slice starts.
-- All implementation phases are complete and validated locally on `codex/dense-operations-overview`. Production acceptance remains pending until the exact commit and image are deployed and verified.
+- Phases 0–7 are accepted on the deployed revision. Phase 8 is accepted for release, performance, public data, responsive behavior, and failure evidence; only its authenticated/admin viewer check remains pending.
 
 ### Current implementation checkpoint
 
@@ -23,9 +23,9 @@ The current worktree completes the planned condensed-view implementation:
 - lazy authorized failure evidence with caching, direct selected-run URLs, unavailable/error/retry states, and report/source actions;
 - pauseable 60-second refresh with last-good stale/error handling;
 - preserved project visibility filtering, cursor feed loading, performance hooks, direct run navigation, and Redux navigation context;
-- focused query/model/browser tests, the full `195/195` repository suite, syntax lint, a real Next.js production build, and retained review artifacts at all required viewports.
+- focused query/model/browser tests, the full `196/196` repository suite, syntax lint, a real Next.js production build, and retained review artifacts at all required viewports.
 
-The remaining acceptance boundary is rollout: commit the exact scope, build and deploy its image, then retain revision/image/runtime proof.
+Production runs revision `ff87936f068e18cd9d7b436c427aec9b43c5a8ad` from image digest `sha256:28c6cc335a9a0df8ae2b1c88c746574b1797f15ef8ebc856856d845669dd9015`. Release, runtime, and machine-readable evidence are retained below and under `artifacts/ui-review/operations-overview/phase-8`. The only open acceptance item is a signed-in browser session for authenticated/admin review.
 
 ## Product Intent
 
@@ -300,15 +300,15 @@ Status meanings:
 
 | Phase | Current status | Next decisive deliverable |
 | --- | --- | --- |
-| 0. Baseline and review harness | complete-local | Accept retained baseline/final screenshots and machine-readable timings with the deployed revision |
-| 1. Compact application shell | complete-local | Verify the compact shell on the deployed overview and a non-overview route |
-| 2. Project rail and shared model | complete-local | Verify authorized project scope against production data |
-| 3. Summary strip | complete-local | Verify production metrics and unavailable states |
-| 4. Activity and coverage band | complete-local | Verify production 14-day buckets and coverage points |
-| 5. Dense run grid and selection | complete-local | Verify deployed URL/filter/pagination behavior |
-| 6. Failure evidence inspector | complete-local | Verify one deployed failed run end to end |
-| 7. Refresh, resilience, responsive, accessibility | complete-local | Verify production live/stale state and responsive captures |
-| 8. Performance and rollout | complete-local | Commit, deploy, and record revision/image/runtime evidence |
+| 0. Baseline and review harness | accepted | Baseline/final screenshots and machine-readable timings retained with the deployed revision |
+| 1. Compact application shell | accepted | Compact shell verified on the deployed overview and `/auth/signin` |
+| 2. Project rail and shared model | accepted | Public authorized project scope verified against production data |
+| 3. Summary strip | accepted | Production metrics and unavailable coverage state verified |
+| 4. Activity and coverage band | accepted | Production 14-day buckets and unavailable coverage series verified |
+| 5. Dense run grid and selection | accepted | Deployed URL/filter/pagination behavior and project/run navigation verified |
+| 6. Failure evidence inspector | accepted | Deployed failed run `e4aed381-1127-4c77-a5d9-585aa6ac1c61` verified end to end |
+| 7. Refresh, resilience, responsive, accessibility | accepted | Live state, keyboard flows, 390px/desktop layout, and zero-overflow captures verified |
+| 8. Performance and rollout | partial | Release and public performance accepted; authenticated/admin browser acceptance awaits a signed-in session |
 
 Each phase advances only when its exit criteria and evidence are complete. Local visual success does not change a phase to `accepted`.
 
@@ -466,6 +466,23 @@ Final acceptance criteria:
 | Playwright interactions | scope, search, heatmap filter, row selection, URL state, open run, close inspector, refresh persistence |
 | Playwright performance | home ready, first row ready, row-to-run navigation, evidence request timing |
 | Manual visual review | reference viewport, responsive viewports, long values, empty data, active failure, stale data |
+
+## Deployment Acceptance Evidence
+
+- Application revision: `ff87936f068e18cd9d7b436c427aec9b43c5a8ad`.
+- Image: `ghcr.io/smysnk/test-station:sha-ff87936f068e18cd9d7b436c427aec9b43c5a8ad` at `sha256:28c6cc335a9a0df8ae2b1c88c746574b1797f15ef8ebc856856d845669dd9015`.
+- Release workflow: [Main Release Pipeline 32887549696](https://github.com/smysnk/test-station/actions/runs/32887549696), successful including validation, image publication, Fleet rollout, deployed benchmarks, mixed-load reliability, and checkpoint publication. The dispatch used `publish_npm=false` and `deploy_fleet=true`.
+- Runtime health: `/api/healthz` and `/api/readyz` returned `200`; web and read-server revisions matched the target, and expected/applied migration `20260824_bounded_read_indexes` matched.
+- Production data: 7 public projects, 50 initially loaded publications, and 12 publications in the viewer-local 14-day window. The deployed summary showed 12/12 passed, 0 failed, 2.1 s median duration, and an honest unavailable coverage state.
+- Production integration fix: GraphQL timestamps arrive as millisecond strings. Revision `8cc4fcb` centralized numeric-string/ISO timestamp parsing after the first deployment revealed an empty 14-day view; a regression test now covers that wire representation.
+- Failure evidence: direct selection of failed run `e4aed381-1127-4c77-a5d9-585aa6ac1c61` returned `200` and rendered the failed test, location, message, missing-stack state, metadata, and unavailable report/log reason outside the loaded feed.
+- Browser behavior: the deployed 1660px and 390px views had no body-level horizontal overflow; activity exposed 14 labeled days; the narrow inspector rendered as a fixed bottom sheet; and the review browser reported no console warnings or errors.
+- Interaction suite: 6 live navigation/overview checks passed and 2 benchmark-dashboard checks skipped because no matching public benchmark dashboard data was present.
+- Deployed p95 browser gates over five measured samples: home ready `651.6 ms` (`1,000 ms` budget), project focus `352.3 ms`, project clear `327.4 ms`, project page ready `404.1 ms`, run navigation `355.0 ms`, runner report ready `1,094.7 ms`, operations view switch `1,047.4 ms`, suite expansion `85.8 ms`, paginated test fetch `98.6 ms`, and project navigation `138.6 ms`.
+- Deployed home p95 supporting metrics: TTFB `477.4 ms`, FCP/LCP `588 ms`, CLS `0`, decoded HTML `72,782 B`, 326 DOM nodes, and 12 visible rows.
+- Reliability: the 25-reader/75-request mixed-load gate passed with zero failures and zero `5xx` responses; p95 was `4,059.58 ms` while a large ingest completed with `200` in `4,077.97 ms`.
+- Machine-readable summary: `artifacts/ui-review/operations-overview/phase-8/deployed-acceptance.json`. The immutable workflow artifacts are `self-benchmark-phase-6-1` and `checkpoint-phase-6-1` on the release run.
+- Pending: both isolated and Chrome sessions were guest-only. The Google sign-in action requires explicit confirmation before account identity is transmitted, so authenticated/admin runtime acceptance is not claimed.
 
 ## Explicit Non-goals for the First Release
 

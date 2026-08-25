@@ -93,7 +93,7 @@ test('run detail project links navigate back to the project page when clicked', 
   await projectLink.click();
 
   await page.waitForURL(new RegExp(`/projects/${escapeRegExp(projectSlug)}(?:\\?|$)`), { timeout: 15_000 });
-  await expect(page.getByText('Execution feed', { exact: true })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText('Test Runs', { exact: true })).toBeVisible({ timeout: 45_000 });
 });
 
 async function goToPublicHome(page) {
@@ -119,7 +119,7 @@ async function goToPublicProjectPage(page) {
 
   await page.goto(`/projects/${projectSlug}`);
   await page.waitForURL(new RegExp(`/projects/${escapeRegExp(projectSlug)}(?:\\?|$)`), { timeout: 45_000 });
-  await expect(page.getByText('Execution feed', { exact: true })).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByText('Test Runs', { exact: true })).toBeVisible({ timeout: 45_000 });
 
   return projectSlug;
 }
@@ -159,6 +159,9 @@ async function getFirstRunRow(page) {
 }
 
 async function getFirstProjectRunLink(page) {
+  await page.getByText('Loading project activity…', { exact: true })
+    .waitFor({ state: 'hidden', timeout: 45_000 })
+    .catch(() => {});
   const runLink = page.locator(runLinkSelector).first();
   test.skip(await runLink.count() === 0, 'No project execution-feed run links are visible to click.');
   await expect(runLink).toBeVisible();

@@ -49,6 +49,15 @@ Generated: 2026-08-25
 - `phase-8/final-390x844-inspector.png`
 - `phase-8/final-performance-warm.json`
 
+### Phase 8 deployed
+
+- `phase-8/deployed-1660x948.png`
+- `phase-8/deployed-1660x948-activity.png`
+- `phase-8/deployed-1660x948-failure-inspector.png`
+- `phase-8/deployed-390x844.png`
+- `phase-8/deployed-390x844-failure-inspector.png`
+- `phase-8/deployed-acceptance.json`
+
 ### Vertical-slice captures
 
 - Phase 1: `phase-1/compact-shell-1660x948.png`
@@ -77,13 +86,19 @@ The serialized `__NEXT_DATA__` payload measured 34,438 characters for 50 rows. C
 
 ## Verification
 
-- Repository tests: 195 passed, 0 failed
-- Syntax lint: 203 web and 58 server JavaScript files checked through the repository lint command
+- Repository tests: 196 passed, 0 failed
+- Syntax lint: 204 web and 58 server JavaScript files checked through the repository lint command
 - Next.js production build: successful; `/api/runs/[id]/failure-evidence` registered as a dynamic API route
 - Focused Playwright interactions: coordinated project/day/status/search URL state and inspector focus restoration passed
 - Focused Playwright performance: 1,000 ms home and 750 ms evidence budgets passed
 - Browser review: zero console warnings/errors in the final activity view
 - Non-overview regression: `/auth/signin` retained its existing shell and had no overflow or server error
+- Deployed revision: `ff87936f068e18cd9d7b436c427aec9b43c5a8ad`
+- Deployed image digest: `sha256:28c6cc335a9a0df8ae2b1c88c746574b1797f15ef8ebc856856d845669dd9015`
+- Release workflow: `32887549696`, all jobs passed including the deployed benchmark and 25-reader reliability gate
+- Live interactions: 6 passed, 2 benchmark-dashboard checks skipped for absent public benchmark data
+- Live guest data: 7 projects, 12 publications in the 14-day window, and a direct older failed-run evidence request rendered successfully
+- Authenticated/admin browser verification remains pending because available sessions are signed out and Google sign-in requires explicit user confirmation
 
 ## Gap log
 
