@@ -1804,6 +1804,23 @@ test('web GraphQL helpers and proxy allow anonymous public reads without actor h
   assert.equal(requests[1].headers['x-test-station-parent-request-id'], 'proxy-guest');
 });
 
+test('anonymous home shell cache bounds repeated production reads without caching viewer sessions', async () => {
+  let requests = 0;
+  const fetchImpl = async () => {
+    requests += 1;
+    return new Response(JSON.stringify({ data: {
+      viewer:null,
+      projects:[{ id:'project-cache', key:'cache', slug:'cache', name:'Cache' }],
+      runFeed:[],
+    } }), { status:200, headers:{ 'content-type':'application/json' } });
+  };
+  const first = await loadWebHomePage({ session:null, fetchImpl, cacheTtlMs:15_000 });
+  const second = await loadWebHomePage({ session:null, fetchImpl, cacheTtlMs:15_000 });
+  assert.equal(first.projects[0].key, 'cache');
+  assert.equal(second.projects[0].key, 'cache');
+  assert.equal(requests, 1);
+});
+
 test('web SSR page result builders allow guest public pages and return notFound for private resources', async () => {
   const store = createStoreStub();
   const session = null;

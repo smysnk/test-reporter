@@ -49,6 +49,7 @@ import {
 
 export const ADMIN_PAGE_UNAUTHORIZED = Symbol('test-station.admin-page-unauthorized');
 const INITIAL_HOME_RUN_LIMIT = 50;
+let anonymousHomeShellCache = null;
 const renderedReportCache = new Map();
 const renderedReportCacheDirectory = path.join(os.tmpdir(), 'test-station-rendered-reports');
 
@@ -155,7 +156,11 @@ export async function executeWebGraphql({ session, query, variables = {}, fetchI
   return result.data;
 }
 
-export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null }) {
+export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = null, requestTrace = null, profiler = null, cacheTtlMs = 0 }) {
+  const now = Date.now();
+  if (!session && cacheTtlMs > 0 && anonymousHomeShellCache?.expiresAt > now) {
+    return anonymousHomeShellCache.data;
+  }
   const result = await measureProfileStep(profiler, 'home-feed-query', () => executeWebGraphqlRequest({
     session,
     query: WEB_HOME_QUERY,
@@ -168,7 +173,7 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
   }));
   const data = result.data;
 
-  return {
+  const home = {
     viewer: data.viewer || data.me || null,
     projects: Array.isArray(data.projects) ? data.projects : [],
     runs: Array.isArray(data.runFeed)
@@ -176,6 +181,8 @@ export async function loadWebHomePage({ session, fetchImpl = fetch, requestId = 
       : [],
     hasMoreRuns: Array.isArray(data.runFeed) && data.runFeed.length > INITIAL_HOME_RUN_LIMIT,
   };
+  if (!session && cacheTtlMs > 0) anonymousHomeShellCache = { data: home, expiresAt: now + cacheTtlMs };
+  return home;
 }
 
 export async function loadWebRunFeedPage({ session, after = null, projectKey = null, status = null, branch = null, search = null, fetchImpl = fetch, requestId = null, requestTrace = null }) {

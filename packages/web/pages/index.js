@@ -22,6 +22,7 @@ export const getServerSideProps = wrapper.getServerSideProps((store) => async (c
     requestId: typeof context.req.headers['x-request-id'] === 'string' ? context.req.headers['x-request-id'] : null,
     requestTrace,
     profiler: pageProfiler,
+    cacheTtlMs: session ? 0 : 15_000,
   });
   const pageProfile = pageProfiler.finalize({
     trace: requestTrace,
