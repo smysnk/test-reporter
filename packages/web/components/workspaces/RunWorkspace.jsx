@@ -41,6 +41,13 @@ export function RunWorkspace({ initialData }) {
     const retry = setTimeout(shell.retry, 1000);
     return () => clearTimeout(retry);
   }, [data?.transient, shell.error, shell.retry]);
+  React.useEffect(() => {
+    const projectSlug = run?.project?.slug;
+    if (!projectSlug) return;
+    const encodedSlug = encodeURIComponent(projectSlug);
+    prefetchBffResource(`/api/projects/${encodedSlug}/workspace`);
+    prefetchBffResource(`/api/projects/${encodedSlug}/runs?`);
+  }, [run?.project?.slug]);
   if (!run || !presentation) return <div className={styles.state}>Run unavailable.</div>;
   const summary = run.summary || {};
   const tabItems = presentation.availableViews.map((view) => ({
@@ -157,7 +164,7 @@ function ArtifactsMode({ run, state, update }) {
 function ArtifactList({ artifacts }) { return <section><h3>Artifacts</h3><div className={styles.list}>{artifacts.map((artifact) => <a className={styles.listRow} key={artifact.id} href={artifact.href || artifact.sourceUrl || '#'} target="_blank" rel="noreferrer"><span>▱</span><span>{artifact.label || artifact.relativePath || artifact.id}<small>{artifact.kind} · {artifact.relativePath || 'stored evidence'}</small></span><b>↗</b></a>)}</div></section>; }
 function ArtifactTable({ artifacts }) { return <div className={styles.tableWrap}><table className={styles.table}><thead><tr><th>Name</th><th>Kind</th><th>Scope</th><th>Media type</th><th /></tr></thead><tbody>{artifacts.map((artifact) => <tr key={artifact.id}><td>{artifact.label || artifact.relativePath || artifact.id}</td><td>{artifact.kind}</td><td>{artifact.testExecutionId ? 'test' : artifact.suiteRunId ? 'suite' : 'run'}</td><td>{artifact.mediaType || 'n/a'}</td><td>{artifact.href || artifact.sourceUrl ? <a className={styles.link} href={artifact.href || artifact.sourceUrl} target="_blank" rel="noreferrer">Open ↗</a> : 'stored'}</td></tr>)}</tbody></table></div>; }
 
-function RunnerReportMode({ run }) { React.useEffect(() => { if (typeof performance !== 'undefined') performance.mark('runner-report-ready'); }, []); return <iframe className={styles.report} title={`Runner report for ${run.externalKey}`} src={`/api/runs/${encodeURIComponent(run.id)}/report`} scrolling="no" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" />; }
+function RunnerReportMode({ run }) { React.useEffect(() => { if (typeof performance !== 'undefined') performance.mark('runner-report-ready'); }, []); return <iframe className={styles.report} title={`Runner report for ${run.externalKey}`} src={`/api/runs/${encodeURIComponent(run.id)}/report?view=compact`} scrolling="no" sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox" />; }
 
 function suiteTotal(suite) {
   return suite?.summary?.totalTests ?? suite?.summary?.total ?? null;

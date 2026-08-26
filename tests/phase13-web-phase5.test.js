@@ -3208,7 +3208,8 @@ test('unified runner report mode keeps the report in the shared run workspace', 
   assert.match(runPageSource, /RunWorkspace/);
   assert.match(runWorkspaceSource, /scrolling="no"/);
   assert.match(runWorkspaceSource, /Runner report/);
-  assert.match(runWorkspaceSource, /\/api\/runs\/\$\{encodeURIComponent\(run\.id\)\}\/report/);
+  assert.match(runWorkspaceSource, /\/api\/runs\/\$\{encodeURIComponent\(run\.id\)\}\/report\?view=compact/);
+  assert.match(runWorkspaceSource, /prefetchBffResource\(`\/api\/projects\/\$\{encodedSlug\}\/runs\?`\)/);
 });
 
 test('legacy run template URLs redirect into addressable unified workspace modes', () => {
